@@ -15,11 +15,17 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Resolve hono types through client's copy to avoid version mismatch */
+    "paths": {
+      "hono": ["./node_modules/hono"],
+      "hono/*": ["./node_modules/hono/*"]
+    },
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["app", ".react-router/types/**/*"]
 }
