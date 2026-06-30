@@ -4,10 +4,10 @@ import { authMiddleware } from '../middleware/auth'
 
 const app = new Hono<AppEnv>()
 
-const equipmentRoute = app
+const calendarRoute = app
   .use('/*', authMiddleware)
-  .get('/list', (c) => {
-    return c.json({ message: '備品管理機能は準備中です', data: [] })
+  .get('/events', (c) => {
+    return c.json({ message: 'カレンダー機能は準備中です', events: [] })
   })
 
-export default equipmentRoute
+export default calendarRoute
