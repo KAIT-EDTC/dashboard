@@ -1,0 +1,12 @@
+{
+  "name": "edtc-mypage",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n client,server -c cyan,magenta \"cd client && npm run dev\" \"cd server && npm run dev\"",
+    "dev:client": "cd client && npm run dev",
+    "dev:server": "cd server && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
