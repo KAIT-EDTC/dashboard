@@ -4,13 +4,17 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy --minify",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "wrangler d1 migrations apply edtc-dashboard --local"
   },
   "dependencies": {
-    "hono": "^4.12.18"
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.27"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260515.1",
+    "drizzle-kit": "^0.31.10",
     "wrangler": "^4.4.0"
   }
 }
