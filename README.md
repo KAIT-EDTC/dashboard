@@ -141,14 +141,44 @@ npm run dev                        # client: http://localhost:5173 / server: htt
 3. App ID を `GITHUB_APP_ID`、秘密鍵（ダウンロードしたPEMのまま）を `GITHUB_APP_PRIVATE_KEY` に設定
 4. 記事フォルダの置き場所は `wrangler.jsonc` の `BLOG_CONTENT_DIR`（既定 `content/blog`）。公開通知で記事URLを出したい場合は `BLOG_SITE_URL`（例: `https://kaitedtc.com`）
 
-### デプロイ（Cloudflare）
+### デプロイ（Cloudflare Workers）
+
+1つのWorkerが、静的ファイル（client）と `/api/*` を同じオリジンから配信する（`server/wrangler.jsonc` の `env.production`）。同一オリジンなのでCORSも `COOKIE_DOMAIN` も不要。
+
+> **公開URLについて**: 現在は `https://edtc-dashboard.<アカウントのサブドメイン>.workers.dev`。`kaitedtc.com` のDNSはさくらインターネットにあり、WorkersのカスタムドメインはCloudflareのゾーンが必須のため、`dashboard.kaitedtc.com` にはまだできていない。移行できるようになったら、`wrangler.jsonc` の `workers_dev` を外して `routes`（`custom_domain: true`）を足し、`FRONTEND_URL`・`DISCORD_REDIRECT_URI`・DiscordのRedirects・GitHub AppのWebhook URLを新しいURLに合わせる。
+
+**初回のみ**
 
 ```sh
 cd server
-npx wrangler d1 create edtc-dashboard     # 出力された database_id を wrangler.jsonc に反映
-npm run db:migrate:remote
-npx wrangler secret put JWT_SECRET        # 他の秘密情報も同様に
-npm run deploy
+npx wrangler login
+npx wrangler d1 create edtc-dashboard
+#   → 出力された database_id を wrangler.jsonc の env.production.d1_databases に貼る
+npm run db:migrate:remote                                # テーブルを作る
+
+# 秘密情報（値を聞かれる）。GitHub App の鍵は  < your-app.pem  でファイルから渡す
+npx wrangler secret put JWT_SECRET --env production                  # openssl rand -hex 32
+npx wrangler secret put DISCORD_CLIENT_ID --env production
+npx wrangler secret put DISCORD_CLIENT_SECRET --env production
+npx wrangler secret put DISCORD_REDIRECT_URI --env production        # https://<公開URL>/api/auth/callback
+npx wrangler secret put DISCORD_GUILD_ID --env production
+npx wrangler secret put DISCORD_ADMIN_ROLE_IDS --env production
+npx wrangler secret put DISCORD_WEBHOOK_URL --env production
+npx wrangler secret put DISCORD_BLOG_REVIEWER_ROLE_ID --env production   # 任意
+npx wrangler secret put GITHUB_APP_ID --env production
+npx wrangler secret put GITHUB_APP_PRIVATE_KEY --env production < your-app.pem
+npx wrangler secret put GITHUB_WEBHOOK_SECRET --env production
 ```
 
-`wrangler.jsonc` の `FRONTEND_URL` は本番のURLに変える（CORS許可とOAuth後のリダイレクト先）。APIとフロントを別サブドメインに置く場合は `COOKIE_DOMAIN`（例: `.kaitedtc.com`）を設定する。client は `VITE_API_URL` を指定してビルドし、`client/build/client` を静的ホスティング（Cloudflare Pages など）に置く。SPAなので全パスを `index.html` にフォールバックさせること。
+デプロイ後に外部サービス側のURLも本番向けにする。
+
+- Discord Developer Portal → OAuth2 → Redirects に `https://<公開URL>/api/auth/callback` を追加
+- GitHub App → Webhook URL を `https://<公開URL>/api/webhooks/github` に設定し、購読イベント（Pull request / Pull request review / Issue comment）にチェック
+
+**デプロイ（毎回）**
+
+```sh
+npm run deploy    # client をビルドして wrangler deploy --env production
+```
+
+スキーマを変えた回は、デプロイの前に `npm run db:generate` でマイグレーションを作り、`npm run db:migrate:remote` を実行する。

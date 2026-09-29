@@ -1,9 +1,12 @@
 {
   "$schema": "../node_modules/wrangler/config-schema.json",
-  "name": "edtc-dashboard-api",
+  "name": "edtc-dashboard",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
+
+  // ---- ローカル開発（wrangler dev）用 ------------------------------------
+  // FRONTEND_URL などの値は server/.dev.vars で上書きできる
   "vars": {
     // フロントエンドのURL（CORS許可・OAuth後のリダイレクト先）
     "FRONTEND_URL": "http://localhost:5173",
@@ -18,5 +21,37 @@
       "database_id": "local-dev-db",
       "migrations_dir": "drizzle"
     }
-  ]
+  ],
+
+  // ---- 本番（wrangler deploy --env production） ---------------------------
+  // 1つのWorkerで静的ファイル(client)と /api/* を同じオリジンから配信する
+  "env": {
+    "production": {
+      "name": "edtc-dashboard",
+      // 独自ドメイン(dashboard.kaitedtc.com)はDNSがCloudflare外(さくら)のため、当面は workers.dev で公開する。
+      // ドメインをCloudflareに移したら: workers_dev を外し、routes: [{ "pattern": "dashboard.kaitedtc.com", "custom_domain": true }] を追加
+      "workers_dev": true,
+      "preview_urls": false,
+      "assets": {
+        "directory": "../client/build/client",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*"]
+      },
+      "vars": {
+        // 独自ドメインに移したら https://dashboard.kaitedtc.com に戻す（OAuthのリダイレクトURIなども合わせる）
+        "FRONTEND_URL": "https://edtc-dashboard.famigb.workers.dev",
+        "BLOG_REPO": "KAIT-EDTC/EDTCHP",
+        "BLOG_CONTENT_DIR": "content/blog",
+        "BLOG_SITE_URL": "https://kaitedtc.com"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "edtc-dashboard",
+          "database_id": "d210279f-a0dd-4c16-ab9e-d965c0ad845b",
+          "migrations_dir": "drizzle"
+        }
+      ]
+    }
+  }
 }

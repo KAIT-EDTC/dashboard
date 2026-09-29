@@ -16,7 +16,8 @@
     "typecheck": "npm run typecheck --workspaces",
     "lint": "npm run lint -w client",
     "db:generate": "npm run db:generate -w server",
-    "db:migrate": "npm run db:migrate -w server"
+    "db:migrate": "npm run db:migrate -w server",
+    "deploy": "npm run build && npm run deploy -w server"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

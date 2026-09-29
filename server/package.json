@@ -7,11 +7,11 @@
   },
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy --minify",
+    "deploy": "wrangler deploy --env production --minify",
     "typecheck": "tsc",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "wrangler d1 migrations apply edtc-dashboard --local",
-    "db:migrate:remote": "wrangler d1 migrations apply edtc-dashboard --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply edtc-dashboard --remote --env production"
   },
   "dependencies": {
     "@edtc/shared": "*",
