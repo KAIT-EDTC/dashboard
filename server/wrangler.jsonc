@@ -1,11 +1,16 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
+  "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "edtc-dashboard-api",
   "main": "src/index.ts",
-  "compatibility_date": "2026-05-14",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    // フロントエンドのURL（CORS許可・OAuth後のリダイレクト先）
+    "FRONTEND_URL": "http://localhost:5173",
+    // ブログ記事のPR先リポジトリと、記事フォルダを置くディレクトリ
+    "BLOG_REPO": "KAIT-EDTC/EDTCHP",
+    "BLOG_CONTENT_DIR": "content/blog"
+  },
   "d1_databases": [
     {
       "binding": "DB",

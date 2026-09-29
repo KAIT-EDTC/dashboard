@@ -1,19 +1,27 @@
-import { type RouteConfig, index, layout, route } from "@react-router/dev/routes";
+import { index, layout, prefix, route, type RouteConfig } from '@react-router/dev/routes'
 
 export default [
-  /* Public routes */
-  route("login", "./routes/login.tsx"),
-  route("register", "./routes/register.tsx"),
+  route('login', 'routes/login.tsx'),
+  route('register', 'routes/register.tsx'),
 
-  /* Protected routes - wrapped by AuthGuard + Dashboard layout */
-  layout("./routes/_auth.tsx", [
-    route("dashboard", "./routes/_auth.dashboard.tsx"),
-    route("blog/new", "./routes/_auth.blog.new.tsx"),
-    route("members", "./routes/_auth.members.tsx"),
-    route("equipment", "./routes/_auth.equipment.tsx"),
-    route("calendar", "./routes/_auth.calendar.tsx"),
+  // ログインが必要な画面（routes/app-layout.tsx の clientLoader で認証する）
+  layout('routes/app-layout.tsx', { id: 'app' }, [
+    index('routes/home.tsx'),
+    ...prefix('events', [
+      index('routes/events/list.tsx'),
+      route('new', 'routes/events/new.tsx'),
+      route(':eventId', 'routes/events/detail.tsx'),
+      route(':eventId/edit', 'routes/events/edit.tsx'),
+    ]),
+    ...prefix('blog', [
+      index('routes/blog/list.tsx'),
+      route(':postId', 'routes/blog/post.tsx'),
+    ]),
+    ...prefix('members', [
+      index('routes/members/list.tsx'),
+      route(':memberId', 'routes/members/detail.tsx'),
+    ]),
+    route('profile', 'routes/profile.tsx'),
+    route('*', 'routes/not-found.tsx'),
   ]),
-
-  /* Catch-all redirect to dashboard */
-  route("*", "./routes/catchall.tsx"),
-] satisfies RouteConfig;
+] satisfies RouteConfig
