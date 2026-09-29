@@ -17,7 +17,8 @@
     "lint": "npm run lint -w client",
     "db:generate": "npm run db:generate -w server",
     "db:migrate": "npm run db:migrate -w server",
-    "deploy": "npm run build && npm run deploy -w server"
+    "deploy": "npm run build && npm run deploy -w server",
+    "db:migrate:remote": "npm run db:migrate:remote -w server"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

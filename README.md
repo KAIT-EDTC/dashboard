@@ -145,15 +145,16 @@ npm run dev                        # client: http://localhost:5173 / server: htt
 
 1つのWorkerが、静的ファイル（client）と `/api/*` を同じオリジンから配信する（`server/wrangler.jsonc` の `env.production`）。同一オリジンなのでCORSも `COOKIE_DOMAIN` も不要。
 
-> **公開URLについて**: 現在は `https://edtc-dashboard.<アカウントのサブドメイン>.workers.dev`。`kaitedtc.com` のDNSはさくらインターネットにあり、WorkersのカスタムドメインはCloudflareのゾーンが必須のため、`dashboard.kaitedtc.com` にはまだできていない。移行できるようになったら、`wrangler.jsonc` の `workers_dev` を外して `routes`（`custom_domain: true`）を足し、`FRONTEND_URL`・`DISCORD_REDIRECT_URI`・DiscordのRedirects・GitHub AppのWebhook URLを新しいURLに合わせる。
+> **公開URLについて**: 現在は `https://edtc-dashboard.kait-edtc.workers.dev`（団体のCloudflareアカウント）。デプロイ先のアカウントは `wrangler.jsonc` の `env.production.account_id` で固定してある（個人アカウントへ誤ってデプロイしないため。アカウントIDは秘密情報ではない）。`kaitedtc.com` のDNSはさくらインターネットにあり、WorkersのカスタムドメインはCloudflareのゾーンが必須のため、`dashboard.kaitedtc.com` にはまだできていない。移行できるようになったら、`wrangler.jsonc` の `workers_dev` を外して `routes`（`custom_domain: true`）を足し、`FRONTEND_URL`・`DISCORD_REDIRECT_URI`・DiscordのRedirects・GitHub AppのWebhook URLを新しいURLに合わせる。
 
 **初回のみ**
 
 ```sh
 cd server
-npx wrangler login
+npx wrangler login                              # 団体アカウントの権限があるCloudflareユーザーで
 npx wrangler d1 create edtc-dashboard
 #   → 出力された database_id を wrangler.jsonc の env.production.d1_databases に貼る
+#   （wrangler の d1 create が認証エラーになる場合は、ダッシュボードのD1画面から作ってもよい）
 npm run db:migrate:remote                                # テーブルを作る
 
 # 秘密情報（値を聞かれる）。GitHub App の鍵は  < your-app.pem  でファイルから渡す
