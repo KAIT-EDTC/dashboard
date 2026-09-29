@@ -1,20 +1,28 @@
 {
-  "name": "server",
+  "name": "@edtc/server",
+  "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/app.ts"
+  },
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy --minify",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "deploy": "wrangler deploy --env production --minify",
+    "typecheck": "tsc",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "wrangler d1 migrations apply edtc-dashboard --local"
+    "db:migrate": "wrangler d1 migrations apply edtc-dashboard --local",
+    "db:migrate:remote": "wrangler d1 migrations apply edtc-dashboard --remote --env production"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.2",
-    "hono": "^4.12.27"
+    "@edtc/shared": "*",
+    "@hono/zod-validator": "^0.9.1",
+    "drizzle-orm": "^0.45.3",
+    "hono": "^4.13.11",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260515.1",
-    "drizzle-kit": "^0.31.10",
-    "wrangler": "^4.4.0"
+    "@cloudflare/workers-types": "^5.20260929.1",
+    "drizzle-kit": "^0.31.11",
+    "wrangler": "^4.143.0"
   }
 }

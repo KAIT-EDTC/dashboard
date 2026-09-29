@@ -1,39 +1,39 @@
 {
-  "name": "client",
+  "name": "@edtc/client",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "prepare": "panda codegen",
     "dev": "react-router dev",
     "build": "react-router build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "typecheck": "react-router typegen && tsc",
+    "lint": "eslint ."
   },
   "dependencies": {
-    "hono": "^4.12.18",
+    "@edtc/shared": "*",
+    "@react-router/node": "^7.18.0",
+    "dompurify": "^3.4.16",
+    "hono": "^4.13.11",
     "isbot": "^5.1.44",
-    "react": "^19.2.6",
-    "react-dom": "^19.2.6",
-    "react-router": "^7.15.1",
-    "react-router-dom": "^7.18.0"
+    "marked": "^18.0.14",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router": "^7.18.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@edtc/server": "*",
     "@eslint/js": "^10.0.1",
     "@pandacss/dev": "^1.11.4",
-    "@react-router/dev": "^7.15.1",
-    "@react-router/node": "^7.15.1",
+    "@react-router/dev": "^7.18.0",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "autoprefixer": "^10.5.2",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "postcss": "^8.5.16",
-    "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.12"
+    "vite": "^8.1.0"
   }
 }
