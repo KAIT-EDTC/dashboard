@@ -8,6 +8,7 @@ import { blogRoute } from './features/blog/routes'
 import { githubWebhookRoute } from './features/blog/webhook'
 import { eventsRoute } from './features/events/routes'
 import { membersRoute } from './features/members/routes'
+import { reportsRoute } from './features/reports/routes'
 
 const app = new Hono<AppEnv>()
 
@@ -30,6 +31,7 @@ const routes = app
   .route('/api/members', membersRoute)
   .route('/api/events', eventsRoute)
   .route('/api/blog', blogRoute)
+  .route('/api/reports', reportsRoute)
   .route('/api/webhooks/github', githubWebhookRoute)
 
 export default app

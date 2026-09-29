@@ -23,3 +23,11 @@ export const ITEM_KIND_LABELS: Record<ItemKind, string> = {
   personal: '各自持参',
   shared: '共有（担当者が用意）',
 }
+
+/** 活動での役割。講師は1イベントにつき1人まで（主催者が選ぶ）、それ以外の参加者は講師補助 */
+export const PARTICIPANT_ROLES = ['lecturer', 'assistant'] as const
+export type ParticipantRole = (typeof PARTICIPANT_ROLES)[number]
+export const PARTICIPANT_ROLE_LABELS: Record<ParticipantRole, string> = {
+  lecturer: '講師',
+  assistant: '講師補助',
+}

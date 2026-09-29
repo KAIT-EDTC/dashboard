@@ -17,6 +17,7 @@ import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
 import { validate } from '../../lib/validator'
 import { assertCanManage, canManage, requireAuth } from '../../middleware/auth'
+import { approvedReportsOf, myReportOf } from '../reports/queries'
 import { notifyEventCreated } from './notifications'
 
 /** 終了日時が無いイベントは開始日の終わりまでを開催中とみなす */
@@ -112,7 +113,9 @@ export const eventsRoute = new Hono<AppEnv>()
   })
 
   .get('/:id', async (c) => {
-    const event = await createDb(c.env).query.events.findFirst({
+    const session = c.get('session')
+    const db = createDb(c.env)
+    const event = await db.query.events.findFirst({
       where: eq(events.id, c.req.param('id')),
       with: {
         creator: { columns: memberSummaryColumns },
@@ -127,7 +130,11 @@ export const eventsRoute = new Hono<AppEnv>()
       },
     })
     if (!event) throw notFound('イベントが見つかりません')
-    return c.json({ event, canManage: canManage(c.get('session'), event.createdBy) })
+    const [reports, myReport] = await Promise.all([
+      approvedReportsOf(db, event.id),
+      myReportOf(db, event.id, session.userId),
+    ])
+    return c.json({ event, reports, myReport: myReport ?? null, canManage: canManage(session, event.createdBy) })
   })
 
   .put('/:id', validate('json', eventInputSchema), async (c) => {
@@ -181,28 +188,46 @@ export const eventsRoute = new Hono<AppEnv>()
         set: { status, comment, updatedAt: now },
       })
 
-    // 不参加にしたら担当していた持ち物を手放す
+    // 不参加にしたら担当していた持ち物と講師の役割を手放す
     if (status === 'declined') {
-      await db
-        .update(eventItems)
-        .set({ assigneeId: null, prepared: false })
-        .where(and(eq(eventItems.eventId, event.id), eq(eventItems.assigneeId, session.userId)))
+      await db.batch([
+        db
+          .update(eventItems)
+          .set({ assigneeId: null, prepared: false })
+          .where(and(eq(eventItems.eventId, event.id), eq(eventItems.assigneeId, session.userId))),
+        db
+          .update(eventParticipants)
+          .set({ role: 'assistant' })
+          .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, session.userId))),
+      ])
     }
     return c.json({ ok: true })
   })
 
-  // 出席・支払いの記録（主催者・管理者）
+  // 出席・支払い・役割の記録（主催者・管理者）
   .patch('/:id/participants/:userId', validate('json', participantUpdateSchema), async (c) => {
+    const input = c.req.valid('json')
     const db = createDb(c.env)
     const event = await findEvent(db, c.req.param('id'))
     assertCanManage(c.get('session'), event.createdBy)
 
-    const updated = await db
-      .update(eventParticipants)
-      .set(c.req.valid('json'))
-      .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, c.req.param('userId'))))
-      .returning({ userId: eventParticipants.userId })
-    if (updated.length === 0) throw notFound('参加者が見つかりません')
+    const target = and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, c.req.param('userId')))
+    const participant = await db.select({ userId: eventParticipants.userId }).from(eventParticipants).where(target).get()
+    if (!participant) throw notFound('参加者が見つかりません')
+
+    const update = db.update(eventParticipants).set(input).where(target)
+    if (input.role === 'lecturer') {
+      // 講師は1人だけ。新しく講師にしたら、それまでの講師は講師補助に戻す
+      await db.batch([
+        db
+          .update(eventParticipants)
+          .set({ role: 'assistant' })
+          .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.role, 'lecturer'))),
+        update,
+      ])
+    } else {
+      await update
+    }
     return c.json({ ok: true })
   })
 

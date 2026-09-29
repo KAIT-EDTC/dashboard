@@ -1,3 +1,4 @@
+import { DIVISIONS, type Division } from '@edtc/shared'
 import type { Bindings } from '../env'
 
 const API = 'https://discord.com/api/v10'
@@ -75,6 +76,26 @@ export function isAdminMember(env: Bindings, member: DiscordGuildMember): boolea
     .map((id) => id.trim())
     .filter(Boolean)
   return member.roles.some((role) => adminRoles.includes(role))
+}
+
+/** DISCORD_DIVISION_HEAD_ROLE_IDS（部署:ロールID をカンマ区切り）を読む。部署名の誤りは無視する */
+function divisionHeadRoles(env: Bindings): Map<Division, string> {
+  const map = new Map<Division, string>()
+  for (const entry of (env.DISCORD_DIVISION_HEAD_ROLE_IDS ?? '').split(',')) {
+    const [division, roleId] = entry.split(/[:：]/).map((v) => v.trim())
+    if (roleId && (DIVISIONS as readonly string[]).includes(division)) map.set(division as Division, roleId)
+  }
+  return map
+}
+
+/** 部長ロールを持っている部署 */
+export function headDivisionsOf(env: Bindings, member: DiscordGuildMember): Division[] {
+  return [...divisionHeadRoles(env)].filter(([, roleId]) => member.roles.includes(roleId)).map(([division]) => division)
+}
+
+/** 通知でメンションする部長ロール */
+export function divisionHeadRoleId(env: Bindings, division: Division): string | undefined {
+  return divisionHeadRoles(env).get(division)
 }
 
 // ---------------------------------------------------------------------------

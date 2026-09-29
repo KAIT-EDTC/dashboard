@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { EVENT_CATEGORIES, ITEM_KINDS, RSVP_STATUSES } from '../events'
+import { EVENT_CATEGORIES, ITEM_KINDS, PARTICIPANT_ROLES, RSVP_STATUSES } from '../events'
 
 /** 日本時間の YYYY-MM-DDTHH:mm */
 const dateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, '日時の形式が正しくありません')
@@ -30,6 +30,7 @@ export const rsvpSchema = z.object({
 export const participantUpdateSchema = z.object({
   attended: z.boolean().optional(),
   paid: z.boolean().optional(),
+  role: z.enum(PARTICIPANT_ROLES).optional(),
 })
 
 const itemFields = {

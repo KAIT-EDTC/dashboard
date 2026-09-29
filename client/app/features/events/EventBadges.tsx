@@ -1,4 +1,11 @@
-import { EVENT_CATEGORY_LABELS, RSVP_STATUS_LABELS, type EventCategory, type RsvpStatus } from '@edtc/shared'
+import {
+  EVENT_CATEGORY_LABELS,
+  PARTICIPANT_ROLE_LABELS,
+  RSVP_STATUS_LABELS,
+  type EventCategory,
+  type ParticipantRole,
+  type RsvpStatus,
+} from '@edtc/shared'
 import { Badge, type BadgeTone } from '~/components/ui/Badge'
 
 const CATEGORY_TONES: Record<EventCategory, BadgeTone> = {
@@ -17,4 +24,8 @@ const RSVP_TONES: Record<RsvpStatus, BadgeTone> = { going: 'success', maybe: 'wa
 
 export function RsvpBadge({ status }: { status: RsvpStatus | null }) {
   return status ? <Badge tone={RSVP_TONES[status]}>{RSVP_STATUS_LABELS[status]}</Badge> : <Badge tone="danger">未回答</Badge>
+}
+
+export function RoleBadge({ role }: { role: ParticipantRole }) {
+  return <Badge tone={role === 'lecturer' ? 'accent' : 'neutral'}>{PARTICIPANT_ROLE_LABELS[role]}</Badge>
 }

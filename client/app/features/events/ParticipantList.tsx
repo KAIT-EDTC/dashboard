@@ -3,8 +3,10 @@ import { Link, useFetcher } from 'react-router'
 import { css } from 'styled-system/css'
 import { Avatar } from '~/components/ui/Avatar'
 import { Card } from '~/components/ui/Card'
+import { Button } from '~/components/ui/Button'
 import { Checkbox } from '~/components/ui/Field'
 import { formatYen, fullName } from '~/lib/format'
+import { RoleBadge } from './EventBadges'
 import type { EventDetail, EventParticipant } from './types'
 
 /** 出席・支払いのチェック（主催者・管理者のみ） */
@@ -21,6 +23,27 @@ function ParticipantToggles({ participant, showPaid }: { participant: EventParti
       <Checkbox label="出席" checked={value('attended')} onChange={(e) => toggle('attended', e.currentTarget.checked)} />
       {showPaid && <Checkbox label="支払済" checked={value('paid')} onChange={(e) => toggle('paid', e.currentTarget.checked)} />}
     </div>
+  )
+}
+
+/** 講師にする／外す（主催者・管理者のみ）。講師は1人だけで、ほかの参加者は講師補助 */
+function LecturerToggle({ participant }: { participant: EventParticipant }) {
+  const fetcher = useFetcher()
+  const isLecturer = participant.role === 'lecturer'
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      loading={fetcher.state !== 'idle'}
+      onClick={() =>
+        fetcher.submit(
+          { intent: 'update-participant', userId: participant.userId, role: isLecturer ? 'assistant' : 'lecturer' },
+          { method: 'post' },
+        )
+      }
+    >
+      {isLecturer ? '講師を外す' : '講師にする'}
+    </Button>
   )
 }
 
@@ -49,9 +72,15 @@ export function ParticipantList({ event, canManage }: { event: EventDetail; canM
                   <Link to={`/members/${p.userId}`} className={css({ display: 'flex', alignItems: 'center', gap: 'sm', flex: 1, minW: '140px', color: 'fg', _hover: { color: 'accent' } })}>
                     <Avatar user={p.user} size={28} />
                     <span className={css({ fontSize: 'sm', fontWeight: '500' })}>{fullName(p.user)}</span>
+                    {status === 'going' && <RoleBadge role={p.role} />}
                     {p.comment && <span className={css({ fontSize: 'xs', color: 'fg.muted', truncate: true })}>「{p.comment}」</span>}
                   </Link>
-                  {canManage && status === 'going' && <ParticipantToggles participant={p} showPaid={!!event.fee} />}
+                  {canManage && status === 'going' && (
+                    <>
+                      <LecturerToggle participant={p} />
+                      <ParticipantToggles participant={p} showPaid={!!event.fee} />
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
