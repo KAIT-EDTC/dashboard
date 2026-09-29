@@ -11,7 +11,7 @@
     // フロントエンドのURL（CORS許可・OAuth後のリダイレクト先）
     "FRONTEND_URL": "http://localhost:5173",
     // ブログ記事のPR先リポジトリと、記事フォルダを置くディレクトリ
-    "BLOG_REPO": "KAIT-EDTC/EDTCHP",
+    "BLOG_REPO": "KAIT-EDTC/EDTCHP_v2",
     "BLOG_CONTENT_DIR": "content/blog"
   },
   "d1_databases": [
@@ -42,7 +42,7 @@
       "vars": {
         // 独自ドメインに移したら https://dashboard.kaitedtc.com に戻す（OAuthのリダイレクトURIなども合わせる）
         "FRONTEND_URL": "https://edtc-dashboard.kait-edtc.workers.dev",
-        "BLOG_REPO": "KAIT-EDTC/EDTCHP",
+        "BLOG_REPO": "KAIT-EDTC/EDTCHP_v2",
         "BLOG_CONTENT_DIR": "content/blog",
         "BLOG_SITE_URL": "https://kaitedtc.com"
       },

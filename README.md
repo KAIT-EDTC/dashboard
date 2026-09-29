@@ -1,10 +1,10 @@
 # EDTC ダッシュボード
 
-EDTCメンバー専用サイト。イベントの出欠・持ち物・集金、サイト（[EDTCHP](https://github.com/KAIT-EDTC/EDTCHP)）へのブログ投稿、メンバー紹介をまとめて扱う。
+EDTCメンバー専用サイト。イベントの出欠・持ち物・集金、サイト（[EDTCHP_v2](https://github.com/KAIT-EDTC/EDTCHP_v2)）へのブログ投稿、メンバー紹介をまとめて扱う。
 
 - **ログイン**: Discord OAuth。EDTCのDiscordサーバーのメンバーだけが使える。初回はサーバーニックネーム（`2424013: 山田 太郎`）から学籍情報を読み取って登録する
 - **イベント**: 出欠（参加/未定/不参加・コメント・定員・回答期限）、持ち物（各自持参／共有の担当者・準備状況）、参加費の集金と当日の出席記録、カレンダー表示。作成時にDiscordへ通知
-- **ブログ**: Markdownで書き（画像は貼り付け・ドラッグ＆ドロップ可）、提出するとGitHub App経由でEDTCHPにPRを作成。レビューや公開はWebhookで追跡し、執筆者にDiscordで通知
+- **ブログ**: Markdownで書き（画像は貼り付け・ドラッグ＆ドロップ可）、提出するとGitHub App経由でEDTCHP_v2にPRを作成。レビューや公開はWebhookで追跡し、執筆者にDiscordで通知
 - **メンバー**: 名簿（学年・部署・趣味で検索）とプロフィール（自己紹介・興味・リンク・書いた記事）
 
 ## 構成
@@ -66,13 +66,13 @@ theme/ (client直下)     # Panda のトークン・グローバルCSS
 ### 公開フロー
 
 1. ダッシュボードで記事を書く（イベントページの「ブログを書く」からだとタイトルと日付を引き継ぐ）。画像はブラウザでWebP（最大1600px）に変換してから保存される
-2. 「提出する」で、記事フォルダ（`index.md` と画像）を1コミットにまとめたPRが EDTCHP に作られ、Discordに通知される。PRの「Files changed」で本文を画像つきで確認できる
+2. 「提出する」で、記事フォルダ（`index.md` と画像）を1コミットにまとめたPRが EDTCHP_v2 に作られ、Discordに通知される。PRの「Files changed」で本文を画像つきで確認できる
 3. レビューコメント・修正依頼・承認・マージ・クローズはWebhookで受け取り、執筆者にメンションで通知。マージされると「公開済み」になる
 4. 修正して再提出すると同じPRが更新される
 
 PRのブランチは提出のたびに「最新の main + 記事の1コミット」として作り直す。そのため **記事の正はダッシュボード** で、PR上で直接コミットした修正は次の再提出で上書きされる。
 
-### 記事ファイルの形式（EDTCHP側はこれを読む）
+### 記事ファイルの形式（EDTCHP_v2側はこれを読む）
 
 ```
 <BLOG_CONTENT_DIR>/            # 既定: content/blog（wrangler.jsonc の vars で変更）
@@ -137,7 +137,7 @@ npm run dev                        # client: http://localhost:5173 / server: htt
    - Repository permissions: **Contents: Read and write** / **Pull requests: Read and write** / Metadata: Read-only
    - Webhook URL: `<APIのURL>/api/webhooks/github`、Secret を決めて `GITHUB_WEBHOOK_SECRET` に設定
    - Subscribe to events: **Pull request** / **Pull request review** / **Issue comment**
-2. `KAIT-EDTC/EDTCHP` にインストール
+2. `KAIT-EDTC/EDTCHP_v2` にインストール
 3. App ID を `GITHUB_APP_ID`、秘密鍵（ダウンロードしたPEMのまま）を `GITHUB_APP_PRIVATE_KEY` に設定
 4. 記事フォルダの置き場所は `wrangler.jsonc` の `BLOG_CONTENT_DIR`（既定 `content/blog`）。公開通知で記事URLを出したい場合は `BLOG_SITE_URL`（例: `https://kaitedtc.com`）
 
