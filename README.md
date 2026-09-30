@@ -145,7 +145,7 @@ npm run dev                        # client: http://localhost:5173 / server: htt
 
 1つのWorkerが、静的ファイル（client）と `/api/*` を同じオリジンから配信する（`server/wrangler.jsonc` の `env.production`）。同一オリジンなのでCORSも `COOKIE_DOMAIN` も不要。
 
-> **公開URLについて**: 現在は `https://edtc-dashboard.kait-edtc.workers.dev`（団体のCloudflareアカウント）。デプロイ先のアカウントは `wrangler.jsonc` の `env.production.account_id` で固定してある（個人アカウントへ誤ってデプロイしないため。アカウントIDは秘密情報ではない）。`kaitedtc.com` のDNSはさくらインターネットにあり、WorkersのカスタムドメインはCloudflareのゾーンが必須のため、`dashboard.kaitedtc.com` にはまだできていない。移行できるようになったら、`wrangler.jsonc` の `workers_dev` を外して `routes`（`custom_domain: true`）を足し、`FRONTEND_URL`・`DISCORD_REDIRECT_URI`・DiscordのRedirects・GitHub AppのWebhook URLを新しいURLに合わせる。
+> **公開URLについて**: `https://dashboard.kaitedtc.com`（団体のCloudflareアカウント。`kaitedtc.com` のDNSはCloudflareで管理）。デプロイ先のアカウントは `wrangler.jsonc` の `env.production.account_id` で固定してある（個人アカウントへ誤ってデプロイしないため。アカウントIDは秘密情報ではない）。公開URLを変えるときは、`FRONTEND_URL`（`wrangler.jsonc`）・`DISCORD_REDIRECT_URI`（`wrangler secret`）・DiscordのRedirects・GitHub AppのWebhook URLを合わせて変更する。
 
 **初回のみ**
 
