@@ -1,11 +1,11 @@
-import { BLOG_TAGS, buildArticleId, SLUG_PATTERN, validateForSubmit, type BlogPostContent } from '@edtc/shared'
+import { articleIdBase, BLOG_SERIES, validateForSubmit, type BlogPostContent } from '@edtc/shared'
 import { useEffect, useState } from 'react'
 import { useBlocker, useFetcher } from 'react-router'
 import { css } from 'styled-system/css'
 import { Alert } from '~/components/ui/Alert'
 import { Button } from '~/components/ui/Button'
 import { Card } from '~/components/ui/Card'
-import { ChipCheckbox, TextareaField, TextField } from '~/components/ui/Field'
+import { ChipCheckbox, SelectField, TextareaField, TextField } from '~/components/ui/Field'
 import { SaveIcon, TrashIcon } from '~/components/ui/Icons'
 import type { FormErrors } from '~/lib/form'
 import { ListCardPreview, MarkdownBody } from './ArticlePreview'
@@ -18,12 +18,12 @@ import type { PostDetailResponse } from './types'
 export type EditorIntent = 'save' | 'submit' | 'delete'
 export type EditorActionData = (FormErrors & { intent: EditorIntent }) | { ok: true; intent: EditorIntent; prUrl?: string }
 
-export function BlogEditor({ post, hasUnsubmittedChanges, githubConfigured }: PostDetailResponse) {
+export function BlogEditor({ post, availableTags, hasUnsubmittedChanges, githubConfigured }: PostDetailResponse) {
   const [content, setContent] = useState<BlogPostContent>(() => contentOf(post))
   const fetcher = useFetcher<EditorActionData>()
   const pendingIntent = fetcher.state === 'idle' ? null : (fetcher.json as { intent?: EditorIntent } | undefined)?.intent
   const dirty = JSON.stringify(content) !== JSON.stringify(contentOf(post))
-  const problems = validateForSubmit(content)
+  const problems = validateForSubmit(content, { seriesOptional: !!post.articleId })
   const fieldErrors = fetcher.data && 'fieldErrors' in fetcher.data ? (fetcher.data.fieldErrors ?? {}) : {}
   const locked = !!post.publishedAt
 
@@ -51,7 +51,16 @@ export function BlogEditor({ post, hasUnsubmittedChanges, githubConfigured }: Po
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  const articleIdPrefix = buildArticleId(content.eventDate, 'x').slice(0, -1)
+  const idBase = articleIdBase(content.eventDate, content.series)
+  const seriesHint = locked
+    ? `公開済みのため変更できません（記事ID: ${post.articleId}）`
+    : idBase
+      ? `記事ID: ${idBase}（提出時に確定。同じ日に同じシリーズの記事があると -2 などが付きます）`
+      : post.articleId
+        ? `現在の記事ID: ${post.articleId}（日付・シリーズを選び直すと提出時に更新されます）`
+        : 'イベント実施日とシリーズから記事ID（URLとフォルダ名）が決まります'
+  // 管理者が削除したタグが記事に残っている場合も外せるようにする
+  const tagLabels = [...availableTags.map((tag) => tag.label), ...content.tags.filter((tag) => !availableTags.some((t) => t.label === tag))]
 
   return (
     <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
@@ -77,26 +86,32 @@ export function BlogEditor({ post, hasUnsubmittedChanges, githubConfigured }: Po
             <TextField label="タイトル" value={content.title} onChange={(e) => set('title', e.currentTarget.value)} required error={fieldErrors.title} placeholder="例: 第一回遊行塾に行ってきました！" />
             <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: '1fr 1fr' }, gap: 'md' })}>
               <TextField label="イベント実施日" type="date" value={content.eventDate} onChange={(e) => set('eventDate', e.currentTarget.value)} required disabled={locked} error={fieldErrors.eventDate} />
-              <TextField
-                label={`記事ID${articleIdPrefix ? `（${articleIdPrefix}◯◯）` : ''}`}
-                value={content.slug}
-                onChange={(e) => set('slug', e.currentTarget.value)}
-                required
+              <SelectField
+                label="シリーズ"
+                value={content.series}
+                onChange={(e) => set('series', e.currentTarget.value)}
+                required={!post.articleId}
                 disabled={locked}
-                placeholder="yugyou01"
-                error={fieldErrors.slug ?? (content.slug && !SLUG_PATTERN.test(content.slug) ? '半角英数字と _ のみ使用できます' : undefined)}
-                hint={locked ? '公開済みのため変更できません' : '半角英数字と _（URLとフォルダ名になります）'}
-              />
+                error={fieldErrors.series}
+                hint={seriesHint}
+              >
+                <option value="">{post.articleId ? '（今の記事IDのまま）' : '選択してください'}</option>
+                {BLOG_SERIES.map((series) => (
+                  <option key={series.id} value={series.id}>
+                    {series.label}
+                  </option>
+                ))}
+              </SelectField>
             </div>
             <TextField label="執筆者名" value={content.authorName} onChange={(e) => set('authorName', e.currentTarget.value)} required hint="サイトに表示される名前" />
             <TextareaField label="一覧用の説明文" value={content.description} onChange={(e) => set('description', e.currentTarget.value)} rows={2} required error={fieldErrors.description} />
             <fieldset>
               <legend className={css({ fontSize: 'sm', fontWeight: '600', color: 'fg.muted', mb: '6px' })}>タグ</legend>
               <div className={css({ display: 'flex', flexWrap: 'wrap', gap: 'sm' })}>
-                {BLOG_TAGS.map((tag) => (
+                {tagLabels.map((tag) => (
                   <ChipCheckbox
                     key={tag}
-                    label={tag}
+                    label={availableTags.some((t) => t.label === tag) ? tag : `${tag}（削除済み）`}
                     checked={content.tags.includes(tag)}
                     onChange={(e) => set('tags', e.currentTarget.checked ? [...content.tags, tag] : content.tags.filter((t) => t !== tag))}
                   />

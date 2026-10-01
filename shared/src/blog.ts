@@ -4,12 +4,21 @@
  *   <BLOG_CONTENT_DIR>/<記事ID>/index.md        … frontmatter + Markdown本文
  *   <BLOG_CONTENT_DIR>/<記事ID>/img-xxxxxxxx.webp … 本文・サムネイルの画像（index.md から相対参照）
  *
- * 記事IDは「YY-MM-DD-slug」（例: 26-05-16-yugyou01）。旧サイトのURLと同じ規則。
+ * 記事IDは「YY-MM-DD-シリーズ」（例: 26-05-16-yugyou）。同じ日に同じシリーズの記事が複数あるときは
+ * 「26-05-16-yugyou-2」のように連番が付く（採番はサーバーが提出時に行う）。
+ * 旧ルール（YY-MM-DD-slug、例: 26-05-16-yugyou01）で提出済みの記事IDはそのまま使い続ける。
  */
 
-/** 記事に付けられるタグ（ダッシュボードとサイトで共通の語彙） */
-export const BLOG_TAGS = ['ピックアップ', '遊行塾', 'イベント', '対外活動', '遊び'] as const
-export type BlogTag = (typeof BLOG_TAGS)[number]
+/** 記事のシリーズ（記事IDの末尾になる）。タグとは別で、コードで固定 */
+export const BLOG_SERIES = [
+  { id: 'yugyou', label: '遊行塾' },
+  { id: 'event', label: 'イベント' },
+  { id: 'outreach', label: '対外活動' },
+  { id: 'play', label: '遊び' },
+  { id: 'other', label: 'その他' },
+] as const
+export type BlogSeriesId = (typeof BLOG_SERIES)[number]['id']
+export const BLOG_SERIES_IDS = BLOG_SERIES.map((series) => series.id) as [BlogSeriesId, ...BlogSeriesId[]]
 
 export const BLOG_STATUSES = ['draft', 'in_review', 'published'] as const
 export type BlogStatus = (typeof BLOG_STATUSES)[number]
@@ -19,9 +28,6 @@ export const BLOG_STATUS_LABELS: Record<BlogStatus, string> = {
   published: '公開済み',
 }
 
-/** 記事IDのうち日付以降の部分（例: yugyou01） */
-export const SLUG_PATTERN = /^[A-Za-z0-9_]+$/
-
 /** アップロードした画像のファイル名。記事フォルダの中にこの名前で置かれる */
 export const IMAGE_FILE_PATTERN = /^img-[a-z0-9]{8}\.webp$/
 
@@ -29,22 +35,29 @@ export type BlogPostContent = {
   title: string
   /** イベント実施日 YYYY-MM-DD */
   eventDate: string
-  slug: string
+  /** シリーズID（BLOG_SERIES）。未選択は '' */
+  series: string
   /** 記事一覧・OGPに使う短い説明 */
   description: string
   authorName: string
-  tags: BlogTag[]
+  /** タグの表示名（管理者がダッシュボードで管理する） */
+  tags: string[]
   /** サムネイル画像のファイル名 */
   thumbnail: string | null
   /** Markdown。画像は ![説明](./img-xxxxxxxx.webp) で参照する */
   body: string
 }
 
-/** 2026-05-16 + yugyou01 → 26-05-16-yugyou01 */
-export function buildArticleId(eventDate: string, slug: string): string {
+/** 2026-05-16 + yugyou → 26-05-16-yugyou（連番を付ける前の記事ID） */
+export function articleIdBase(eventDate: string, series: string): string {
   const m = eventDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (!m || !SLUG_PATTERN.test(slug)) return ''
-  return `${m[1].slice(2)}-${m[2]}-${m[3]}-${slug}`
+  if (!m || !BLOG_SERIES_IDS.includes(series as BlogSeriesId)) return ''
+  return `${m[1].slice(2)}-${m[2]}-${m[3]}-${series}`
+}
+
+/** articleIdBase に連番を付けた形（base または base-2, base-3…）か */
+export function isArticleIdOf(articleId: string, base: string): boolean {
+  return !!base && (articleId === base || new RegExp(`^${base}-[2-9]\\d*$`).test(articleId))
 }
 
 /** 本文中の画像（![alt](src)）をすべて取り出す */
@@ -86,13 +99,17 @@ export function buildMarkdown(content: BlogPostContent): string {
   return `---\n${frontmatter.join('\n')}\n---\n\n${body}\n`
 }
 
-/** PR作成（提出）前のチェック */
-export function validateForSubmit(content: BlogPostContent): string[] {
+/**
+ * PR作成（提出）前のチェック。
+ * 旧ルールで記事IDが決まっている記事は、シリーズ未選択でも提出できる（seriesOptional）
+ */
+export function validateForSubmit(content: BlogPostContent, { seriesOptional = false } = {}): string[] {
   const errors: string[] = []
   if (!content.title.trim()) errors.push('タイトルを入力してください')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(content.eventDate)) errors.push('イベント実施日を入力してください')
-  if (!content.slug) errors.push('記事IDを入力してください')
-  else if (!SLUG_PATTERN.test(content.slug)) errors.push('記事IDは半角英数字と _ のみ使用できます')
+  if (!content.series) {
+    if (!seriesOptional) errors.push('シリーズを選択してください')
+  } else if (!BLOG_SERIES_IDS.includes(content.series as BlogSeriesId)) errors.push('シリーズが正しくありません')
   if (!content.description.trim()) errors.push('一覧用の説明文を入力してください')
   if (!content.authorName.trim()) errors.push('執筆者名を入力してください')
   if (content.tags.length === 0) errors.push('タグを1つ以上選択してください')

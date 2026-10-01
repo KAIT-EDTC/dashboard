@@ -1,5 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm'
-import { buildArticleId, buildMarkdown, referencedImages, type BlogPostContent } from '@edtc/shared'
+import { buildMarkdown, referencedImages, type BlogPostContent } from '@edtc/shared'
 import type { Db } from '../../db'
 import { blogImages } from '../../db/schema'
 import type { Bindings } from '../../env'
@@ -14,6 +14,7 @@ type Base = {
 export type PublishTarget = {
   id: string
   prNumber: number | null
+  articleId: string
   submittedContent: BlogPostContent
   /** PR本文・コミットに載せる執筆者表記 */
   authorLabel: string
@@ -74,7 +75,7 @@ export class BlogPublisher {
   async sync(target: PublishTarget): Promise<SyncResult> {
     const base = await this.loadBase()
     const content = target.submittedContent
-    const articleId = buildArticleId(content.eventDate, content.slug)
+    const { articleId } = target
     const dir = this.articleDir(articleId)
     const branch = `blog/${target.id}`
 
