@@ -4,12 +4,12 @@
  *   <BLOG_CONTENT_DIR>/<記事ID>/index.md        … frontmatter + Markdown本文
  *   <BLOG_CONTENT_DIR>/<記事ID>/img-xxxxxxxx.webp … 本文・サムネイルの画像（index.md から相対参照）
  *
- * 記事IDは「YY-MM-DD-シリーズ」（例: 26-05-16-yugyou）。同じ日に同じシリーズの記事が複数あるときは
+ * 記事IDは「YY-MM-DD-イベント種別」（例: 26-05-16-yugyou）。同じ日に同じイベント種別の記事が複数あるときは
  * 「26-05-16-yugyou-2」のように連番が付く（採番はサーバーが提出時に行う）。
  * 旧ルール（YY-MM-DD-slug、例: 26-05-16-yugyou01）で提出済みの記事IDはそのまま使い続ける。
  */
 
-/** 記事のシリーズ（記事IDの末尾になる）。タグとは別で、コードで固定 */
+/** 記事のイベント種別（記事IDの末尾になる）。タグとは別で、コードで固定 */
 export const BLOG_SERIES = [
   { id: 'yugyou', label: '遊行塾' },
   { id: 'event', label: 'イベント' },
@@ -35,7 +35,7 @@ export type BlogPostContent = {
   title: string
   /** イベント実施日 YYYY-MM-DD */
   eventDate: string
-  /** シリーズID（BLOG_SERIES）。未選択は '' */
+  /** イベント種別ID（BLOG_SERIES）。未選択は '' */
   series: string
   /** 記事一覧・OGPに使う短い説明 */
   description: string
@@ -101,15 +101,15 @@ export function buildMarkdown(content: BlogPostContent): string {
 
 /**
  * PR作成（提出）前のチェック。
- * 旧ルールで記事IDが決まっている記事は、シリーズ未選択でも提出できる（seriesOptional）
+ * 旧ルールで記事IDが決まっている記事は、イベント種別未選択でも提出できる（seriesOptional）
  */
 export function validateForSubmit(content: BlogPostContent, { seriesOptional = false } = {}): string[] {
   const errors: string[] = []
   if (!content.title.trim()) errors.push('タイトルを入力してください')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(content.eventDate)) errors.push('イベント実施日を入力してください')
   if (!content.series) {
-    if (!seriesOptional) errors.push('シリーズを選択してください')
-  } else if (!BLOG_SERIES_IDS.includes(content.series as BlogSeriesId)) errors.push('シリーズが正しくありません')
+    if (!seriesOptional) errors.push('イベント種別を選択してください')
+  } else if (!BLOG_SERIES_IDS.includes(content.series as BlogSeriesId)) errors.push('イベント種別が正しくありません')
   if (!content.description.trim()) errors.push('一覧用の説明文を入力してください')
   if (!content.authorName.trim()) errors.push('執筆者名を入力してください')
   if (content.tags.length === 0) errors.push('タグを1つ以上選択してください')

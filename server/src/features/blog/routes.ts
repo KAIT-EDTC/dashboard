@@ -106,7 +106,7 @@ export const blogRoute = new Hono<AppEnv>()
     const post = await findPost(db, c.req.param('id'))
     assertCanManage(c.get('session'), post.authorId)
     if (post.publishedAt && (input.eventDate !== post.eventDate || input.series !== post.series)) {
-      throw badRequest('公開済みの記事は日付とシリーズを変更できません')
+      throw badRequest('公開済みの記事は日付とイベント種別を変更できません')
     }
     // 管理者が削除したタグが付いたままの記事も保存できるよう、すでに付いているタグは許可する
     const knownTags = new Set((await db.select({ label: blogTags.label }).from(blogTags)).map((tag) => tag.label))
@@ -189,7 +189,7 @@ export const blogRoute = new Hono<AppEnv>()
     if (post.publishedAt) {
       const submitted = post.submittedContent
       if (submitted && (content.eventDate !== submitted.eventDate || content.series !== (submitted.series ?? ''))) {
-        throw badRequest('公開済みの記事は日付とシリーズを変更できません')
+        throw badRequest('公開済みの記事は日付とイベント種別を変更できません')
       }
     }
     const knownTags = new Set((await db.select({ label: blogTags.label }).from(blogTags)).map((tag) => tag.label))

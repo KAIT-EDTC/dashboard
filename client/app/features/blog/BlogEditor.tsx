@@ -1,4 +1,4 @@
-import { articleIdBase, BLOG_SERIES, validateForSubmit, type BlogPostContent } from '@edtc/shared'
+import { BLOG_SERIES, validateForSubmit, type BlogPostContent } from '@edtc/shared'
 import { useEffect, useState } from 'react'
 import { useBlocker, useFetcher } from 'react-router'
 import { css } from 'styled-system/css'
@@ -51,14 +51,6 @@ export function BlogEditor({ post, availableTags, hasUnsubmittedChanges, githubC
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  const idBase = articleIdBase(content.eventDate, content.series)
-  const seriesHint = locked
-    ? `公開済みのため変更できません（記事ID: ${post.articleId}）`
-    : idBase
-      ? `記事ID: ${idBase}（提出時に確定。同じ日に同じシリーズの記事があると -2 などが付きます）`
-      : post.articleId
-        ? `現在の記事ID: ${post.articleId}（日付・シリーズを選び直すと提出時に更新されます）`
-        : 'イベント実施日とシリーズから記事ID（URLとフォルダ名）が決まります'
   // 管理者が削除したタグが記事に残っている場合も外せるようにする
   const tagLabels = [...availableTags.map((tag) => tag.label), ...content.tags.filter((tag) => !availableTags.some((t) => t.label === tag))]
 
@@ -87,13 +79,12 @@ export function BlogEditor({ post, availableTags, hasUnsubmittedChanges, githubC
             <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: '1fr 1fr' }, gap: 'md' })}>
               <TextField label="イベント実施日" type="date" value={content.eventDate} onChange={(e) => set('eventDate', e.currentTarget.value)} required disabled={locked} error={fieldErrors.eventDate} />
               <SelectField
-                label="シリーズ"
+                label="イベント種別"
                 value={content.series}
                 onChange={(e) => set('series', e.currentTarget.value)}
                 required={!post.articleId}
                 disabled={locked}
                 error={fieldErrors.series}
-                hint={seriesHint}
               >
                 <option value="">{post.articleId ? '（今の記事IDのまま）' : '選択してください'}</option>
                 {BLOG_SERIES.map((series) => (

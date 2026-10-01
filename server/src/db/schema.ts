@@ -80,7 +80,7 @@ export const blogPosts = sqliteTable(
     eventDate: text('event_date').notNull().default(''),
     /** 旧ルールの記事ID末尾（廃止。新しい記事では使わない） */
     slug: text('slug').notNull().default(''),
-    /** シリーズID（BLOG_SERIES）。記事IDの末尾になる */
+    /** イベント種別ID（BLOG_SERIES）。記事IDの末尾になる */
     series: text('series').notNull().default(''),
     description: text('description').notNull().default(''),
     authorName: text('author_name').notNull().default(''),
@@ -92,7 +92,7 @@ export const blogPosts = sqliteTable(
     status: text('status', { enum: BLOG_STATUSES }).notNull().default('draft'),
     /** 提出時点の内容。PRのブランチは常にこのスナップショットから作り直す */
     submittedContent: text('submitted_content', { mode: 'json' }).$type<BlogPostContent>(),
-    /** 提出時点の記事ID（YY-MM-DD-シリーズ[-連番]）。一度公開したら変更できない */
+    /** 提出時点の記事ID（YY-MM-DD-イベント種別[-連番]）。一度公開したら変更できない */
     articleId: text('article_id'),
     branch: text('branch'),
     prNumber: integer('pr_number'),
