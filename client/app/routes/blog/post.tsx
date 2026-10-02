@@ -61,7 +61,7 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
       ) : (
         <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', lg: '3fr 1fr' }, gap: 'lg', alignItems: 'start' })}>
           <Card title="記事">
-            <ArticlePreview postId={post.id} content={contentOf(post)} />
+            <ArticlePreview postId={post.id} content={contentOf(post)} articleId={post.articleId} />
           </Card>
           {post.prUrl && (
             <Card title="レビュー">

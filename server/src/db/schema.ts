@@ -6,7 +6,6 @@ import {
   ITEM_KINDS,
   RSVP_STATUSES,
   type BlogPostContent,
-  type BlogTag,
   type Division,
   type ProfileLinks,
 } from '@edtc/shared'
@@ -79,10 +78,13 @@ export const blogPosts = sqliteTable(
     // 記事の中身（Markdownとして EDTCHP に PR される）
     title: text('title').notNull().default(''),
     eventDate: text('event_date').notNull().default(''),
+    /** 旧ルールの記事ID末尾（廃止。新しい記事では使わない） */
     slug: text('slug').notNull().default(''),
+    /** イベント種別ID（BLOG_SERIES）。記事IDの末尾になる */
+    series: text('series').notNull().default(''),
     description: text('description').notNull().default(''),
     authorName: text('author_name').notNull().default(''),
-    tags: text('tags', { mode: 'json' }).$type<BlogTag[]>().notNull().default(sql`'[]'`),
+    tags: text('tags', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
     thumbnail: text('thumbnail'),
     body: text('body').notNull().default(''),
 
@@ -90,7 +92,7 @@ export const blogPosts = sqliteTable(
     status: text('status', { enum: BLOG_STATUSES }).notNull().default('draft'),
     /** 提出時点の内容。PRのブランチは常にこのスナップショットから作り直す */
     submittedContent: text('submitted_content', { mode: 'json' }).$type<BlogPostContent>(),
-    /** 提出時点の記事ID（YY-MM-DD-slug）。一度公開したら変更できない */
+    /** 提出時点の記事ID（YY-MM-DD-イベント種別[-連番]）。一度公開したら変更できない */
     articleId: text('article_id'),
     branch: text('branch'),
     prNumber: integer('pr_number'),
@@ -102,6 +104,14 @@ export const blogPosts = sqliteTable(
   },
   (t) => [index('blog_posts_author_idx').on(t.authorId), index('blog_posts_pr_idx').on(t.prNumber)],
 )
+
+/** 記事に付けられるタグ。管理者がダッシュボードで管理し、記事には表示名で保存する */
+export const blogTags = sqliteTable('blog_tags', {
+  id: text('id').primaryKey(),
+  label: text('label').notNull().unique(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamps.createdAt,
+})
 
 /**
  * 記事の画像（WebP）。本文からは ./<fileName> で参照し、PRでは記事フォルダに同じ名前で置かれる。

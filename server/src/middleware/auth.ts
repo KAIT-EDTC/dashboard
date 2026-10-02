@@ -32,3 +32,7 @@ export function canManage(session: Session, ownerId: string): boolean {
 export function assertCanManage(session: Session, ownerId: string) {
   if (!canManage(session, ownerId)) throw forbidden()
 }
+
+export function assertAdmin(session: Session) {
+  if (session.role !== 'admin') throw forbidden()
+}

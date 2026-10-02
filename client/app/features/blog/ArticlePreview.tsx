@@ -1,4 +1,4 @@
-import { buildArticleId, type BlogPostContent } from '@edtc/shared'
+import { articleIdBase, type BlogPostContent } from '@edtc/shared'
 import { useMemo } from 'react'
 import { css } from 'styled-system/css'
 import { Badge } from '~/components/ui/Badge'
@@ -58,8 +58,8 @@ export function ListCardPreview({ postId, content }: { postId: string; content: 
 }
 
 /** 記事ページ全体（閲覧用） */
-export function ArticlePreview({ postId, content }: { postId: string; content: BlogPostContent }) {
-  const articleId = buildArticleId(content.eventDate, content.slug)
+export function ArticlePreview({ postId, content, articleId: fixedId }: { postId: string; content: BlogPostContent; articleId?: string | null }) {
+  const articleId = fixedId || articleIdBase(content.eventDate, content.series)
   return (
     <article className={css({ display: 'flex', flexDirection: 'column', gap: 'md', maxW: '760px' })}>
       <header className={css({ display: 'flex', flexDirection: 'column', gap: 'xs' })}>

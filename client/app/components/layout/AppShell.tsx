@@ -4,7 +4,7 @@ import { css, cx } from 'styled-system/css'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
-import { CalendarIcon, HomeIcon, LogOutIcon, PenIcon, UsersIcon } from '../ui/Icons'
+import { CalendarIcon, HomeIcon, LogOutIcon, PenIcon, TagIcon, UsersIcon } from '../ui/Icons'
 import { Logo } from './Logo'
 
 const NAV_ITEMS = [
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/blog', label: 'ブログ', icon: PenIcon, end: false },
   { to: '/members', label: 'メンバー', icon: UsersIcon, end: false },
 ]
+const ADMIN_NAV_ITEMS = [{ to: '/admin/blog-tags', label: 'タグ管理', icon: TagIcon, end: false }]
 
 type ShellUser = {
   id: string
@@ -109,7 +110,7 @@ export function AppShell({ user, onLogout, children }: { user: ShellUser; onLogo
               borderBottomWidth: { base: '1px', md: '0' },
             })}
           >
-            {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+            {(user.role === 'admin' ? [...NAV_ITEMS, ...ADMIN_NAV_ITEMS] : NAV_ITEMS).map(({ to, label, icon: Icon, end }) => (
               <NavLink key={to} to={to} end={end} className={({ isActive }) => cx(navLinkStyle, isActive && navLinkActiveStyle)}>
                 <Icon size={18} />
                 {label}

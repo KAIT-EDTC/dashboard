@@ -76,7 +76,7 @@ PRのブランチは提出のたびに「最新の main + 記事の1コミット
 
 ```
 <BLOG_CONTENT_DIR>/            # 既定: content/blog（wrangler.jsonc の vars で変更）
-└── 26-10-17-yugyou05/         # 記事ID = YY-MM-DD-slug（イベント実施日 + 半角英数字と_）
+└── 26-10-17-yugyou/           # 記事ID = YY-MM-DD-イベント種別（イベント実施日 + イベント種別。同日・同イベント種別の2件目以降は -2, -3…）
     ├── index.md
     ├── img-k3x9a0qz.webp      # サムネイル・本文の画像（WebP, 最大幅1600px）
     └── img-p2m81c7d.webp
@@ -88,7 +88,7 @@ title: "第5回 遊行塾ではんだ付けに挑戦！"
 date: 2026-10-17                  # イベント実施日
 author: "山田　太郎"
 description: "ライントレーサーのはんだ付けを行いました"
-tags: ["遊行塾"]                  # shared/src/blog.ts の BLOG_TAGS から選ぶ
+tags: ["遊行塾"]                  # 管理者がダッシュボードの「タグ管理」で登録したタグから選ぶ
 thumbnail: ./img-k3x9a0qz.webp
 ---
 
@@ -99,6 +99,9 @@ thumbnail: ./img-k3x9a0qz.webp
 
 - 本文は標準的なMarkdown（GFM）。改行だけでは段落は分かれない（空行で区切る）
 - 画像は必ず記事フォルダ内のファイルを相対パスで参照し、altが付いている（提出時にチェックする）。外部画像・HTMLの `<img>` `<script>` `<iframe>` は提出できない
+- 記事IDは執筆者が入力せず、イベント種別（`shared/src/blog.ts` の `BLOG_SERIES`: yugyou / event / outreach / play / other）の選択とイベント実施日から、初回提出時にサーバーが決める。一度公開した記事の日付・イベント種別は変えられない。イベント種別を追加・変更するときはコードを修正する
+- 旧ルール（`YY-MM-DD-slug`、例: `26-05-16-yugyou01`）で提出済みの記事IDはそのまま使い続ける
+- タグは管理者（`DISCORD_ADMIN_ROLE_IDS` のロール）がダッシュボードの「タグ管理」で追加・名前変更・並べ替え・削除する。名前を変えると記事のタグも更新され、使用中のタグは削除できない
 - 公開通知のリンクは `<BLOG_SITE_URL>/blog/<記事ID>` になる
 
 ## 開発

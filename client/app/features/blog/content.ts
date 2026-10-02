@@ -5,7 +5,7 @@ export function contentOf(post: BlogPostContent): BlogPostContent {
   return {
     title: post.title,
     eventDate: post.eventDate,
-    slug: post.slug,
+    series: post.series,
     description: post.description,
     authorName: post.authorName,
     tags: post.tags,

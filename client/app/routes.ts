@@ -21,6 +21,7 @@ export default [
       index('routes/members/list.tsx'),
       route(':memberId', 'routes/members/detail.tsx'),
     ]),
+    route('admin/blog-tags', 'routes/admin/blog-tags.tsx'),
     route('profile', 'routes/profile.tsx'),
     route('*', 'routes/not-found.tsx'),
   ]),
