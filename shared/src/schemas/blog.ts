@@ -15,9 +15,16 @@ export const blogPostInputSchema = z.object({
   body: z.string().max(50_000, '本文が長すぎます'),
 }) satisfies z.ZodType<BlogPostContent>
 
-/** タグの追加・名前の変更（管理者） */
-export const blogTagInputSchema = z.object({
-  label: z.string().trim().min(1, 'タグ名を入力してください').max(TAG_LABEL_MAX, 'タグ名が長すぎます'),
+/** タグ一覧の一括保存（管理者）。上から順に並び、id のないものは新規追加、載っていない既存のタグは削除 */
+export const blogTagsSaveSchema = z.object({
+  tags: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        label: z.string().trim().min(1, 'タグ名を入力してください').max(TAG_LABEL_MAX, 'タグ名が長すぎます'),
+      }),
+    )
+    .max(100, 'タグが多すぎます'),
 })
 
 /** アップロード画像の上限（クライアント側でWebP・最大1600pxに変換してから送る） */

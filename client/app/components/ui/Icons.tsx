@@ -65,6 +65,11 @@ export const TagIcon = icon(
     <path d="M7 7h.01" />
   </>,
 )
+export const GripIcon = icon(
+  <>
+    <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth="3" />
+  </>,
+)
 export const PlusIcon = icon(<path d="M12 5v14M5 12h14" />)
 export const XIcon = icon(<path d="M18 6 6 18M6 6l12 12" />)
 export const CheckIcon = icon(<path d="M20 6 9 17l-5-5" />)
