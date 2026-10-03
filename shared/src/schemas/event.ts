@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { DIVISIONS } from '../divisions'
-import { EVENT_CATEGORIES, ITEM_KINDS, RSVP_STATUSES } from '../events'
+import { CATEGORY_TONES, ITEM_KINDS, RSVP_STATUSES } from '../events'
 
 /** 日本時間の YYYY-MM-DDTHH:mm */
 const dateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, '日時の形式が正しくありません')
@@ -8,7 +8,8 @@ const dateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, '日時の�
 export const eventInputSchema = z
   .object({
     title: z.string().trim().min(1, 'タイトルを入力してください').max(100, 'タイトルが長すぎます'),
-    category: z.enum(EVENT_CATEGORIES),
+    /** イベントの種類のID。存在するかはサーバーが確かめる */
+    category: z.string().min(1, '種類を選択してください'),
     description: z.string().trim().max(5000, '説明が長すぎます'),
     location: z.string().trim().max(100, '場所が長すぎます'),
     startsAt: dateTime,
@@ -52,3 +53,19 @@ export const itemUpdateSchema = z
     prepared: z.boolean(),
   })
   .partial()
+
+export const CATEGORY_LABEL_MAX = 20
+
+/** イベントの種類の一括保存（管理者）。上から順に並び、id のないものは新規追加、載っていない既存の種類は削除 */
+export const eventCategoriesSaveSchema = z.object({
+  categories: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        label: z.string().trim().min(1, '種類の名前を入力してください').max(CATEGORY_LABEL_MAX, '種類の名前が長すぎます'),
+        tone: z.enum(CATEGORY_TONES),
+      }),
+    )
+    .min(1, '種類は1つ以上必要です')
+    .max(30, '種類が多すぎます'),
+})

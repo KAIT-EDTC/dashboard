@@ -1,4 +1,4 @@
-import { BLOG_SERIES, validateForSubmit, type BlogPostContent } from '@edtc/shared'
+import { validateForSubmit, type BlogPostContent } from '@edtc/shared'
 import { useEffect, useState } from 'react'
 import { useBlocker, useFetcher } from 'react-router'
 import { css } from 'styled-system/css'
@@ -18,12 +18,12 @@ import type { PostDetailResponse } from './types'
 export type EditorIntent = 'save' | 'submit' | 'delete'
 export type EditorActionData = (FormErrors & { intent: EditorIntent }) | { ok: true; intent: EditorIntent; prUrl?: string }
 
-export function BlogEditor({ post, availableTags, hasUnsubmittedChanges, githubConfigured }: PostDetailResponse) {
+export function BlogEditor({ post, availableTags, availableSeries, hasUnsubmittedChanges, githubConfigured }: PostDetailResponse) {
   const [content, setContent] = useState<BlogPostContent>(() => contentOf(post))
   const fetcher = useFetcher<EditorActionData>()
   const pendingIntent = fetcher.state === 'idle' ? null : (fetcher.json as { intent?: EditorIntent } | undefined)?.intent
   const dirty = JSON.stringify(content) !== JSON.stringify(contentOf(post))
-  const problems = validateForSubmit(content, { seriesOptional: !!post.articleId })
+  const problems = validateForSubmit(content, { seriesOptional: !!post.articleId, seriesIds: availableSeries.map((series) => series.id) })
   const fieldErrors = fetcher.data && 'fieldErrors' in fetcher.data ? (fetcher.data.fieldErrors ?? {}) : {}
   const locked = !!post.publishedAt
 
@@ -87,7 +87,7 @@ export function BlogEditor({ post, availableTags, hasUnsubmittedChanges, githubC
                 error={fieldErrors.series}
               >
                 <option value="">{post.articleId ? '（今の記事IDのまま）' : '選択してください'}</option>
-                {BLOG_SERIES.map((series) => (
+                {availableSeries.map((series) => (
                   <option key={series.id} value={series.id}>
                     {series.label}
                   </option>

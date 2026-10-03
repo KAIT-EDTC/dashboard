@@ -1,4 +1,4 @@
-import { todayInJst, type EventCategory } from '@edtc/shared'
+import { todayInJst, type CategoryTone } from '@edtc/shared'
 import { Link } from 'react-router'
 import { css, cx } from 'styled-system/css'
 import { buttonStyle } from '~/components/ui/Button'
@@ -7,12 +7,12 @@ import type { EventListItem } from './types'
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 
-const CATEGORY_COLORS: Record<EventCategory, string> = {
-  activity: css({ bg: 'accent.subtle', color: 'accent.fg' }),
-  outreach: css({ bg: 'success.subtle', color: 'success.fg' }),
-  meeting: css({ bg: 'surface.muted', color: 'fg.muted' }),
-  social: css({ bg: 'warning.subtle', color: 'warning.fg' }),
-  other: css({ bg: 'surface.muted', color: 'fg.muted' }),
+const TONE_COLORS: Record<CategoryTone, string> = {
+  accent: css({ bg: 'accent.subtle', color: 'accent.fg' }),
+  success: css({ bg: 'success.subtle', color: 'success.fg' }),
+  warning: css({ bg: 'warning.subtle', color: 'warning.fg' }),
+  danger: css({ bg: 'danger.subtle', color: 'danger.fg' }),
+  neutral: css({ bg: 'surface.muted', color: 'fg.muted' }),
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -88,7 +88,7 @@ export function EventCalendar({ month, events, monthHref }: { month: string; eve
                   key={event.id}
                   to={`/events/${event.id}`}
                   title={event.title}
-                  className={cx(css({ display: 'block', px: '4px', fontSize: '11px', fontWeight: '600', borderRadius: 'sm', truncate: true, _hover: { opacity: 0.8 } }), CATEGORY_COLORS[event.category])}
+                  className={cx(css({ display: 'block', px: '4px', fontSize: '11px', fontWeight: '600', borderRadius: 'sm', truncate: true, _hover: { opacity: 0.8 } }), TONE_COLORS[event.categoryTone])}
                 >
                   {event.startsAt.slice(11)} {event.title}
                 </Link>
