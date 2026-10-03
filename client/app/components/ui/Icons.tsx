@@ -28,6 +28,11 @@ export const HomeIcon = icon(
     <path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
   </>,
 )
+export const SlidersIcon = icon(
+  <>
+    <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
+  </>,
+)
 export const CalendarIcon = icon(
   <>
     <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -57,6 +62,35 @@ export const LogOutIcon = icon(
   <>
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
     <path d="m16 17 5-5-5-5M21 12H9" />
+  </>,
+)
+export const ListIcon = icon(
+  <>
+    <path d="M8 6h13" />
+    <path d="M8 12h13" />
+    <path d="M8 18h13" />
+    <path d="M3 6h.01" />
+    <path d="M3 12h.01" />
+    <path d="M3 18h.01" />
+  </>,
+)
+
+export const BellIcon = icon(
+  <>
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+  </>,
+)
+
+export const TagIcon = icon(
+  <>
+    <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z" />
+    <path d="M7 7h.01" />
+  </>,
+)
+export const GripIcon = icon(
+  <>
+    <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth="3" />
   </>,
 )
 export const PlusIcon = icon(<path d="M12 5v14M5 12h14" />)
@@ -140,9 +174,6 @@ export const LinkIcon = icon(
     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
   </>,
 )
-
-/** EDTCのロゴ（積み重なった層） */
-export const LogoIcon = icon(<path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />)
 
 export function DiscordIcon({ size = 18, ...props }: IconProps) {
   return (

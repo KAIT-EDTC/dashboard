@@ -1,5 +1,5 @@
 import { eventInputSchema } from '@edtc/shared'
-import { optionalInt, optionalText, text } from '~/lib/form'
+import { optionalInt, optionalText, text, texts } from '~/lib/form'
 
 export function parseEventForm(form: FormData) {
   return eventInputSchema.safeParse({
@@ -12,5 +12,7 @@ export function parseEventForm(form: FormData) {
     rsvpDeadline: optionalText(form, 'rsvpDeadline'),
     capacity: optionalInt(form, 'capacity'),
     fee: optionalInt(form, 'fee'),
+    targetDivisions: texts(form, 'targetDivisions'),
+    targetUserIds: texts(form, 'targetUserIds'),
   })
 }

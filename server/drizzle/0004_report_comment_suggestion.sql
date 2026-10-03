@@ -1,1 +1,0 @@
-ALTER TABLE `activity_report_comments` ADD `suggestion` text;

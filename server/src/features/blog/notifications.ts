@@ -1,5 +1,6 @@
+import type { Db } from '../../db'
 import type { Bindings } from '../../env'
-import { EMBED_COLORS, mention, mentionRole, notify } from '../../lib/discord'
+import { EMBED_COLORS, mention, notify } from '../../lib/discord'
 
 type PostSummary = {
   id: string
@@ -11,16 +12,15 @@ type PostSummary = {
 
 const dashboardUrl = (env: Bindings, postId: string) => `${env.FRONTEND_URL}/blog/${postId}`
 
-export function notifySubmitted(env: Bindings, post: PostSummary, isResubmission: boolean) {
-  const reviewer = env.DISCORD_BLOG_REVIEWER_ROLE_ID
-  return notify(env, {
+export function notifySubmitted(env: Bindings, db: Db, post: PostSummary, isResubmission: boolean, reviewerIds: string[]) {
+  return notify(env, db, 'blogSubmitted', {
     content: [
-      reviewer && mentionRole(reviewer),
+      reviewerIds.map(mention).join(' '),
       isResubmission ? '🔄 ブログ記事の修正版が提出されました。' : '📝 ブログ記事が提出されました。レビューをお願いします！',
     ]
       .filter(Boolean)
       .join(' '),
-    mentionRoleIds: reviewer ? [reviewer] : [],
+    mentionUserIds: reviewerIds,
     embeds: [
       {
         title: post.title,
@@ -35,17 +35,17 @@ export function notifySubmitted(env: Bindings, post: PostSummary, isResubmission
   })
 }
 
-export function notifyPublished(env: Bindings, post: PostSummary, articleId: string | null) {
+export function notifyPublished(env: Bindings, db: Db, post: PostSummary, articleId: string | null) {
   const siteUrl = env.BLOG_SITE_URL && articleId ? `${env.BLOG_SITE_URL.replace(/\/+$/, '')}/blog/${articleId}` : undefined
-  return notify(env, {
+  return notify(env, db, 'blogPublished', {
     content: `🎉 ${mention(post.authorId)} さんのブログ記事がマージされました！まもなくサイトに公開されます。`,
     mentionUserIds: [post.authorId],
     embeds: [{ title: post.title, url: siteUrl ?? post.prUrl, color: EMBED_COLORS.success }],
   })
 }
 
-export function notifyClosed(env: Bindings, post: PostSummary) {
-  return notify(env, {
+export function notifyClosed(env: Bindings, db: Db, post: PostSummary) {
+  return notify(env, db, 'blogClosed', {
     content: `↩️ ${mention(post.authorId)} さんのブログ記事のPRがクローズされました。内容を確認して再提出してください。`,
     mentionUserIds: [post.authorId],
     embeds: [{ title: post.title, url: dashboardUrl(env, post.id), color: EMBED_COLORS.warning }],
@@ -54,6 +54,7 @@ export function notifyClosed(env: Bindings, post: PostSummary) {
 
 export function notifyFeedback(
   env: Bindings,
+  db: Db,
   post: PostSummary,
   feedback: { kind: 'approved' | 'changes_requested' | 'commented'; reviewer: string; body: string; url: string },
 ) {
@@ -63,7 +64,7 @@ export function notifyFeedback(
     commented: '💬 ブログ記事にコメントが届きました',
   }[feedback.kind]
   const body = feedback.body.length > 500 ? `${feedback.body.slice(0, 500)}…` : feedback.body
-  return notify(env, {
+  return notify(env, db, 'blogFeedback', {
     content: `${heading} ${mention(post.authorId)}`,
     mentionUserIds: [post.authorId],
     embeds: [

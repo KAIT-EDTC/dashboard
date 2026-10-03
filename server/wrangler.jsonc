@@ -11,7 +11,7 @@
     // フロントエンドのURL（CORS許可・OAuth後のリダイレクト先）
     "FRONTEND_URL": "http://localhost:5173",
     // ブログ記事のPR先リポジトリと、記事フォルダを置くディレクトリ
-    "BLOG_REPO": "KAIT-EDTC/EDTCHP",
+    "BLOG_REPO": "KAIT-EDTC/EDTCHP_v2",
     "BLOG_CONTENT_DIR": "content/blog"
   },
   "d1_databases": [
@@ -30,9 +30,9 @@
       "name": "edtc-dashboard",
       // 団体(Kait.edtc)のCloudflareアカウント。個人アカウントへ誤ってデプロイしないよう固定する
       "account_id": "f63f9ebc5db7b049a6e98a155a3d219d",
-      // 独自ドメイン(dashboard.kaitedtc.com)はDNSがCloudflare外(さくら)のため、当面は workers.dev で公開する。
-      // ドメインをCloudflareに移したら: workers_dev を外し、routes: [{ "pattern": "dashboard.kaitedtc.com", "custom_domain": true }] を追加
-      "workers_dev": true,
+      // kaitedtc.com のDNSはCloudflareにあるので、独自ドメインで公開する（workers.dev は無効）
+      "workers_dev": false,
+      "routes": [{ "pattern": "dashboard.kaitedtc.com", "custom_domain": true }],
       "preview_urls": false,
       "assets": {
         "directory": "../client/build/client",
@@ -40,9 +40,9 @@
         "run_worker_first": ["/api/*"]
       },
       "vars": {
-        // 独自ドメインに移したら https://dashboard.kaitedtc.com に戻す（OAuthのリダイレクトURIなども合わせる）
-        "FRONTEND_URL": "https://edtc-dashboard.kait-edtc.workers.dev",
-        "BLOG_REPO": "KAIT-EDTC/EDTCHP",
+        // OAuthのリダイレクトURI(DISCORD_REDIRECT_URI)など、公開URLに依存する設定もこのURLに合わせる
+        "FRONTEND_URL": "https://dashboard.kaitedtc.com",
+        "BLOG_REPO": "KAIT-EDTC/EDTCHP_v2",
         "BLOG_CONTENT_DIR": "content/blog",
         "BLOG_SITE_URL": "https://kaitedtc.com"
       },

@@ -8,7 +8,7 @@ export function contentOf(post: Pick<PostRow, keyof BlogPostContent>): BlogPostC
   return {
     title: post.title,
     eventDate: post.eventDate,
-    slug: post.slug,
+    series: post.series,
     description: post.description,
     authorName: post.authorName,
     tags: post.tags,
@@ -21,6 +21,12 @@ export function imagesOf(content: BlogPostContent | null | undefined): string[] 
   return content ? referencedImages(content) : []
 }
 
+/** 旧ルールで提出した内容（series がなく slug がある）を今の形に揃える */
+export function normalizeSnapshot(snapshot: BlogPostContent): BlogPostContent {
+  const { slug: _legacySlug, ...rest } = snapshot as BlogPostContent & { slug?: string }
+  return contentOf({ ...rest, series: rest.series ?? '' })
+}
+
 export function hasUnsubmittedChanges(post: PostRow): boolean {
-  return !!post.submittedContent && JSON.stringify(contentOf(post)) !== JSON.stringify(post.submittedContent)
+  return !!post.submittedContent && JSON.stringify(contentOf(post)) !== JSON.stringify(normalizeSnapshot(post.submittedContent))
 }

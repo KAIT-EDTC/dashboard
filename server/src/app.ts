@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { csrf } from 'hono/csrf'
 import { HTTPException } from 'hono/http-exception'
 import type { AppEnv } from './env'
+import { adminRoute } from './features/admin/routes'
 import { authRoute } from './features/auth/routes'
 import { blogRoute } from './features/blog/routes'
 import { githubWebhookRoute } from './features/blog/webhook'
@@ -28,6 +29,7 @@ app.notFound((c) => c.json({ error: 'Not Found' }, 404))
 
 const routes = app
   .route('/api/auth', authRoute)
+  .route('/api/admin', adminRoute)
   .route('/api/members', membersRoute)
   .route('/api/events', eventsRoute)
   .route('/api/blog', blogRoute)

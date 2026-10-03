@@ -432,7 +432,7 @@ export const reportsRoute = new Hono<AppEnv>()
         .get()
       runInBackground(
         c,
-        notifyRejected(c.env, summary, {
+        notifyRejected(c.env, db, summary, {
           reviewerName: reviewer ? `${reviewer.lastName} ${reviewer.firstName}` : '',
           step,
           comment: input.comment,
@@ -440,7 +440,7 @@ export const reportsRoute = new Hono<AppEnv>()
         }),
       )
     } else if (finished) {
-      runInBackground(c, notifyApproved(c.env, summary))
+      runInBackground(c, notifyApproved(c.env, db, summary))
     } else {
       runInBackground(c, notifyAwaitingReview(c.env, db, summary, report.approvalSteps[nextStep], 'advanced'))
     }

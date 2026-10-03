@@ -1,203 +1,9 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "247df449-1e80-45ba-9966-9d70a188d9bc",
+  "id": "577def6f-2444-4df9-8f88-0ec322820bf8",
   "prevId": "90f0bfb4-d1cd-48eb-b5a6-18ab07ce9145",
   "tables": {
-    "activity_reports": {
-      "name": "activity_reports",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "event_id": {
-          "name": "event_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "author_id": {
-          "name": "author_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "division": {
-          "name": "division",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "content": {
-          "name": "content",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "reflection": {
-          "name": "reflection",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "rating": {
-          "name": "rating",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "notes": {
-          "name": "notes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'draft'"
-        },
-        "submitted_at": {
-          "name": "submitted_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "reviewer_id": {
-          "name": "reviewer_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "reviewed_at": {
-          "name": "reviewed_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "rejection_fields": {
-          "name": "rejection_fields",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'[]'"
-        },
-        "rejection_comment": {
-          "name": "rejection_comment",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
-        }
-      },
-      "indexes": {
-        "activity_reports_event_author_idx": {
-          "name": "activity_reports_event_author_idx",
-          "columns": [
-            "event_id",
-            "author_id"
-          ],
-          "isUnique": true
-        },
-        "activity_reports_author_idx": {
-          "name": "activity_reports_author_idx",
-          "columns": [
-            "author_id"
-          ],
-          "isUnique": false
-        },
-        "activity_reports_status_division_idx": {
-          "name": "activity_reports_status_division_idx",
-          "columns": [
-            "status",
-            "division"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "activity_reports_event_id_events_id_fk": {
-          "name": "activity_reports_event_id_events_id_fk",
-          "tableFrom": "activity_reports",
-          "tableTo": "events",
-          "columnsFrom": [
-            "event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "activity_reports_author_id_users_id_fk": {
-          "name": "activity_reports_author_id_users_id_fk",
-          "tableFrom": "activity_reports",
-          "tableTo": "users",
-          "columnsFrom": [
-            "author_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "activity_reports_reviewer_id_users_id_fk": {
-          "name": "activity_reports_reviewer_id_users_id_fk",
-          "tableFrom": "activity_reports",
-          "tableTo": "users",
-          "columnsFrom": [
-            "reviewer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "blog_images": {
       "name": "blog_images",
       "columns": {
@@ -308,6 +114,14 @@
         },
         "slug": {
           "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "series": {
+          "name": "series",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -462,6 +276,54 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "blog_tags": {
+      "name": "blog_tags",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        }
+      },
+      "indexes": {
+        "blog_tags_label_unique": {
+          "name": "blog_tags_label_unique",
+          "columns": [
+            "label"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "event_items": {
       "name": "event_items",
       "columns": {
@@ -612,14 +474,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "''"
-        },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'assistant'"
         },
         "attended": {
           "name": "attended",
@@ -907,14 +761,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'member'"
-        },
-        "head_of": {
-          "name": "head_of",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'[]'"
         },
         "last_name": {
           "name": "last_name",

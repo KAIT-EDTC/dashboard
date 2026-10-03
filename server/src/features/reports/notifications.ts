@@ -1,7 +1,8 @@
-import { APPROVAL_STEP_LABELS, type ApprovalStep, type Division } from '@edtc/shared'
+import { APPROVAL_STEP_LABELS, type ApprovalStep, type Division, type NotificationKind } from '@edtc/shared'
 import type { Db } from '../../db'
 import type { Bindings } from '../../env'
 import { EMBED_COLORS, sendDirectMessage, sendDirectMessages } from '../../lib/discord'
+import { getNotificationSettings } from '../admin/notification-settings'
 import { approverIdsOf } from './queries'
 
 /**
@@ -10,6 +11,17 @@ import { approverIdsOf } from './queries'
  */
 
 const dashboardUrl = (env: Bindings, reportId: string) => `${env.FRONTEND_URL}/reports/${reportId}`
+
+/** 「通知設定」でオフにされていないか（DMもチャンネル通知と同じく種類ごとに止められる） */
+async function isEnabled(env: Bindings, db: Db, kind: NotificationKind): Promise<boolean> {
+  if (!env.DISCORD_BOT_TOKEN) return false
+  try {
+    return (await getNotificationSettings(db)).enabled[kind]
+  } catch (error) {
+    console.error('通知設定を読めませんでした', error)
+    return false
+  }
+}
 
 type ReportSummary = {
   id: string
@@ -28,7 +40,7 @@ export async function notifyAwaitingReview(
   step: ApprovalStep,
   reason: 'submitted' | 'resubmitted' | 'advanced',
 ) {
-  if (!env.DISCORD_BOT_TOKEN) return
+  if (!(await isEnabled(env, db, 'reportReviewRequested'))) return
   const approverIds = await approverIdsOf(db, step, report)
   if (approverIds.length === 0) {
     console.warn(`活動報告書 ${report.id} を確認できる${APPROVAL_STEP_LABELS[step]}が見つからないため、DMを送れませんでした`)
@@ -56,19 +68,22 @@ export async function notifyAwaitingReview(
   })
 }
 
-export function notifyApproved(env: Bindings, report: ReportSummary) {
-  return sendDirectMessage(env, report.authorId, {
+export async function notifyApproved(env: Bindings, db: Db, report: ReportSummary) {
+  if (!(await isEnabled(env, db, 'reportReviewed'))) return
+  await sendDirectMessage(env, report.authorId, {
     content: '✅ 活動報告書が承認されました。',
     embeds: [{ title: report.eventTitle, url: dashboardUrl(env, report.id), color: EMBED_COLORS.success }],
   })
 }
 
-export function notifyRejected(
+export async function notifyRejected(
   env: Bindings,
+  db: Db,
   report: ReportSummary,
   review: { reviewerName: string; step: ApprovalStep; comment: string; inlineCount: number },
 ) {
-  return sendDirectMessage(env, report.authorId, {
+  if (!(await isEnabled(env, db, 'reportReviewed'))) return
+  await sendDirectMessage(env, report.authorId, {
     content: '✏️ 活動報告書に修正依頼が届きました。',
     embeds: [
       {

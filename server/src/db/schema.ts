@@ -1,19 +1,18 @@
 import { relations, sql } from 'drizzle-orm'
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import {
-  BLOG_STATUSES,
-  EVENT_CATEGORIES,
   APPROVAL_STEPS,
+  BLOG_STATUSES,
   COMMENTABLE_FIELDS,
   ITEM_KINDS,
   OFFICERS,
   PARTICIPANT_ROLES,
   REPORT_STATUSES,
   RSVP_STATUSES,
-  type BlogPostContent,
-  type BlogTag,
-  type Division,
   type ApprovalStep,
+  type BlogPostContent,
+  type CategoryTone,
+  type Division,
   type ProfileLinks,
 } from '@edtc/shared'
 
@@ -36,7 +35,7 @@ export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
   discordUsername: text('discord_username').notNull(),
   discordAvatar: text('discord_avatar'),
-  /** ログインのたびにDiscordロールから再計算される */
+  /** 管理者がダッシュボードの「ユーザー管理」で変更する。最初に登録した人は管理者になる */
   role: text('role', { enum: ['member', 'admin'] }).notNull().default('member'),
   /** 部長を務める部署。ログインのたびにDiscordの部長ロールから再計算される */
   headOf: text('head_of', { mode: 'json' }).$type<Division[]>().notNull().default(sql`'[]'`),
@@ -89,10 +88,13 @@ export const blogPosts = sqliteTable(
     // 記事の中身（Markdownとして EDTCHP に PR される）
     title: text('title').notNull().default(''),
     eventDate: text('event_date').notNull().default(''),
+    /** 旧ルールの記事ID末尾（廃止。新しい記事では使わない） */
     slug: text('slug').notNull().default(''),
+    /** イベント種別ID（BLOG_SERIES）。記事IDの末尾になる */
+    series: text('series').notNull().default(''),
     description: text('description').notNull().default(''),
     authorName: text('author_name').notNull().default(''),
-    tags: text('tags', { mode: 'json' }).$type<BlogTag[]>().notNull().default(sql`'[]'`),
+    tags: text('tags', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
     thumbnail: text('thumbnail'),
     body: text('body').notNull().default(''),
 
@@ -100,7 +102,7 @@ export const blogPosts = sqliteTable(
     status: text('status', { enum: BLOG_STATUSES }).notNull().default('draft'),
     /** 提出時点の内容。PRのブランチは常にこのスナップショットから作り直す */
     submittedContent: text('submitted_content', { mode: 'json' }).$type<BlogPostContent>(),
-    /** 提出時点の記事ID（YY-MM-DD-slug）。一度公開したら変更できない */
+    /** 提出時点の記事ID（YY-MM-DD-イベント種別[-連番]）。一度公開したら変更できない */
     articleId: text('article_id'),
     branch: text('branch'),
     prNumber: integer('pr_number'),
@@ -112,6 +114,58 @@ export const blogPosts = sqliteTable(
   },
   (t) => [index('blog_posts_author_idx').on(t.authorId), index('blog_posts_pr_idx').on(t.prNumber)],
 )
+
+/** ブログ記事のイベント種別。id は記事IDの末尾（管理者が作成時に決め、後から変えられない） */
+export const blogSeries = sqliteTable('blog_series', {
+  id: text('id').primaryKey(),
+  label: text('label').notNull().unique(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamps.createdAt,
+})
+
+/** イベントの種類（活動・ミーティングなど）。名前を変えても id は変わらない */
+export const eventCategories = sqliteTable('event_categories', {
+  id: text('id').primaryKey(),
+  label: text('label').notNull().unique(),
+  /** バッジ・カレンダーの色（CATEGORY_TONES） */
+  tone: text('tone').$type<CategoryTone>().notNull().default('neutral'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamps.createdAt,
+})
+
+/** 記事に付けられるタグ。管理者がダッシュボードで管理し、記事には表示名で保存する */
+export const blogTags = sqliteTable('blog_tags', {
+  id: text('id').primaryKey(),
+  label: text('label').notNull().unique(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamps.createdAt,
+})
+
+/** ブログ提出時にDiscordでメンションするレビュー担当。管理者が「ユーザー管理」で選ぶ */
+export const blogReviewers = sqliteTable('blog_reviewers', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamps.createdAt,
+})
+
+/**
+ * Discord通知の設定（1行だけ。id は常に 1）。行が無ければ「通知先なし・すべてオン」として扱う。
+ * webhook_url は管理者が「通知設定」で入力する。画面には返さず、末尾だけ見せる
+ */
+export const notificationSettings = sqliteTable('notification_settings', {
+  id: integer('id').primaryKey(),
+  webhookUrl: text('webhook_url'),
+  onEventCreated: integer('on_event_created', { mode: 'boolean' }).notNull().default(true),
+  onBlogSubmitted: integer('on_blog_submitted', { mode: 'boolean' }).notNull().default(true),
+  onBlogPublished: integer('on_blog_published', { mode: 'boolean' }).notNull().default(true),
+  onBlogClosed: integer('on_blog_closed', { mode: 'boolean' }).notNull().default(true),
+  onBlogFeedback: integer('on_blog_feedback', { mode: 'boolean' }).notNull().default(true),
+  /** 活動報告書の通知（Webhookではなく、関係者へのDM） */
+  onReportReviewRequested: integer('on_report_review_requested', { mode: 'boolean' }).notNull().default(true),
+  onReportReviewed: integer('on_report_reviewed', { mode: 'boolean' }).notNull().default(true),
+  updatedAt: timestamps.updatedAt,
+})
 
 /**
  * 記事の画像（WebP）。本文からは ./<fileName> で参照し、PRでは記事フォルダに同じ名前で置かれる。
@@ -142,7 +196,8 @@ export const events = sqliteTable(
   {
     id: text('id').primaryKey(),
     title: text('title').notNull(),
-    category: text('category', { enum: EVENT_CATEGORIES }).notNull(),
+    /** event_categories の id（管理者が増減する。使用中の種類は削除できない） */
+    category: text('category').notNull(),
     description: text('description').notNull().default(''),
     location: text('location').notNull().default(''),
     /** 日本時間 YYYY-MM-DDTHH:mm */
@@ -199,6 +254,34 @@ export const eventItems = sqliteTable(
     createdAt: timestamps.createdAt,
   },
   (t) => [index('event_items_event_idx').on(t.eventId), index('event_items_assignee_idx').on(t.assigneeId)],
+)
+
+/**
+ * イベントの対象者。対象の部署と個人のどちらも無ければ全員向け。
+ * 部署は指定だけを保存し、その時点の部署のメンバーを対象とする（後から部署に入った人も含む）
+ */
+export const eventTargetDivisions = sqliteTable(
+  'event_target_divisions',
+  {
+    eventId: text('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    division: text('division').$type<Division>().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.division] })],
+)
+
+export const eventTargetUsers = sqliteTable(
+  'event_target_users',
+  {
+    eventId: text('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.userId] }), index('event_target_users_user_idx').on(t.userId)],
 )
 
 // ---------------------------------------------------------------------------
@@ -307,7 +390,18 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   creator: one(users, { fields: [events.createdBy], references: [users.id] }),
   participants: many(eventParticipants),
   items: many(eventItems),
+  targetDivisions: many(eventTargetDivisions),
+  targetUsers: many(eventTargetUsers),
   reports: many(activityReports),
+}))
+
+export const eventTargetDivisionsRelations = relations(eventTargetDivisions, ({ one }) => ({
+  event: one(events, { fields: [eventTargetDivisions.eventId], references: [events.id] }),
+}))
+
+export const eventTargetUsersRelations = relations(eventTargetUsers, ({ one }) => ({
+  event: one(events, { fields: [eventTargetUsers.eventId], references: [events.id] }),
+  user: one(users, { fields: [eventTargetUsers.userId], references: [users.id] }),
 }))
 
 export const eventParticipantsRelations = relations(eventParticipants, ({ one }) => ({

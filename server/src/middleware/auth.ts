@@ -34,9 +34,13 @@ export function assertCanManage(session: Session, ownerId: string) {
   if (!canManage(session, ownerId)) throw forbidden()
 }
 
+export function assertAdmin(session: Session) {
+  if (session.role !== 'admin') throw forbidden()
+}
+
 type ReviewTarget = { authorId: string; division: Division | null; approverId: string | null; approvalSteps: ApprovalStep[] }
 
-/** 活動報告書のその段階を承認・差し戻しできるか（自分の報告書は除く。管理者は関わらない） */
+/** 活動報告書のその段階を承認・修正依頼できるか（自分の報告書は除く。管理者は関わらない） */
 export function canReviewStep(session: Session, report: ReviewTarget, step: ApprovalStep | undefined): boolean {
   if (!step || report.authorId === session.userId) return false
   return canApproveStep({ ...session, id: session.userId }, step, report)

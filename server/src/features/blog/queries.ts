@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import type { Db } from '../../db'
-import { blogPosts, users } from '../../db/schema'
+import { blogPosts, blogReviewers, blogSeries, users } from '../../db/schema'
 import type { Session } from '../../env'
 import { notFound } from '../../lib/errors'
 import { canManage } from '../../middleware/auth'
@@ -24,4 +24,18 @@ export async function authorLabelOf(db: Db, userId: string) {
     .where(eq(users.id, userId))
     .get()
   return user ? `${user.lastName} ${user.firstName} (@${user.discordUsername})` : userId
+}
+
+/** 提出通知でメンションするレビュー担当（管理者が「ユーザー管理」で選ぶ） */
+export async function listReviewerIds(db: Db) {
+  const rows = await db.select({ userId: blogReviewers.userId }).from(blogReviewers)
+  return rows.map((row) => row.userId)
+}
+
+/** 今あるイベント種別（並び順どおり） */
+export function listSeries(db: Db) {
+  return db
+    .select({ id: blogSeries.id, label: blogSeries.label })
+    .from(blogSeries)
+    .orderBy(asc(blogSeries.sortOrder), asc(blogSeries.createdAt))
 }

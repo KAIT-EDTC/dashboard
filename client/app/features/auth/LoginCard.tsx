@@ -1,13 +1,14 @@
 import { css } from 'styled-system/css'
 import { buttonStyle } from '~/components/ui/Button'
 import { Alert } from '~/components/ui/Alert'
-import { DiscordIcon, LogoIcon } from '~/components/ui/Icons'
+import { DiscordIcon } from '~/components/ui/Icons'
+import { BrandIcon } from '~/components/layout/BrandIcon'
 import { API_URL } from '~/lib/api'
 
 export function LoginCard({ errorMessage }: { errorMessage: string | null }) {
   return (
     <div className={css({ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 'md' })}>
-      <LogoIcon size={48} className={css({ color: 'accent' })} />
+      <BrandIcon size={64} />
       <div>
         <h1 className={css({ fontSize: '2xl', fontWeight: '700', mb: 'xs' })}>EDTCダッシュボードへようこそ</h1>
         <p className={css({ color: 'fg.muted' })}>イベントの出欠や持ち物、ブログの投稿、メンバー紹介をここで。</p>

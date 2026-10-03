@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { gradeOf, parseNickname, parseStudentId, registrationSchema, splitName } from '@edtc/shared'
 import { createDb } from '../../db'
@@ -10,7 +10,6 @@ import {
   fetchCurrentUser,
   fetchGuildMember,
   headDivisionsOf,
-  isAdminMember,
   officerOf,
 } from '../../lib/discord'
 import { badRequest, conflict, unauthorized } from '../../lib/errors'
@@ -47,17 +46,17 @@ export const authRoute = new Hono<AppEnv>()
       ])
       if (!member) return loginPage('not_a_member')
 
-      const role = isAdminMember(c.env, member) ? 'admin' : 'member'
+      // 部署長・本部長・代表はDiscordロールで判定する（管理者はダッシュボードで管理する）
       const headOf = headDivisionsOf(c.env, member)
       const officer = officerOf(c.env, member)
       const db = createDb(c.env)
       const existing = await db.select({ id: users.id }).from(users).where(eq(users.id, discordUser.id)).get()
 
       if (existing) {
-        // アイコン・ユーザー名・ロール（管理者・部署長・代表・本部長）はDiscord側を正とする
+        // アイコン・ユーザー名・役職（部署長・本部長・代表）はDiscord側を正とする（管理者はダッシュボードで管理する）
         await db
           .update(users)
-          .set({ discordUsername: discordUser.username, discordAvatar: discordUser.avatar, role, headOf, officer })
+          .set({ discordUsername: discordUser.username, discordAvatar: discordUser.avatar, headOf, officer })
           .where(eq(users.id, discordUser.id))
         await startSession(c, discordUser.id)
         return c.redirect(c.env.FRONTEND_URL)
@@ -68,7 +67,6 @@ export const authRoute = new Hono<AppEnv>()
         username: discordUser.username,
         avatar: discordUser.avatar,
         nick: member.nick,
-        role,
         headOf,
         officer,
       })
@@ -121,7 +119,8 @@ export const authRoute = new Hono<AppEnv>()
         id: claims.sub,
         discordUsername: claims.username,
         discordAvatar: claims.avatar,
-        role: claims.role,
+        // 管理者が1人もいないとき（最初の登録者）だけ管理者にする
+        role: sql`CASE WHEN EXISTS (SELECT 1 FROM users WHERE role = 'admin') THEN 'member' ELSE 'admin' END`,
         headOf: claims.headOf ?? [],
         officer: claims.officer ?? null,
         lastName: input.lastName,

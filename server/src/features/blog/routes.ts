@@ -4,25 +4,27 @@ import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import {
   blogPostInputSchema,
-  buildArticleId,
   IMAGE_FILE_PATTERN,
   MAX_IMAGE_BYTES,
   referencedImages,
   validateForSubmit,
 } from '@edtc/shared'
 import { createDb, memberSummaryColumns } from '../../db'
-import { blogImages, blogPosts, events, users } from '../../db/schema'
+import { blogImages, blogPosts, blogTags, events, users } from '../../db/schema'
 import type { AppEnv } from '../../env'
 import { runInBackground } from '../../lib/background'
 import { base64ToBytes, bytesToBase64 } from '../../lib/base64'
-import { badRequest, conflict, notFound } from '../../lib/errors'
+import { badRequest, notFound } from '../../lib/errors'
 import { isGitHubConfigured } from '../../lib/github'
 import { validate } from '../../lib/validator'
 import { assertCanManage, canManage, requireAuth } from '../../middleware/auth'
+import { resolveArticleId } from './article-id'
 import { contentOf, hasUnsubmittedChanges, imagesOf } from './content'
 import { notifySubmitted } from './notifications'
 import { BlogPublisher } from './publisher'
-import { assertCanView, authorLabelOf, findPost } from './queries'
+import { assertCanView, authorLabelOf, findPost, listReviewerIds, listSeries } from './queries'
+import { blogSeriesRoute } from './series'
+import { blogTagsRoute } from './tags'
 
 const WEBP_MAGIC = { riff: 'RIFF', webp: 'WEBP' }
 const isWebp = (bytes: Uint8Array) =>
@@ -37,6 +39,8 @@ function newImageFileName(): string {
 
 export const blogRoute = new Hono<AppEnv>()
   .use(requireAuth)
+  .route('/tags', blogTagsRoute)
+  .route('/series', blogSeriesRoute)
 
   .get('/posts', validate('query', z.object({ scope: z.enum(['mine', 'all']).default('all') })), async (c) => {
     const { scope } = c.req.valid('query')
@@ -88,8 +92,12 @@ export const blogRoute = new Hono<AppEnv>()
     if (!post) throw notFound('記事が見つかりません')
     assertCanView(session, post)
     const { submittedContent: _snapshot, ...rest } = post
+    const availableTags = await db.select({ id: blogTags.id, label: blogTags.label }).from(blogTags).orderBy(blogTags.sortOrder, blogTags.createdAt)
+    const availableSeries = await listSeries(db)
     return c.json({
       post: rest,
+      availableTags,
+      availableSeries,
       canEdit: canManage(session, post.authorId),
       hasUnsubmittedChanges: hasUnsubmittedChanges(post),
       githubConfigured: isGitHubConfigured(c.env),
@@ -101,9 +109,16 @@ export const blogRoute = new Hono<AppEnv>()
     const db = createDb(c.env)
     const post = await findPost(db, c.req.param('id'))
     assertCanManage(c.get('session'), post.authorId)
-    if (post.publishedAt && buildArticleId(input.eventDate, input.slug) !== post.articleId) {
-      throw badRequest('公開済みの記事は日付と記事IDを変更できません')
+    if (post.publishedAt && (input.eventDate !== post.eventDate || input.series !== post.series)) {
+      throw badRequest('公開済みの記事は日付とイベント種別を変更できません')
     }
+    if (input.series && !(await listSeries(db)).some((series) => series.id === input.series)) {
+      throw badRequest('イベント種別が正しくありません。画面を読み込み直してください')
+    }
+    // 管理者が削除したタグが付いたままの記事も保存できるよう、すでに付いているタグは許可する
+    const knownTags = new Set((await db.select({ label: blogTags.label }).from(blogTags)).map((tag) => tag.label))
+    const unknownTags = input.tags.filter((tag) => !knownTags.has(tag) && !post.tags.includes(tag))
+    if (unknownTags.length > 0) throw badRequest(`存在しないタグです: ${unknownTags.join(', ')}`)
 
     // 使われなくなった画像を消す。提出済みの内容が参照している画像と、
     // 保存と入れ違いでアップロードされたばかりの画像（1時間以内）は残す
@@ -176,17 +191,18 @@ export const blogRoute = new Hono<AppEnv>()
     assertCanManage(c.get('session'), post.authorId)
 
     const content = contentOf(post)
-    const errors = validateForSubmit(content)
+    const seriesIds = (await listSeries(db)).map((series) => series.id)
+    const errors = validateForSubmit(content, { seriesOptional: !!post.articleId, seriesIds })
     if (errors.length > 0) throw badRequest(errors.join('\n'))
-
-    const articleId = buildArticleId(content.eventDate, content.slug)
-    if (post.publishedAt && articleId !== post.articleId) throw badRequest('公開済みの記事は日付と記事IDを変更できません')
-    const duplicate = await db
-      .select({ id: blogPosts.id })
-      .from(blogPosts)
-      .where(and(eq(blogPosts.articleId, articleId), ne(blogPosts.id, post.id), ne(blogPosts.status, 'draft')))
-      .get()
-    if (duplicate) throw conflict('同じ記事IDの記事がダッシュボードで提出されています。記事IDを変更してください')
+    if (post.publishedAt) {
+      const submitted = post.submittedContent
+      if (submitted && (content.eventDate !== submitted.eventDate || content.series !== (submitted.series ?? ''))) {
+        throw badRequest('公開済みの記事は日付とイベント種別を変更できません')
+      }
+    }
+    const knownTags = new Set((await db.select({ label: blogTags.label }).from(blogTags)).map((tag) => tag.label))
+    const unknownTags = content.tags.filter((tag) => !knownTags.has(tag))
+    if (unknownTags.length > 0) throw badRequest(`削除されたタグが付いています。外してから提出してください: ${unknownTags.join(', ')}`)
 
     const images = referencedImages(content)
     const uploaded = images.length
@@ -200,11 +216,9 @@ export const blogRoute = new Hono<AppEnv>()
 
     try {
       const publisher = await BlogPublisher.create(c.env, db)
-      if (!post.publishedAt && (await publisher.articleExists(articleId))) {
-        throw conflict('同じ記事IDの記事がすでにサイトにあります。記事IDを変更してください')
-      }
+      const articleId = await resolveArticleId(db, publisher, post, content)
       const authorLabel = await authorLabelOf(db, post.authorId)
-      const result = await publisher.sync({ id: post.id, prNumber: post.prNumber, submittedContent: content, authorLabel })
+      const result = await publisher.sync({ id: post.id, prNumber: post.prNumber, articleId, submittedContent: content, authorLabel })
 
       await db
         .update(blogPosts)
@@ -223,8 +237,10 @@ export const blogRoute = new Hono<AppEnv>()
         c,
         notifySubmitted(
           c.env,
+          db,
           { id: post.id, title: content.title, authorId: post.authorId, authorLabel, prUrl: result.prUrl },
           !result.created,
+          await listReviewerIds(db),
         ),
       )
       return c.json({ prUrl: result.prUrl, created: result.created })

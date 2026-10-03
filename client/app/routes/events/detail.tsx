@@ -83,7 +83,7 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
 
 export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
-  const { event, reports, myReport, canManage } = loaderData
+  const { event, canManage, isTarget, pending, reports, myReport } = loaderData
   const me = useCurrentUser()
   const mine = event.participants.find((p) => p.userId === me.id)
   const started = event.startsAt <= nowInJst()
@@ -94,7 +94,7 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
     <>
       <PageHeader
         title={event.title}
-        description={<CategoryBadge category={event.category} />}
+        description={<CategoryBadge label={event.categoryLabel} tone={event.categoryTone} />}
         back={{ to: '/events', label: 'イベント一覧' }}
         actions={
           <>
@@ -136,8 +136,8 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
           <ItemList event={event} userId={me.id} canManage={canManage} />
         </div>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
-          <RsvpPanel event={event} userId={me.id} canManage={canManage} />
-          <ParticipantList event={event} canManage={canManage} />
+          <RsvpPanel event={event} userId={me.id} canManage={canManage} isTarget={isTarget} />
+          <ParticipantList event={event} pending={pending} canManage={canManage} />
         </div>
       </div>
     </>
