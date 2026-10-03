@@ -6,13 +6,18 @@ import { Alert } from '~/components/ui/Alert'
 import { Button } from '~/components/ui/Button'
 import { Card } from '~/components/ui/Card'
 import { SelectField, TextareaField, TextField } from '~/components/ui/Field'
+import { AttachmentField } from '~/features/events/AttachmentField'
 import { DivisionPicker } from '~/features/members/DivisionPicker'
 import { MemberPicker } from '~/features/members/MemberPicker'
 import type { MemberListItem } from '~/features/members/types'
 import type { FormErrors } from '~/lib/form'
+import type { EventAttachment } from './types'
 
 type EventFormProps = {
   defaultValue?: Partial<EventInput>
+  /** 編集時の、すでに添付されているファイルとイベントID */
+  attachments?: EventAttachment[]
+  eventId?: string
   /** 対象者の選択と人数の表示に使う */
   members: MemberListItem[]
   errors?: FormErrors
@@ -22,7 +27,7 @@ type EventFormProps = {
   secondaryActions?: ReactNode
 }
 
-export function EventForm({ defaultValue = {}, members, errors, submitting, submitLabel, secondaryActions }: EventFormProps) {
+export function EventForm({ defaultValue = {}, attachments, eventId, members, errors, submitting, submitLabel, secondaryActions }: EventFormProps) {
   const e = errors?.fieldErrors ?? {}
   const [targetDivisions, setTargetDivisions] = useState<Division[]>(defaultValue.targetDivisions ?? [])
   const [targetUserIds, setTargetUserIds] = useState<string[]>(defaultValue.targetUserIds ?? [])
@@ -30,7 +35,7 @@ export function EventForm({ defaultValue = {}, members, errors, submitting, subm
   const targeted = targetDivisions.length > 0 || targetUserIds.length > 0
   const grid = css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: '1fr 1fr' }, gap: 'md' })
   return (
-    <Form method="post" className={css({ display: 'flex', flexDirection: 'column', gap: 'lg', maxW: '760px' })}>
+    <Form method="post" encType="multipart/form-data" className={css({ display: 'flex', flexDirection: 'column', gap: 'lg', maxW: '760px' })}>
       {errors?.error && <Alert>{errors.error}</Alert>}
       <Card title="基本情報">
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
@@ -48,6 +53,7 @@ export function EventForm({ defaultValue = {}, members, errors, submitting, subm
             <TextField label="終了日時" name="endsAt" type="datetime-local" defaultValue={defaultValue.endsAt ?? ''} error={e.endsAt} />
           </div>
           <TextareaField label="説明" name="description" rows={5} defaultValue={defaultValue.description} placeholder="内容・集合場所・服装など" error={e.description} />
+          <AttachmentField existing={attachments} eventId={eventId} />
         </div>
       </Card>
 

@@ -2,10 +2,11 @@ import { redirect, useNavigation, useSubmit } from 'react-router'
 import { Button, ButtonLink } from '~/components/ui/Button'
 import { TrashIcon } from '~/components/ui/Icons'
 import { PageHeader } from '~/components/ui/PageHeader'
+import { filesFrom, uploadAttachments } from '~/features/events/attachments'
 import { parseEventForm } from '~/features/events/event-form'
 import { EventForm } from '~/features/events/EventForm'
 import { api, unwrap } from '~/lib/api'
-import { catchApiError, zodErrors } from '~/lib/form'
+import { catchApiError, texts, zodErrors } from '~/lib/form'
 import type { Route } from './+types/edit'
 
 export const meta: Route.MetaFunction = () => [{ title: 'イベントを編集 | EDTC ダッシュボード' }]
@@ -33,7 +34,15 @@ export async function clientAction({ request, params }: Route.ClientActionArgs) 
   if (!parsed.success) return zodErrors(parsed.error)
   const result = await catchApiError(() => unwrap(api.events[':id'].$put({ param, json: parsed.data })))
   if (result.errors) return result.errors
-  return redirect(`/events/${params.eventId}`)
+
+  // 削除を先に済ませてから追加する（個数の上限に収まるように）。失敗しても保存は取り消さず、詳細ページで知らせる
+  let failed = 0
+  for (const attachmentId of texts(form, 'removeAttachmentIds')) {
+    const removal = await catchApiError(() => unwrap(api.events[':id'].attachments[':attachmentId'].$delete({ param: { ...param, attachmentId } })))
+    if (removal.errors) failed++
+  }
+  failed += (await uploadAttachments(params.eventId, filesFrom(form, 'files'))).length
+  return redirect(`/events/${params.eventId}${failed > 0 ? `?attachFailed=${failed}` : ''}`)
 }
 
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
@@ -55,6 +64,8 @@ export default function EditEventPage({ loaderData, actionData }: Route.Componen
       <PageHeader title="イベントを編集" back={{ to: `/events/${event.id}`, label: event.title }} />
       <EventForm
         defaultValue={{ ...event, targetUserIds: event.targetUsers.map((user) => user.id) }}
+        attachments={event.attachments}
+        eventId={event.id}
         members={members}
         errors={actionData}
         submitting={navigation.state === 'submitting' && !deleting}

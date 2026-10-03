@@ -6,5 +6,6 @@ export type EventDetailResponse = InferResponseType<(typeof api.events)[':id']['
 export type EventDetail = EventDetailResponse['event']
 export type EventParticipant = EventDetail['participants'][number]
 export type EventItem = EventDetail['items'][number]
+export type EventAttachment = EventDetail['attachments'][number]
 export type PendingMember = EventDetailResponse['pending'][number]
 export type MyItem = InferResponseType<(typeof api.events)['my-items']['$get'], 200>['items'][number]
