@@ -11,6 +11,8 @@
     "typecheck": "tsc",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "wrangler d1 migrations apply edtc-dashboard --local",
+    "db:seed": "npm run db:seed:clear && wrangler d1 execute edtc-dashboard --local --file seed/seed.sql",
+    "db:seed:clear": "wrangler d1 execute edtc-dashboard --local --file seed/clear.sql",
     "db:migrate:remote": "wrangler d1 migrations apply edtc-dashboard --remote --env production"
   },
   "dependencies": {
