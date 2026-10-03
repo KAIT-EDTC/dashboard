@@ -22,7 +22,7 @@ import { resolveArticleId } from './article-id'
 import { contentOf, hasUnsubmittedChanges, imagesOf } from './content'
 import { notifySubmitted } from './notifications'
 import { BlogPublisher } from './publisher'
-import { assertCanView, authorLabelOf, findPost } from './queries'
+import { assertCanView, authorLabelOf, findPost, listReviewerIds } from './queries'
 import { blogTagsRoute } from './tags'
 
 const WEBP_MAGIC = { riff: 'RIFF', webp: 'WEBP' }
@@ -231,6 +231,7 @@ export const blogRoute = new Hono<AppEnv>()
           c.env,
           { id: post.id, title: content.title, authorId: post.authorId, authorLabel, prUrl: result.prUrl },
           !result.created,
+          await listReviewerIds(db),
         ),
       )
       return c.json({ prUrl: result.prUrl, created: result.created })

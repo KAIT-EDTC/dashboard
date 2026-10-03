@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { gradeOf, parseNickname, parseStudentId, registrationSchema, splitName } from '@edtc/shared'
 import { createDb } from '../../db'
@@ -9,7 +9,6 @@ import {
   exchangeCode,
   fetchCurrentUser,
   fetchGuildMember,
-  isAdminMember,
 } from '../../lib/discord'
 import { badRequest, conflict, unauthorized } from '../../lib/errors'
 import { validate } from '../../lib/validator'
@@ -45,15 +44,14 @@ export const authRoute = new Hono<AppEnv>()
       ])
       if (!member) return loginPage('not_a_member')
 
-      const role = isAdminMember(c.env, member) ? 'admin' : 'member'
       const db = createDb(c.env)
       const existing = await db.select({ id: users.id }).from(users).where(eq(users.id, discordUser.id)).get()
 
       if (existing) {
-        // アイコン・ユーザー名・ロールはDiscord側を正とする
+        // アイコン・ユーザー名はDiscord側を正とする（ロールはダッシュボードで管理する）
         await db
           .update(users)
-          .set({ discordUsername: discordUser.username, discordAvatar: discordUser.avatar, role })
+          .set({ discordUsername: discordUser.username, discordAvatar: discordUser.avatar })
           .where(eq(users.id, discordUser.id))
         await startSession(c, discordUser.id)
         return c.redirect(c.env.FRONTEND_URL)
@@ -64,7 +62,6 @@ export const authRoute = new Hono<AppEnv>()
         username: discordUser.username,
         avatar: discordUser.avatar,
         nick: member.nick,
-        role,
       })
       return c.redirect(`${c.env.FRONTEND_URL}/register`)
     } catch (error) {
@@ -115,7 +112,8 @@ export const authRoute = new Hono<AppEnv>()
         id: claims.sub,
         discordUsername: claims.username,
         discordAvatar: claims.avatar,
-        role: claims.role,
+        // 管理者が1人もいないとき（最初の登録者）だけ管理者にする
+        role: sql`CASE WHEN EXISTS (SELECT 1 FROM users WHERE role = 'admin') THEN 'member' ELSE 'admin' END`,
         lastName: input.lastName,
         firstName: input.firstName,
         lastNameKana: input.lastNameKana,

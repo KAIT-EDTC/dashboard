@@ -6,8 +6,6 @@ DISCORD_CLIENT_SECRET=
 DISCORD_REDIRECT_URI=http://localhost:8787/api/auth/callback
 # EDTCサーバーのID
 DISCORD_GUILD_ID=
-# 管理者として扱うロールID（カンマ区切り）
-DISCORD_ADMIN_ROLE_IDS=
 # 通知先チャンネルのWebhook URL（未設定なら通知しない）
 DISCORD_WEBHOOK_URL=
 

@@ -8,7 +8,7 @@ const API = 'https://discord.com/api/v10'
 
 /**
  * guilds.members.read で「自分のサーバー内プロフィール（ニックネーム・ロール）」を取得できるため、
- * Botトークンなしでサーバー所属・学籍番号・管理者ロールを確認できる
+ * Botトークンなしでサーバー所属・学籍番号を確認できる
  */
 const SCOPES = ['identify', 'guilds.members.read']
 
@@ -21,7 +21,6 @@ export type DiscordUser = {
 
 export type DiscordGuildMember = {
   nick: string | null
-  roles: string[]
 }
 
 export function authorizeUrl(env: Bindings, state: string): string {
@@ -69,14 +68,6 @@ export async function fetchGuildMember(accessToken: string, guildId: string): Pr
   return res.json()
 }
 
-export function isAdminMember(env: Bindings, member: DiscordGuildMember): boolean {
-  const adminRoles = (env.DISCORD_ADMIN_ROLE_IDS ?? '')
-    .split(',')
-    .map((id) => id.trim())
-    .filter(Boolean)
-  return member.roles.some((role) => adminRoles.includes(role))
-}
-
 // ---------------------------------------------------------------------------
 // 通知（Webhook）
 // ---------------------------------------------------------------------------
@@ -98,12 +89,11 @@ export const EMBED_COLORS = {
 
 /** Discordのユーザーメンション */
 export const mention = (userId: string) => `<@${userId}>`
-export const mentionRole = (roleId: string) => `<@&${roleId}>`
 
 /** 通知の失敗で本来の処理を失敗させないよう、例外は握りつぶしてログだけ残す */
 export async function notify(
   env: Bindings,
-  message: { content?: string; embeds?: DiscordEmbed[]; mentionUserIds?: string[]; mentionRoleIds?: string[] },
+  message: { content?: string; embeds?: DiscordEmbed[]; mentionUserIds?: string[] },
 ): Promise<void> {
   if (!env.DISCORD_WEBHOOK_URL) return
   try {
@@ -113,7 +103,7 @@ export async function notify(
       body: JSON.stringify({
         content: message.content,
         embeds: message.embeds,
-        allowed_mentions: { users: message.mentionUserIds ?? [], roles: message.mentionRoleIds ?? [] },
+        allowed_mentions: { users: message.mentionUserIds ?? [] },
       }),
     })
     if (!res.ok) console.error('Discord通知に失敗しました', res.status, await res.text())

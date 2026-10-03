@@ -59,7 +59,11 @@ theme/ (client直下)     # Panda のトークン・グローバルCSS
 | ブログの編集・提出 | 自分の記事だけ | すべて |
 | 他人の下書きの閲覧 | × | ○ |
 
-管理者は `DISCORD_ADMIN_ROLE_IDS` に指定したDiscordロールを持つ人。ログインのたびに再判定する。
+管理者は、管理者のダッシュボード左メニュー「ユーザー管理」で追加・解除する（Discordのロールや環境変数は使わない）。
+
+- 最初に登録した人（管理者が1人もいない状態で登録した人）は自動で管理者になる
+- 自分自身の権限は変更できないので、管理者が0人になることはない。全員がログインできなくなった場合などは `wrangler d1 execute edtc-dashboard --remote --env production --command "UPDATE users SET role='admin' WHERE id='<DiscordのユーザーID>'"` で復旧する
+- 「ユーザー管理」では、ブログ提出時のDiscord通知でメンションする **レビュー担当** もメンバーのドロップダウンから選ぶ
 
 ## ブログ
 
@@ -101,7 +105,7 @@ thumbnail: ./img-k3x9a0qz.webp
 - 画像は必ず記事フォルダ内のファイルを相対パスで参照し、altが付いている（提出時にチェックする）。外部画像・HTMLの `<img>` `<script>` `<iframe>` は提出できない
 - 記事IDは執筆者が入力せず、イベント種別（`shared/src/blog.ts` の `BLOG_SERIES`: yugyou / event / outreach / play / other）の選択とイベント実施日から、初回提出時にサーバーが決める。一度公開した記事の日付・イベント種別は変えられない。イベント種別を追加・変更するときはコードを修正する
 - 旧ルール（`YY-MM-DD-slug`、例: `26-05-16-yugyou01`）で提出済みの記事IDはそのまま使い続ける
-- タグは管理者（`DISCORD_ADMIN_ROLE_IDS` のロール）がダッシュボードの「タグ管理」で追加・名前変更・並べ替え・削除する。名前を変えると記事のタグも更新され、使用中のタグは削除できない
+- タグは管理者がダッシュボードの「タグ管理」で追加・名前変更・並べ替え・削除する。名前を変えると記事のタグも更新され、使用中のタグは削除できない
 - 公開通知のリンクは `<BLOG_SITE_URL>/blog/<記事ID>` になる
 
 ## 開発
@@ -131,8 +135,8 @@ npm run dev                        # client: http://localhost:5173 / server: htt
 
 1. [Developer Portal](https://discord.com/developers/applications) でアプリを作り、OAuth2 の Redirects に `<APIのURL>/api/auth/callback` を登録
 2. `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` / `DISCORD_REDIRECT_URI` / `DISCORD_GUILD_ID` を設定
-3. スコープは `identify` と `guilds.members.read`（サーバー内のニックネームとロールを本人のトークンで読むため、Botは不要）
-4. 通知したいチャンネルでWebhookを作り `DISCORD_WEBHOOK_URL` に設定。ブログ提出時にメンションしたいロール（広報部など）があれば `DISCORD_BLOG_REVIEWER_ROLE_ID`
+3. スコープは `identify` と `guilds.members.read`（サーバー内のニックネームを本人のトークンで読むため、Botは不要）
+4. 通知したいチャンネルでWebhookを作り `DISCORD_WEBHOOK_URL` に設定。ブログ提出時にメンションする人は、ダッシュボードの「ユーザー管理」で選ぶ
 
 ### GitHub App（ブログ）
 
@@ -166,9 +170,7 @@ npx wrangler secret put DISCORD_CLIENT_ID --env production
 npx wrangler secret put DISCORD_CLIENT_SECRET --env production
 npx wrangler secret put DISCORD_REDIRECT_URI --env production        # https://<公開URL>/api/auth/callback
 npx wrangler secret put DISCORD_GUILD_ID --env production
-npx wrangler secret put DISCORD_ADMIN_ROLE_IDS --env production
 npx wrangler secret put DISCORD_WEBHOOK_URL --env production
-npx wrangler secret put DISCORD_BLOG_REVIEWER_ROLE_ID --env production   # 任意
 npx wrangler secret put GITHUB_APP_ID --env production
 npx wrangler secret put GITHUB_APP_PRIVATE_KEY --env production < your-app.pem
 npx wrangler secret put GITHUB_WEBHOOK_SECRET --env production

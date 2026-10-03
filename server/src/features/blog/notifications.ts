@@ -1,5 +1,5 @@
 import type { Bindings } from '../../env'
-import { EMBED_COLORS, mention, mentionRole, notify } from '../../lib/discord'
+import { EMBED_COLORS, mention, notify } from '../../lib/discord'
 
 type PostSummary = {
   id: string
@@ -11,16 +11,15 @@ type PostSummary = {
 
 const dashboardUrl = (env: Bindings, postId: string) => `${env.FRONTEND_URL}/blog/${postId}`
 
-export function notifySubmitted(env: Bindings, post: PostSummary, isResubmission: boolean) {
-  const reviewer = env.DISCORD_BLOG_REVIEWER_ROLE_ID
+export function notifySubmitted(env: Bindings, post: PostSummary, isResubmission: boolean, reviewerIds: string[]) {
   return notify(env, {
     content: [
-      reviewer && mentionRole(reviewer),
+      reviewerIds.map(mention).join(' '),
       isResubmission ? '🔄 ブログ記事の修正版が提出されました。' : '📝 ブログ記事が提出されました。レビューをお願いします！',
     ]
       .filter(Boolean)
       .join(' '),
-    mentionRoleIds: reviewer ? [reviewer] : [],
+    mentionUserIds: reviewerIds,
     embeds: [
       {
         title: post.title,

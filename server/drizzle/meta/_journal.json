@@ -15,6 +15,13 @@
       "when": 1790871573607,
       "tag": "0001_serious_gateway",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790928736551,
+      "tag": "0002_flowery_red_hulk",
+      "breakpoints": true
     }
   ]
 }

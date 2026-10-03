@@ -12,12 +12,8 @@ export type Bindings = {
   DISCORD_CLIENT_SECRET: string
   DISCORD_REDIRECT_URI: string
   DISCORD_GUILD_ID: string
-  /** 管理者として扱うDiscordロールID（カンマ区切り） */
-  DISCORD_ADMIN_ROLE_IDS?: string
   /** 通知用Webhook URL。未設定なら通知しない */
   DISCORD_WEBHOOK_URL?: string
-  /** ブログ提出時にメンションするロールID（例: 広報部） */
-  DISCORD_BLOG_REVIEWER_ROLE_ID?: string
 
   /** ブログ記事のPR先 (owner/repo) */
   BLOG_REPO: string
