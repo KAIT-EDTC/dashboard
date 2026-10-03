@@ -1,22 +1,22 @@
 import { z } from 'zod'
 import { DIVISIONS } from '../divisions'
-import { COMMENTABLE_FIELDS, countChars, RATING_MAX, RATING_MIN, REPORT_LIMITS } from '../reports'
+import { COMMENTABLE_FIELDS, countChars, RATING_MAX, RATING_MIN, REPORT_FIELD_LABELS, REPORT_LIMITS, type CommentableField } from '../reports'
 
-const maxChars = (label: string, max: number) =>
+const maxChars = (field: CommentableField) =>
   z
     .string()
     .trim()
-    .refine((v) => countChars(v) <= max, `${label}は${max}文字以内にしてください`)
+    .refine((v) => countChars(v) <= REPORT_LIMITS[field].max, `${REPORT_FIELD_LABELS[field]}は${REPORT_LIMITS[field].max}文字以内にしてください`)
 
 const rating = z.number().int().min(RATING_MIN).max(RATING_MAX)
 
 /** 下書き保存。上限だけ確認し、未入力でもよい */
 export const reportDraftSchema = z.object({
   division: z.enum(DIVISIONS).nullable(),
-  content: maxChars('活動内容', REPORT_LIMITS.content.max),
-  reflection: maxChars('事後報告', REPORT_LIMITS.reflection.max),
+  content: maxChars('content'),
+  reflection: maxChars('reflection'),
   rating: rating.nullable(),
-  notes: maxChars('伝言事項・特記事項', REPORT_LIMITS.notes.max),
+  notes: maxChars('notes'),
   /** 役職者が選ぶ承認者（部員は不要） */
   approverId: z.string().min(1).nullable(),
 })
@@ -24,10 +24,10 @@ export type ReportDraftInput = z.input<typeof reportDraftSchema>
 
 /** 提出。必須項目と事後報告の最低文字数も確認する */
 export const reportSubmitSchema = reportDraftSchema.extend({
-  division: z.enum(DIVISIONS, '所属部署を選んでください'),
-  content: reportDraftSchema.shape.content.refine((v) => v.length > 0, '活動内容を入力してください'),
-  reflection: reportDraftSchema.shape.reflection.refine((v) => v.length > 0, '事後報告を入力してください'),
-  rating: rating.nullable().refine((v) => v !== null, '活動評価を選んでください'),
+  division: z.enum(DIVISIONS, `${REPORT_FIELD_LABELS.division}を選んでください`),
+  content: reportDraftSchema.shape.content.refine((v) => v.length > 0, `${REPORT_FIELD_LABELS.content}を入力してください`),
+  reflection: reportDraftSchema.shape.reflection.refine((v) => v.length > 0, `${REPORT_FIELD_LABELS.reflection}を入力してください`),
+  rating: rating.nullable().refine((v) => v !== null, `${REPORT_FIELD_LABELS.rating}を選んでください`),
 })
 
 /** 新しく作るとき（イベント選択後の作成ページから） */

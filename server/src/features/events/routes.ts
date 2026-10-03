@@ -20,7 +20,7 @@ import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
 import { validate } from '../../lib/validator'
 import { assertCanManage, canManage, requireAuth } from '../../middleware/auth'
-import { approvedReportsOf, myReportOf } from '../reports/queries'
+import { approvedReportsOf, isReportTarget, myReportOf } from '../reports/queries'
 import { eventCategoriesRoute } from './categories'
 import { notifyEventCreated } from './notifications'
 
@@ -241,6 +241,7 @@ export const eventsRoute = new Hono<AppEnv>()
     const targeted = targetDivisions.length > 0 || targetUsers.length > 0
     const targetMembers = targeted ? await findTargetMembers(db, event.id) : []
     const answered = new Set(event.participants.map((p) => p.userId))
+    const mine = event.participants.find((p) => p.userId === userId)
     return c.json({
       event: {
         ...event,
@@ -257,6 +258,8 @@ export const eventsRoute = new Hono<AppEnv>()
       /** 承認済みの活動報告書と、自分の報告書の状態 */
       reports,
       myReport: myReport ?? null,
+      /** 参加した人は、イベントが始まったら報告書を書ける */
+      canWriteReport: !!mine && isReportTarget(mine) && event.startsAt <= nowInJst(),
     })
   })
 

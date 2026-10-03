@@ -1,3 +1,4 @@
+import { isLeader } from '@edtc/shared'
 import { css } from 'styled-system/css'
 import { PageHeader } from '~/components/ui/PageHeader'
 import { TabLinks } from '~/components/ui/Tabs'
@@ -30,7 +31,7 @@ export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteEr
 export default function ReportsPage({ loaderData }: Route.ComponentProps) {
   const { tab, targets, mine, review, statusEvents } = loaderData
   const me = useCurrentUser()
-  const isReviewer = !!me.officer || me.headOf.length > 0
+  const isReviewer = isLeader(me)
   const unwritten = targets.filter((t) => !t.reportStatus).length
 
   return (

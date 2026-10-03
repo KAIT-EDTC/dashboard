@@ -1,7 +1,14 @@
 import { and, asc, eq, isNotNull, ne, or } from 'drizzle-orm'
 import { canApproveStep, isLeader, positionLabels, type ApprovalStep, type Division } from '@edtc/shared'
 import { memberSummaryColumns, type Db } from '../../db'
-import { activityReports, users } from '../../db/schema'
+import { activityReports, eventParticipants, users } from '../../db/schema'
+
+/** 報告書の対象: 参加と回答した人か、当日出席した人 */
+export const isTargetParticipant = or(eq(eventParticipants.status, 'going'), eq(eventParticipants.attended, true))
+
+/** isTargetParticipant と同じ条件を、読み込んだ参加者に当てはめる */
+export const isReportTarget = (participant: Pick<typeof eventParticipants.$inferSelect, 'status' | 'attended'>) =>
+  participant.status === 'going' || participant.attended
 
 /** イベント詳細に載せる承認済みの報告書（伝言事項は連絡事項として表示する） */
 export function approvedReportsOf(db: Db, eventId: string) {

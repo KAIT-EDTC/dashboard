@@ -1,5 +1,4 @@
 import {
-  COMMENTABLE_FIELDS,
   REPORT_FIELD_LABELS,
   REPORT_LIMITS,
   reportSubmitSchema,
@@ -20,7 +19,7 @@ import { formatTimestamp, fullName } from '~/lib/format'
 import type { FormErrors } from '~/lib/form'
 import type { Autosave } from './autosave'
 import { CharCount } from './CharCount'
-import { sameContent, type ReportContent } from './content'
+import { byPosition, sameContent, type ReportContent } from './content'
 import { RequestCard } from './InlineComment'
 import { MarkedTextarea } from './MarkedTextarea'
 import { RatingSlider } from './Rating'
@@ -79,9 +78,7 @@ export function ReportForm({ context, initial, status, divisions, canDelete, rej
   const send = (intent: ReportIntent) => fetcher.submit({ intent, content }, { method: 'post', encType: 'application/json' })
 
   // 修正依頼（いちばん新しい差し戻し）。番号は項目の順・本文の位置の順
-  const requests = rejected
-    ? [...rejection.comments].sort((a, b) => COMMENTABLE_FIELDS.indexOf(a.field) - COMMENTABLE_FIELDS.indexOf(b.field) || a.start - b.start)
-    : []
+  const requests = rejected ? [...rejection.comments].sort(byPosition) : []
   const [applied, setApplied] = useState<ReadonlySet<string>>(new Set())
   const requestsFor = (field: CommentableField) => requests.filter((r) => r.field === field)
   /** まだ対応していない依頼の、いまの本文での位置 */

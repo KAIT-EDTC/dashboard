@@ -1,10 +1,4 @@
-import {
-  COMMENTABLE_FIELDS,
-  REPORT_LIMITS,
-  type CommentableField,
-  type InlineCommentInput,
-  type ReportReviewInput,
-} from '@edtc/shared'
+import { REPORT_LIMITS, type CommentableField, type InlineCommentInput, type ReportReviewInput } from '@edtc/shared'
 import { useState } from 'react'
 import { useFetcher } from 'react-router'
 import { css } from 'styled-system/css'
@@ -13,21 +7,18 @@ import { Button } from '~/components/ui/Button'
 import { Card } from '~/components/ui/Card'
 import { TextareaField } from '~/components/ui/Field'
 import { CheckIcon, EditIcon, TrashIcon, XIcon } from '~/components/ui/Icons'
-import { ApprovalProgress } from './ApprovalProgress'
 import { CharCount } from './CharCount'
 import { CommentableText, type Mark, type RequestMode, type TextRange } from './CommentableText'
+import { byPosition } from './content'
 import { RequestCard, RequestComposer } from './InlineComment'
 import type { ReportActionData } from './ReportForm'
 import { ReportStatusBadge } from './ReportStatusBadge'
 import { ReportView } from './ReportView'
-import { ReviewHistory } from './ReviewHistory'
+import { ReviewProgress } from './ReviewHistory'
 import type { ReportDetail, ReportDetailResponse } from './types'
 
 type PendingRequest = Required<InlineCommentInput> & { key: string }
 type Draft = TextRange & { field: CommentableField; mode: RequestMode }
-
-const byPosition = (a: { field: CommentableField; start: number }, b: { field: CommentableField; start: number }) =>
-  COMMENTABLE_FIELDS.indexOf(a.field) - COMMENTABLE_FIELDS.indexOf(b.field) || a.start - b.start
 
 /** 確認する人の画面。本文を選ぶとその場でコメント・書き直し案を付けられ、まとめて承認・差し戻しする */
 export function ReviewWorkspace({ report, authorRole }: Pick<ReportDetailResponse, 'report' | 'authorRole'>) {
@@ -134,8 +125,7 @@ export function ReviewWorkspace({ report, authorRole }: Pick<ReportDetailRespons
               </div>
             </div>
           </Card>
-          <ApprovalProgress report={report} />
-          <ReviewHistory reviews={report.reviews} />
+          <ReviewProgress report={report} />
         </>
       }
     />
@@ -174,8 +164,7 @@ export function ReviewStatus({ report, canWithdraw }: { report: ReportDetail; ca
           {canWithdraw && <WithdrawButton />}
         </div>
       </Card>
-      <ApprovalProgress report={report} />
-      <ReviewHistory reviews={report.reviews} />
+      <ReviewProgress report={report} />
     </>
   )
 }

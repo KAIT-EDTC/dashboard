@@ -1,3 +1,4 @@
+import { isEditableStatus } from '@edtc/shared'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { css, cx } from 'styled-system/css'
@@ -41,7 +42,7 @@ export function TargetList({ targets }: { targets: ReportTarget[] }) {
       }
     >
       {targets.map((target) => {
-        const editable = target.reportStatus === 'draft' || target.reportStatus === 'rejected'
+        const editable = !!target.reportStatus && isEditableStatus(target.reportStatus)
         return (
           <li key={target.eventId}>
             <Link

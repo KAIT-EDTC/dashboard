@@ -1,4 +1,4 @@
-import { ITEM_KINDS, nowInJst, PARTICIPANT_ROLES, RSVP_STATUSES } from '@edtc/shared'
+import { isEditableStatus, ITEM_KINDS, nowInJst, PARTICIPANT_ROLES, RSVP_STATUSES } from '@edtc/shared'
 import { Form } from 'react-router'
 import { css } from 'styled-system/css'
 import { Button, ButtonLink } from '~/components/ui/Button'
@@ -83,12 +83,9 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
 
 export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
-  const { event, canManage, isTarget, pending, reports, myReport } = loaderData
+  const { event, canManage, isTarget, pending, reports, myReport, canWriteReport } = loaderData
   const me = useCurrentUser()
-  const mine = event.participants.find((p) => p.userId === me.id)
   const started = event.startsAt <= nowInJst()
-  // 参加した人は、イベントが始まったら報告書を書ける
-  const canWriteReport = started && !!mine && (mine.status === 'going' || mine.attended)
 
   return (
     <>
@@ -101,7 +98,7 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
             {myReport ? (
               <ButtonLink to={`/reports/${myReport.id}`}>
                 <FileTextIcon size={16} />
-                {myReport.status === 'draft' || myReport.status === 'rejected' ? '報告書の続きを書く' : '報告書を見る'}
+                {isEditableStatus(myReport.status) ? '報告書の続きを書く' : '報告書を見る'}
               </ButtonLink>
             ) : (
               canWriteReport && (
