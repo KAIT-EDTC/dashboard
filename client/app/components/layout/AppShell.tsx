@@ -1,10 +1,10 @@
-import type { ReactNode } from 'react'
-import { Link, NavLink } from 'react-router'
+import { type ReactNode, useState } from 'react'
+import { Link, NavLink, useLocation } from 'react-router'
 import { css, cx } from 'styled-system/css'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
-import { BellIcon, CalendarIcon, HomeIcon, ListIcon, LogOutIcon, PenIcon, TagIcon, UserIcon, UsersIcon } from '../ui/Icons'
+import { BellIcon, CalendarIcon, HomeIcon, ListIcon, LogOutIcon, PenIcon, SlidersIcon, TagIcon, UserIcon, UsersIcon } from '../ui/Icons'
 import { Logo } from './Logo'
 
 const NAV_ITEMS = [
@@ -49,10 +49,101 @@ const navLinkActiveStyle = css({
   _hover: { bg: 'surface.selected', color: 'accent.fg' },
 })
 
+const tabStyle = css({
+  flex: 1,
+  minW: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '2px',
+  minH: '56px',
+  fontSize: '11px',
+  fontWeight: '500',
+  color: 'fg.muted',
+  bg: 'transparent',
+  cursor: 'pointer',
+  _hover: { color: 'fg' },
+})
+const tabActiveStyle = css({ color: 'accent.fg', fontWeight: '600' })
+
+/** スマホ幅の下部タブバー（管理者メニューは「管理」から開く） */
+function MobileTabBar({ isAdmin }: { isAdmin: boolean }) {
+  const [open, setOpen] = useState(false)
+  const { pathname } = useLocation()
+  const adminActive = pathname.startsWith('/admin')
+
+  return (
+    <div className={css({ display: { base: 'block', md: 'none' }, position: 'relative', flexShrink: 0 })}>
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="メニューを閉じる"
+            onClick={() => setOpen(false)}
+            className={css({ position: 'fixed', inset: 0, zIndex: 10, bg: 'transparent', cursor: 'default' })}
+          />
+          <div
+            className={css({
+              position: 'absolute',
+              right: 'sm',
+              bottom: '100%',
+              mb: 'xs',
+              zIndex: 11,
+              minW: '200px',
+              p: 'xs',
+              display: 'flex',
+              flexDirection: 'column',
+              bg: 'surface',
+              borderWidth: '1px',
+              borderRadius: 'lg',
+              shadow: 'island',
+            })}
+          >
+            {ADMIN_NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                onClick={() => setOpen(false)}
+                className={({ isActive }) => cx(navLinkStyle, css({ py: 'md' }), isActive && navLinkActiveStyle)}
+              >
+                <Icon size={18} />
+                {label}
+              </NavLink>
+            ))}
+          </div>
+        </>
+      )}
+      <nav
+        aria-label="メインメニュー"
+        className={css({ display: 'flex', bg: 'sidebar', borderTopWidth: '1px', pb: 'env(safe-area-inset-bottom)' })}
+      >
+        {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+          <NavLink key={to} to={to} end={end} className={({ isActive }) => cx(tabStyle, isActive && tabActiveStyle)}>
+            <Icon size={22} />
+            {label}
+          </NavLink>
+        ))}
+        {isAdmin && (
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+            className={cx(tabStyle, (open || adminActive) && tabActiveStyle)}
+          >
+            <SlidersIcon size={22} />
+            管理
+          </button>
+        )}
+      </nav>
+    </div>
+  )
+}
+
 /** ログイン後の画面の枠（ヘッダー・ナビゲーション・本文） */
 export function AppShell({ user, onLogout, children }: { user: ShellUser; onLogout: () => void; children: ReactNode }) {
   return (
-    <div className={css({ minH: '100vh', display: 'flex', flexDirection: 'column' })}>
+    <div className={css({ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' })}>
       <header
         className={css({
           h: '56px',
@@ -102,17 +193,15 @@ export function AppShell({ user, onLogout, children }: { user: ShellUser; onLogo
           <nav
             aria-label="メインメニュー"
             className={css({
-              display: 'flex',
-              flexDirection: { base: 'row', md: 'column' },
+              display: { base: 'none', md: 'flex' },
+              flexDirection: 'column',
               gap: 'xs',
               p: 'sm',
-              pt: { md: 'md' },
-              w: { md: '220px' },
+              pt: 'md',
+              w: '220px',
               flexShrink: 0,
-              overflowX: 'auto',
               bg: 'sidebar',
-              borderRightWidth: { md: '1px' },
-              borderBottomWidth: { base: '1px', md: '0' },
+              borderRightWidth: '1px',
             })}
           >
             {(user.role === 'admin' ? [...NAV_ITEMS, ...ADMIN_NAV_ITEMS] : NAV_ITEMS).map(({ to, label, icon: Icon, end }) => (
@@ -123,6 +212,7 @@ export function AppShell({ user, onLogout, children }: { user: ShellUser; onLogo
             ))}
           </nav>
           <div className={css({ flex: 1, minW: 0, overflowY: 'auto', p: { base: 'md', md: '2xl' } })}>{children}</div>
+          <MobileTabBar isAdmin={user.role === 'admin'} />
         </div>
       </main>
     </div>

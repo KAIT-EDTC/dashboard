@@ -28,6 +28,11 @@ export const HomeIcon = icon(
     <path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
   </>,
 )
+export const SlidersIcon = icon(
+  <>
+    <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
+  </>,
+)
 export const CalendarIcon = icon(
   <>
     <rect x="3" y="4" width="18" height="18" rx="2" />

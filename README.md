@@ -139,6 +139,10 @@ npm run dev                        # client: http://localhost:5173 / server: htt
 | `npm run lint` | client の ESLint |
 | `npm run build` | client のビルド（`client/build/client` に静的ファイル） |
 | `npm run db:generate` | `server/src/db/schema.ts` からマイグレーションを生成 |
+| `npm run db:seed` | ローカルD1にダミーのメンバー20人とイベント（出欠・持ち物つき）を入れる。何度実行しても同じ状態になる |
+| `npm run db:seed:clear` | ダミーデータだけを消す |
+
+ダミーデータ（`server/seed/`）はIDが `seed-` で始まり、自分のユーザーやデータには触らない。学年とイベントの日付は実行した日を基準に計算する。ダミーメンバーは実在のDiscordユーザーではないので、Discordのメンションは届かない。`--local` 固定のため本番のD1には入らない。
 
 > スキーマを作り直したため、マイグレーションは `0000_init.sql` から始まる。以前のスキーマをローカルD1に適用していた場合は `server/.wrangler/state` を削除してから `npm run db:migrate` する。
 
