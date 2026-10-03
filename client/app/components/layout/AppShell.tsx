@@ -16,8 +16,8 @@ const NAV_ITEMS = [
 const ADMIN_NAV_ITEMS = [
   { to: '/admin/users', label: 'ユーザー管理', icon: UserIcon, end: false },
   { to: '/admin/notifications', label: '通知設定', icon: BellIcon, end: false },
-  { to: '/admin/categories', label: '種類・種別', icon: ListIcon, end: false },
-  { to: '/admin/blog-tags', label: 'タグ管理', icon: TagIcon, end: false },
+  { to: '/admin/event-settings', label: 'イベント設定', icon: ListIcon, end: false },
+  { to: '/admin/blog-settings', label: 'ブログ設定', icon: TagIcon, end: false },
 ]
 
 type ShellUser = {
@@ -48,6 +48,9 @@ const navLinkActiveStyle = css({
   fontWeight: '600',
   _hover: { bg: 'surface.selected', color: 'accent.fg' },
 })
+
+/** 管理者だけが開けるメニューの見出し */
+const adminHeadingStyle = css({ px: 'md', pt: 'sm', pb: 'xs', fontSize: 'xs', fontWeight: '600', color: 'fg.subtle' })
 
 const tabStyle = css({
   flex: 1,
@@ -100,6 +103,7 @@ function MobileTabBar({ isAdmin }: { isAdmin: boolean }) {
               shadow: 'island',
             })}
           >
+            <p className={adminHeadingStyle}>管理者メニュー</p>
             {ADMIN_NAV_ITEMS.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
@@ -204,12 +208,24 @@ export function AppShell({ user, onLogout, children }: { user: ShellUser; onLogo
               borderRightWidth: '1px',
             })}
           >
-            {(user.role === 'admin' ? [...NAV_ITEMS, ...ADMIN_NAV_ITEMS] : NAV_ITEMS).map(({ to, label, icon: Icon, end }) => (
+            {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
               <NavLink key={to} to={to} end={end} className={({ isActive }) => cx(navLinkStyle, isActive && navLinkActiveStyle)}>
                 <Icon size={18} />
                 {label}
               </NavLink>
             ))}
+            {user.role === 'admin' && (
+              <>
+                <div className={css({ mt: 'sm', borderTopWidth: '1px' })} />
+                <p className={adminHeadingStyle}>管理者メニュー</p>
+                {ADMIN_NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+                  <NavLink key={to} to={to} end={end} className={({ isActive }) => cx(navLinkStyle, isActive && navLinkActiveStyle)}>
+                    <Icon size={18} />
+                    {label}
+                  </NavLink>
+                ))}
+              </>
+            )}
           </nav>
           <div className={css({ flex: 1, minW: 0, overflowY: 'auto', p: { base: 'md', md: '2xl' } })}>{children}</div>
           <MobileTabBar isAdmin={user.role === 'admin'} />

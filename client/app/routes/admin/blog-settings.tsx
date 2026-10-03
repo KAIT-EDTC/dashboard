@@ -1,106 +1,61 @@
-import {
-  CATEGORY_LABEL_MAX,
-  CATEGORY_TONES,
-  CATEGORY_TONE_LABELS,
-  SERIES_ID_PATTERN,
-  SERIES_LABEL_MAX,
-  type CategoryTone,
-} from '@edtc/shared'
+import { SERIES_ID_PATTERN, SERIES_LABEL_MAX, TAG_LABEL_MAX } from '@edtc/shared'
 import { useState } from 'react'
 import { Navigate } from 'react-router'
 import { css } from 'styled-system/css'
-import { Badge } from '~/components/ui/Badge'
 import { inputStyle } from '~/components/ui/Field'
 import { PageHeader } from '~/components/ui/PageHeader'
 import { ListEditor, UnsavedAlert, useUnsavedGuard } from '~/features/admin/ListEditor'
 import { useCurrentUser } from '~/features/auth/use-current-user'
 import { api, unwrap } from '~/lib/api'
 import { catchApiError, type FormErrors } from '~/lib/form'
-import type { Route } from './+types/categories'
+import type { Route } from './+types/blog-settings'
 
-export const meta: Route.MetaFunction = () => [{ title: '種類・種別の管理 | EDTC ダッシュボード' }]
+export const meta: Route.MetaFunction = () => [{ title: 'ブログ設定 | EDTC ダッシュボード' }]
 
 export async function clientLoader() {
-  const [{ categories }, { series }] = await Promise.all([unwrap(api.events.categories.$get()), unwrap(api.blog.series.$get())])
-  return { categories, series }
+  const [{ series }, { tags }] = await Promise.all([unwrap(api.blog.series.$get()), unwrap(api.blog.tags.$get())])
+  return { series, tags }
 }
 
 type Payload =
-  | { kind: 'categories'; categories: { id?: string; label: string; tone: CategoryTone }[] }
   | { kind: 'series'; series: { id: string; label: string }[] }
+  | { kind: 'tags'; tags: { id?: string; label: string }[] }
 
-/** 編集画面から、種類・種別それぞれの一覧が JSON で送られてくる（kind で見分ける） */
+/** 編集画面から、種別・タグそれぞれの一覧が JSON で送られてくる（kind で見分ける） */
 export async function clientAction({ request }: Route.ClientActionArgs): Promise<FormErrors | { ok: true }> {
   const payload = (await request.json()) as Payload
   const result = await catchApiError(() =>
-    payload.kind === 'categories'
-      ? unwrap(api.events.categories.$put({ json: { categories: payload.categories } }))
-      : unwrap(api.blog.series.$put({ json: { series: payload.series } })),
+    payload.kind === 'series'
+      ? unwrap(api.blog.series.$put({ json: { series: payload.series } }))
+      : unwrap(api.blog.tags.$put({ json: { tags: payload.tags } })),
   )
   return result.errors ?? { ok: true }
 }
 
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
 
-export default function CategoriesPage({ loaderData }: Route.ComponentProps) {
+export default function BlogSettingsPage({ loaderData }: Route.ComponentProps) {
   const user = useCurrentUser()
   if (user.role !== 'admin') return <Navigate to="/" replace />
-  return <CategoriesView categories={loaderData.categories} series={loaderData.series} />
+  return <BlogSettingsView series={loaderData.series} tags={loaderData.tags} />
 }
 
-type Category = { id: string; label: string; tone: CategoryTone }
+type Item = { id: string; label: string }
 
-function CategoriesView({ categories, series }: { categories: Category[]; series: { id: string; label: string }[] }) {
-  const [dirty, setDirty] = useState({ categories: false, series: false })
-  const blocker = useUnsavedGuard(dirty.categories || dirty.series)
+function BlogSettingsView({ series, tags }: { series: Item[]; tags: Item[] }) {
+  const [dirty, setDirty] = useState({ series: false, tags: false })
+  const blocker = useUnsavedGuard(dirty.series || dirty.tags)
   // 種別は、追加した行でだけIDを入力する。保存済みの行のIDは変えられない
   const savedSeries = series.map((item) => ({ ...item, newId: '' }))
 
   return (
     <>
       <PageHeader
-        title="種類・種別の管理"
-        description="イベントの種類と、ブログのイベント種別を管理します。それぞれ「保存」を押すとまとめて反映されます。"
+        title="ブログ設定"
+        description="ブログ記事のイベント種別とタグを管理します。それぞれ「保存」を押すとまとめて反映されます。"
       />
       <div className={css({ display: 'flex', flexDirection: 'column', gap: 'xl', maxW: '720px' })}>
         <UnsavedAlert blocker={blocker} />
-
-        <section className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
-          <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
-            イベントを作るときに選ぶ種類です。名前を変えても、そのイベントはそのままです。使われている種類は削除できません。色はバッジとカレンダーに使われます。
-          </p>
-          <ListEditor<{ tone: CategoryTone }>
-            key={JSON.stringify(categories)}
-            title="イベントの種類"
-            saved={categories}
-            noun="種類"
-            labelMax={CATEGORY_LABEL_MAX}
-            newRowExtra={{ tone: 'accent' }}
-            minRows={1}
-            toPayload={(rows) => ({
-              kind: 'categories',
-              categories: rows.map((row) => ({ ...(row.id ? { id: row.id } : {}), label: row.label, tone: row.tone })),
-            })}
-            renderExtra={(row, patch) => (
-              <span className={css({ display: 'inline-flex', alignItems: 'center', gap: 'xs' })}>
-                <Badge tone={row.tone}>{row.label || '見本'}</Badge>
-                <select
-                  aria-label={`${row.label || '新しい種類'}の色`}
-                  value={row.tone}
-                  onChange={(e) => patch({ tone: e.currentTarget.value as CategoryTone })}
-                  className={css({ w: '72px' }) + ' ' + inputStyle}
-                >
-                  {CATEGORY_TONES.map((tone) => (
-                    <option key={tone} value={tone}>
-                      {CATEGORY_TONE_LABELS[tone]}
-                    </option>
-                  ))}
-                </select>
-              </span>
-            )}
-            onDirtyChange={(value) => setDirty((prev) => ({ ...prev, categories: value }))}
-          />
-        </section>
 
         <section className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
           <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
@@ -109,7 +64,7 @@ function CategoriesView({ categories, series }: { categories: Category[]; series
           </p>
           <ListEditor<{ newId: string }>
             key={JSON.stringify(series)}
-            title="ブログのイベント種別"
+            title="イベント種別"
             saved={savedSeries}
             noun="種別"
             labelMax={SERIES_LABEL_MAX}
@@ -138,6 +93,22 @@ function CategoriesView({ categories, series }: { categories: Category[]; series
               )
             }
             onDirtyChange={(value) => setDirty((prev) => ({ ...prev, series: value }))}
+          />
+        </section>
+
+        <section className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
+          <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
+            記事に付けられるタグです。名前を変えると、そのタグを付けている記事も新しい名前になります（公開済みの記事は再提出で反映されます）。使われているタグは削除できません。
+          </p>
+          <ListEditor
+            key={JSON.stringify(tags)}
+            title="タグ"
+            saved={tags}
+            noun="タグ"
+            labelMax={TAG_LABEL_MAX}
+            newRowExtra={{}}
+            toPayload={(rows) => ({ kind: 'tags', tags: rows.map((row) => ({ ...(row.id ? { id: row.id } : {}), label: row.label })) })}
+            onDirtyChange={(value) => setDirty((prev) => ({ ...prev, tags: value }))}
           />
         </section>
       </div>
