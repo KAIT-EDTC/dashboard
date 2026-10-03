@@ -1,13 +1,16 @@
 import { relations, sql } from 'drizzle-orm'
-import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import {
   BLOG_STATUSES,
   ITEM_KINDS,
+  PARTICIPANT_ROLES,
+  REPORT_STATUSES,
   RSVP_STATUSES,
   type BlogPostContent,
   type CategoryTone,
   type Division,
   type ProfileLinks,
+  type ReportField,
 } from '@edtc/shared'
 
 const nowIso = sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`
@@ -31,6 +34,8 @@ export const users = sqliteTable('users', {
   discordAvatar: text('discord_avatar'),
   /** 管理者がダッシュボードの「ユーザー管理」で変更する。最初に登録した人は管理者になる */
   role: text('role', { enum: ['member', 'admin'] }).notNull().default('member'),
+  /** 部長を務める部署。ログインのたびにDiscordの部長ロールから再計算される */
+  headOf: text('head_of', { mode: 'json' }).$type<Division[]>().notNull().default(sql`'[]'`),
 
   lastName: text('last_name').notNull(),
   firstName: text('first_name').notNull(),
@@ -151,6 +156,8 @@ export const notificationSettings = sqliteTable('notification_settings', {
   onBlogPublished: integer('on_blog_published', { mode: 'boolean' }).notNull().default(true),
   onBlogClosed: integer('on_blog_closed', { mode: 'boolean' }).notNull().default(true),
   onBlogFeedback: integer('on_blog_feedback', { mode: 'boolean' }).notNull().default(true),
+  onReportSubmitted: integer('on_report_submitted', { mode: 'boolean' }).notNull().default(true),
+  onReportReviewed: integer('on_report_reviewed', { mode: 'boolean' }).notNull().default(true),
   updatedAt: timestamps.updatedAt,
 })
 
@@ -213,6 +220,8 @@ export const eventParticipants = sqliteTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     status: text('status', { enum: RSVP_STATUSES }).notNull(),
     comment: text('comment').notNull().default(''),
+    /** 活動での役割（主催者が決める）。講師は1イベントにつき1人まで */
+    role: text('role', { enum: PARTICIPANT_ROLES }).notNull().default('assistant'),
     /** 当日の出席（主催者が記録） */
     attended: integer('attended', { mode: 'boolean' }).notNull().default(false),
     /** 参加費の支払い（主催者が記録） */
@@ -270,6 +279,50 @@ export const eventTargetUsers = sqliteTable(
 )
 
 // ---------------------------------------------------------------------------
+// 活動報告書
+// ---------------------------------------------------------------------------
+
+/**
+ * 活動日時・活動名・実施場所はイベント、役割は event_participants が正なので持たない。
+ * 1イベントにつき1人1枚
+ */
+export const activityReports = sqliteTable(
+  'activity_reports',
+  {
+    id: text('id').primaryKey(),
+    eventId: text('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    authorId: text('author_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** 報告する所属部署。この部署の部長が承認する */
+    division: text('division').$type<Division>(),
+    content: text('content').notNull().default(''),
+    reflection: text('reflection').notNull().default(''),
+    /** 活動評価 1(悪)〜5(良) */
+    rating: integer('rating'),
+    /** 伝言事項・特記事項。承認後にイベントの連絡事項へ表示される */
+    notes: text('notes').notNull().default(''),
+
+    status: text('status', { enum: REPORT_STATUSES }).notNull().default('draft'),
+    submittedAt: text('submitted_at'),
+    reviewerId: text('reviewer_id').references(() => users.id, { onDelete: 'set null' }),
+    reviewedAt: text('reviewed_at'),
+    /** 差し戻し時に指摘された項目とコメント */
+    rejectionFields: text('rejection_fields', { mode: 'json' }).$type<ReportField[]>().notNull().default(sql`'[]'`),
+    rejectionComment: text('rejection_comment').notNull().default(''),
+
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('activity_reports_event_author_idx').on(t.eventId, t.authorId),
+    index('activity_reports_author_idx').on(t.authorId),
+    index('activity_reports_status_division_idx').on(t.status, t.division),
+  ],
+)
+
+// ---------------------------------------------------------------------------
 // Relations（db.query で使う）
 // ---------------------------------------------------------------------------
 
@@ -290,6 +343,7 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   creator: one(users, { fields: [events.createdBy], references: [users.id] }),
   participants: many(eventParticipants),
   items: many(eventItems),
+  reports: many(activityReports),
   targetDivisions: many(eventTargetDivisions),
   targetUsers: many(eventTargetUsers),
 }))
@@ -311,4 +365,10 @@ export const eventParticipantsRelations = relations(eventParticipants, ({ one })
 export const eventItemsRelations = relations(eventItems, ({ one }) => ({
   event: one(events, { fields: [eventItems.eventId], references: [events.id] }),
   assignee: one(users, { fields: [eventItems.assigneeId], references: [users.id] }),
+}))
+
+export const activityReportsRelations = relations(activityReports, ({ one }) => ({
+  event: one(events, { fields: [activityReports.eventId], references: [events.id] }),
+  author: one(users, { fields: [activityReports.authorId], references: [users.id], relationName: 'reportAuthor' }),
+  reviewer: one(users, { fields: [activityReports.reviewerId], references: [users.id], relationName: 'reportReviewer' }),
 }))

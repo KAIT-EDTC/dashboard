@@ -1,4 +1,4 @@
-import type { NotificationKind } from '@edtc/shared'
+import { DIVISIONS, type Division, type NotificationKind } from '@edtc/shared'
 import type { Db } from '../db'
 import type { Bindings } from '../env'
 import { getNotificationSettings, resolveWebhook } from '../features/admin/notification-settings'
@@ -11,7 +11,7 @@ const API = 'https://discord.com/api/v10'
 
 /**
  * guilds.members.read で「自分のサーバー内プロフィール（ニックネーム・ロール）」を取得できるため、
- * Botトークンなしでサーバー所属・学籍番号を確認できる
+ * Botトークンなしでサーバー所属・学籍番号・部長ロールを確認できる
  */
 const SCOPES = ['identify', 'guilds.members.read']
 
@@ -24,6 +24,8 @@ export type DiscordUser = {
 
 export type DiscordGuildMember = {
   nick: string | null
+  /** 部長ロールの判定に使う */
+  roles: string[]
 }
 
 export function authorizeUrl(env: Bindings, state: string): string {
@@ -71,6 +73,26 @@ export async function fetchGuildMember(accessToken: string, guildId: string): Pr
   return res.json()
 }
 
+/** DISCORD_DIVISION_HEAD_ROLE_IDS（部署:ロールID をカンマ区切り）を読む。部署名の誤りは無視する */
+function divisionHeadRoles(env: Bindings): Map<Division, string> {
+  const map = new Map<Division, string>()
+  for (const entry of (env.DISCORD_DIVISION_HEAD_ROLE_IDS ?? '').split(',')) {
+    const [division, roleId] = entry.split(/[:：]/).map((v) => v.trim())
+    if (roleId && (DIVISIONS as readonly string[]).includes(division)) map.set(division as Division, roleId)
+  }
+  return map
+}
+
+/** 部長ロールを持っている部署 */
+export function headDivisionsOf(env: Bindings, member: DiscordGuildMember): Division[] {
+  return [...divisionHeadRoles(env)].filter(([, roleId]) => member.roles.includes(roleId)).map(([division]) => division)
+}
+
+/** 通知でメンションする部長ロール */
+export function divisionHeadRoleId(env: Bindings, division: Division): string | undefined {
+  return divisionHeadRoles(env).get(division)
+}
+
 // ---------------------------------------------------------------------------
 // 通知（Webhook）
 // ---------------------------------------------------------------------------
@@ -90,13 +112,15 @@ export const EMBED_COLORS = {
   danger: 0xef4444,
 } as const
 
-/** Discordのユーザーメンション */
+/** Discordのユーザー・ロールのメンション */
 export const mention = (userId: string) => `<@${userId}>`
+export const mentionRole = (roleId: string) => `<@&${roleId}>`
 
 export type NotificationMessage = {
   content?: string
   embeds?: DiscordEmbed[]
   mentionUserIds?: string[]
+  mentionRoleIds?: string[]
 }
 
 /** Webhookに1件送る。失敗したら理由を返す（例外は投げない） */
@@ -108,7 +132,7 @@ export async function sendWebhook(url: string, message: NotificationMessage): Pr
       body: JSON.stringify({
         content: message.content,
         embeds: message.embeds,
-        allowed_mentions: { users: message.mentionUserIds ?? [] },
+        allowed_mentions: { users: message.mentionUserIds ?? [], roles: message.mentionRoleIds ?? [] },
       }),
     })
     if (!res.ok) return { ok: false, error: `Discordが ${res.status} を返しました: ${await res.text()}` }

@@ -35,6 +35,7 @@ export const membersRoute = new Hono<AppEnv>()
         discordUsername: true,
         discordAvatar: true,
         role: true,
+        headOf: true,
         lastName: true,
         firstName: true,
         lastNameKana: true,

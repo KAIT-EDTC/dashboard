@@ -1,8 +1,8 @@
-import { ITEM_KINDS, RSVP_STATUSES } from '@edtc/shared'
+import { ITEM_KINDS, nowInJst, PARTICIPANT_ROLES, RSVP_STATUSES } from '@edtc/shared'
 import { Form } from 'react-router'
 import { css } from 'styled-system/css'
 import { Button, ButtonLink } from '~/components/ui/Button'
-import { EditIcon, PenIcon } from '~/components/ui/Icons'
+import { EditIcon, FileTextIcon, PenIcon } from '~/components/ui/Icons'
 import { PageHeader } from '~/components/ui/PageHeader'
 import { useCurrentUser } from '~/features/auth/use-current-user'
 import { CategoryBadge } from '~/features/events/EventBadges'
@@ -10,6 +10,7 @@ import { EventInfo } from '~/features/events/EventInfo'
 import { ItemList } from '~/features/events/ItemList'
 import { ParticipantList } from '~/features/events/ParticipantList'
 import { RsvpPanel } from '~/features/events/RsvpPanel'
+import { EventNotices, EventReports } from '~/features/reports/EventReports'
 import { api, unwrap } from '~/lib/api'
 import { catchApiError, text, type FormErrors } from '~/lib/form'
 import type { Route } from './+types/detail'
@@ -65,7 +66,11 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
         return unwrap(
           api.events[':id'].participants[':userId'].$patch({
             param: { id, userId: text(form, 'userId') },
-            json: { attended: bool(text(form, 'attended')), paid: bool(text(form, 'paid')) },
+            json: {
+              attended: bool(text(form, 'attended')),
+              paid: bool(text(form, 'paid')),
+              ...(form.has('role') && { role: oneOf(PARTICIPANT_ROLES, text(form, 'role'), 'assistant') }),
+            },
           }),
         )
       default:
@@ -78,8 +83,12 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
 
 export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
-  const { event, canManage, isTarget, pending } = loaderData
+  const { event, reports, myReport, canManage, isTarget, pending } = loaderData
   const me = useCurrentUser()
+  const mine = event.participants.find((p) => p.userId === me.id)
+  const started = event.startsAt <= nowInJst()
+  // 参加した人は、イベントが始まったら報告書を書ける
+  const canWriteReport = started && !!mine && (mine.status === 'going' || mine.attended)
 
   return (
     <>
@@ -89,6 +98,22 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
         back={{ to: '/events', label: 'イベント一覧' }}
         actions={
           <>
+            {myReport ? (
+              <ButtonLink to={`/reports/${myReport.id}`}>
+                <FileTextIcon size={16} />
+                {myReport.status === 'draft' || myReport.status === 'rejected' ? '報告書の続きを書く' : '報告書を見る'}
+              </ButtonLink>
+            ) : (
+              canWriteReport && (
+                <Form method="post" action="/reports?index">
+                  <input type="hidden" name="eventId" value={event.id} />
+                  <Button type="submit">
+                    <FileTextIcon size={16} />
+                    報告書を書く
+                  </Button>
+                </Form>
+              )
+            )}
             {/* イベントのタイトルと日付を引き継いだブログの下書きを作る */}
             <Form method="post" action="/blog?index">
               <input type="hidden" name="eventId" value={event.id} />
@@ -109,6 +134,8 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
       <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', lg: '3fr 2fr' }, gap: 'lg', alignItems: 'start' })}>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
           <EventInfo event={event} />
+          <EventNotices reports={reports} />
+          {started && <EventReports event={event} reports={reports} />}
           <ItemList event={event} userId={me.id} canManage={canManage} />
         </div>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>

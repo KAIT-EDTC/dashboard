@@ -6,6 +6,8 @@ DISCORD_CLIENT_SECRET=
 DISCORD_REDIRECT_URI=http://localhost:8787/api/auth/callback
 # EDTCサーバーのID
 DISCORD_GUILD_ID=
+# 部署ごとの部長ロールID（例: 営業部:1234,総務部:5678）。活動報告書の承認者になる
+DISCORD_DIVISION_HEAD_ROLE_IDS=
 # 通知先チャンネルのWebhook URL。ダッシュボードの「通知設定」で登録するなら不要（画面の設定が優先される）
 DISCORD_WEBHOOK_URL=
 

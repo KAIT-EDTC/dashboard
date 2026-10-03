@@ -1,9 +1,10 @@
 # EDTC ダッシュボード
 
-EDTCメンバー専用サイト。イベントの出欠・持ち物・集金、サイト（[EDTCHP_v2](https://github.com/KAIT-EDTC/EDTCHP_v2)）へのブログ投稿、メンバー紹介をまとめて扱う。
+EDTCメンバー専用サイト。イベントの出欠・持ち物・集金、活動報告書の提出と承認、サイト（[EDTCHP_v2](https://github.com/KAIT-EDTC/EDTCHP_v2)）へのブログ投稿、メンバー紹介をまとめて扱う。
 
 - **ログイン**: Discord OAuth。EDTCのDiscordサーバーのメンバーだけが使える。初回はサーバーニックネーム（`2424013: 山田 太郎`）から学籍情報を読み取って登録する
 - **イベント**: 出欠（参加/未定/不参加・コメント・定員・回答期限）、持ち物（各自持参／共有の担当者・準備状況）、参加費の集金と当日の出席記録、カレンダー表示。作成時にDiscordへ通知
+- **活動報告書**: 参加したイベントを選んで書く（活動日時・活動名・場所・役割はイベントから自動で入る）。提出すると所属部署の部長に届き、承認か差し戻し（直してほしい項目＋コメント）を選べる。承認されるとイベントページに載り、伝言事項は「連絡事項」にまとまる
 - **ブログ**: Markdownで書き（画像は貼り付け・ドラッグ＆ドロップ可）、提出するとGitHub App経由でEDTCHP_v2にPRを作成。レビューや公開はWebhookで追跡し、執筆者にDiscordで通知
 - **メンバー**: 名簿（学年・部署・趣味で検索）とプロフィール（自己紹介・興味・リンク・書いた記事）
 
@@ -23,13 +24,14 @@ npm workspaces のモノレポ。client は server の `AppType` を型として
 ```
 app.ts                 # ルーティングの組み立て・CORS/CSRF・エラーハンドリング。AppType を export
 env.ts                 # Bindings（環境変数）とセッションの型
-db/schema.ts           # テーブル定義（users, user_divisions, events, event_participants, event_items, blog_posts, blog_images）
+db/schema.ts           # テーブル定義（users, user_divisions, events, event_participants, event_items, activity_reports, blog_posts, blog_images）
 middleware/auth.ts     # requireAuth（ロールは毎回DBから読む）と権限チェック
 lib/                   # discord（OAuth・Webhook通知）、github（App認証・Webhook署名検証）など外部サービス
 features/
   auth/                # OAuth・新規登録・セッションCookie
   members/             # 名簿・プロフィール
   events/              # イベント・出欠・持ち物
+  reports/             # 活動報告書（下書き・提出・承認/差し戻し）
   blog/                # 下書き・画像・提出（publisher.ts）・GitHub Webhook
 ```
 
@@ -51,18 +53,23 @@ theme/ (client直下)     # Panda のトークン・グローバルCSS
 
 ## 権限
 
-| | 一般メンバー | 管理者 |
-| --- | --- | --- |
-| イベント作成・出欠回答 | ○ | ○ |
-| イベントの編集・持ち物の追加・出席/集金の記録 | 自分が作成したものだけ | すべて |
-| 共有の持ち物を「担当する」・準備完了 | 自分の担当分 | すべて |
-| ブログの編集・提出 | 自分の記事だけ | すべて |
-| 他人の下書きの閲覧 | × | ○ |
+| | 一般メンバー | 部長 | 管理者 |
+| --- | --- | --- | --- |
+| イベント作成・出欠回答 | ○ | ○ | ○ |
+| イベントの編集・持ち物の追加・出席/集金の記録・講師の指定 | 自分が作成したものだけ | 自分が作成したものだけ | すべて |
+| 共有の持ち物を「担当する」・準備完了 | 自分の担当分 | 自分の担当分 | すべて |
+| 活動報告書を書く・提出 | 参加したイベントの自分の分 | 同左 | 同左 |
+| 活動報告書の承認・差し戻し | × | 自分の部署の報告書（自分の分を除く） | すべて（自分の分を除く） |
+| 承認済みの活動報告書の閲覧 | ○ | ○ | ○ |
+| ブログの編集・提出 | 自分の記事だけ | 自分の記事だけ | すべて |
+| 他人の下書きの閲覧 | × | × | ○ |
 
 管理者は、管理者のダッシュボード左メニュー「ユーザー管理」で追加・解除する（Discordのロールや環境変数は使わない）。
 
 - 最初に登録した人（管理者が1人もいない状態で登録した人）は自動で管理者になる
 - 自分自身の権限は変更できないので、管理者が0人になることはない。全員がログインできなくなった場合などは `wrangler d1 execute edtc-dashboard --remote --env production --command "UPDATE users SET role='admin' WHERE id='<DiscordのユーザーID>'"` で復旧する
+
+部長は `DISCORD_DIVISION_HEAD_ROLE_IDS` で部署と対応づけたDiscordロールを持つ人。ログインのたびに再判定する（ロールを付け替えたら、その人がログインし直すと反映される）。管理者とは別で、自分の部署の活動報告書を承認できる。
 
 ### イベントの種類
 
@@ -76,6 +83,15 @@ theme/ (client直下)     # Panda のトークン・グローバルCSS
 - 部署は指定だけを保存し、表示のたびにその部署の今のメンバーを対象として数える（あとから部署に入った人も対象になる）
 - イベント詳細の参加者欄に、対象者のうち未回答の人が並ぶ
 - 作成時のDiscord通知で対象者（作成者以外）にメンションする
+## 活動報告書
+
+旧「シン・活動報告書.xlsx」をダッシュボードに移したもの。
+
+1. `/reports` の「対象イベント」（参加と回答した・出席したイベントのうち、始まったもの）から選ぶか、イベントページの「報告書を書く」から始める
+2. 活動日時・活動名・実施場所はイベント、役割（講師／講師補助）はイベントの参加者一覧で主催者が決めたものが入る。講師は1イベントに1人までで、ほかの参加者は講師補助
+3. 所属部署・活動内容・事後報告（300〜500字）・活動評価（1〜5）・伝言事項を書いて提出する。文字数はリアルタイムに表示され、条件を満たすまで提出できない
+4. 選んだ所属部署の部長（Discordでメンション）が承認するか、直してほしい項目とコメントを付けて差し戻す。差し戻されたら直して再提出する
+5. 承認された報告書はイベントページの「活動報告書」に、伝言事項は「連絡事項」に表示される
 
 ## ブログ
 
@@ -148,10 +164,11 @@ npm run dev                        # client: http://localhost:5173 / server: htt
 
 1. [Developer Portal](https://discord.com/developers/applications) でアプリを作り、OAuth2 の Redirects に `<APIのURL>/api/auth/callback` を登録
 2. `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` / `DISCORD_REDIRECT_URI` / `DISCORD_GUILD_ID` を設定
-3. スコープは `identify` と `guilds.members.read`（サーバー内のニックネームを本人のトークンで読むため、Botは不要）
+3. スコープは `identify` と `guilds.members.read`（サーバー内のニックネームとロールを本人のトークンで読むため、Botは不要。ロールは部長の判定に使う）
 4. 通知したいチャンネルでWebhookを作り、ダッシュボードの「通知設定」に登録する（管理者のみ）。通知の種類ごとのオン/オフ、テスト送信、ブログ提出時にメンションする **レビュー担当**（メンバーのドロップダウンから選ぶ）も同じ画面で設定する
    - Webhook URLは保存すると画面には末尾しか表示されない。Discordのウェブフック以外のURLは登録できない
    - 環境変数 `DISCORD_WEBHOOK_URL` は、画面で設定するまでの代わりとして使われる（画面の設定が優先）
+5. 部署ごとに部長ロール（「営業部長」など）を作って部長に付け、`DISCORD_DIVISION_HEAD_ROLE_IDS` に `部署名:ロールID` をカンマ区切りで設定する（例: `営業部:1234,総務部:5678`）。部署名は `shared/src/divisions.ts` の表記に合わせる。報告書の承認権限と、提出時のメンション先になる
 
 ### GitHub App（ブログ）
 
@@ -186,6 +203,7 @@ npx wrangler secret put DISCORD_CLIENT_SECRET --env production
 npx wrangler secret put DISCORD_REDIRECT_URI --env production        # https://<公開URL>/api/auth/callback
 npx wrangler secret put DISCORD_GUILD_ID --env production
 npx wrangler secret put DISCORD_WEBHOOK_URL --env production   # 任意（「通知設定」で登録するなら不要）
+npx wrangler secret put DISCORD_DIVISION_HEAD_ROLE_IDS --env production  # 営業部:<ロールID>,総務部:<ロールID>,...
 npx wrangler secret put GITHUB_APP_ID --env production
 npx wrangler secret put GITHUB_APP_PRIVATE_KEY --env production < your-app.pem
 npx wrangler secret put GITHUB_WEBHOOK_SECRET --env production

@@ -1,4 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types'
+import type { Division } from '@edtc/shared'
 
 // クライアントが AppType を型importする際にも解決できるよう、グローバル型に頼らず明示的にimportする
 export type Bindings = {
@@ -12,6 +13,8 @@ export type Bindings = {
   DISCORD_CLIENT_SECRET: string
   DISCORD_REDIRECT_URI: string
   DISCORD_GUILD_ID: string
+  /** 部署ごとの部長ロールID（例: 営業部:123,総務部:456）。活動報告書の承認者になる */
+  DISCORD_DIVISION_HEAD_ROLE_IDS?: string
   /** 通知用Webhook URL。未設定なら通知しない */
   DISCORD_WEBHOOK_URL?: string
 
@@ -31,6 +34,8 @@ export type Role = 'member' | 'admin'
 export type Session = {
   userId: string
   role: Role
+  /** 部長を務める部署 */
+  headOf: Division[]
 }
 
 export type AppEnv = {
