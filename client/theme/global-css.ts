@@ -15,7 +15,7 @@ export const globalCss = defineGlobalStyles({
     bg: 'canvas',
     color: 'fg',
     lineHeight: '1.6',
-    minHeight: '100vh',
+    minHeight: '100dvh',
   },
   'h1, h2, h3, h4': {
     fontWeight: '600',
