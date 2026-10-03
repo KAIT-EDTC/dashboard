@@ -1,11 +1,15 @@
-export const EVENT_CATEGORIES = ['activity', 'outreach', 'meeting', 'social', 'other'] as const
-export type EventCategory = (typeof EVENT_CATEGORIES)[number]
-export const EVENT_CATEGORY_LABELS: Record<EventCategory, string> = {
-  activity: '活動',
-  outreach: '対外活動',
-  meeting: 'ミーティング',
-  social: '親睦',
-  other: 'その他',
+/** イベントの種類のID。管理者が「種類・種別の管理」で増減するので、固定の一覧は持たない */
+export type EventCategory = string
+
+/** 種類の色（バッジ・カレンダーで使う）。Badge の tone と同じ名前 */
+export const CATEGORY_TONES = ['accent', 'success', 'warning', 'danger', 'neutral'] as const
+export type CategoryTone = (typeof CATEGORY_TONES)[number]
+export const CATEGORY_TONE_LABELS: Record<CategoryTone, string> = {
+  accent: '青',
+  success: '緑',
+  warning: '黄',
+  danger: '赤',
+  neutral: '灰',
 }
 
 export const RSVP_STATUSES = ['going', 'maybe', 'declined'] as const

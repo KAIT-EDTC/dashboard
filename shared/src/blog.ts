@@ -9,16 +9,12 @@
  * 旧ルール（YY-MM-DD-slug、例: 26-05-16-yugyou01）で提出済みの記事IDはそのまま使い続ける。
  */
 
-/** 記事のイベント種別（記事IDの末尾になる）。タグとは別で、コードで固定 */
-export const BLOG_SERIES = [
-  { id: 'yugyou', label: '遊行塾' },
-  { id: 'event', label: 'イベント' },
-  { id: 'outreach', label: '対外活動' },
-  { id: 'play', label: '遊び' },
-  { id: 'other', label: 'その他' },
-] as const
-export type BlogSeriesId = (typeof BLOG_SERIES)[number]['id']
-export const BLOG_SERIES_IDS = BLOG_SERIES.map((series) => series.id) as [BlogSeriesId, ...BlogSeriesId[]]
+/**
+ * 記事のイベント種別のID（記事IDの末尾・EDTCHPのフォルダ名になる）。タグとは別で、管理者が「種類・種別の管理」で増減する。
+ * フォルダ名の一部になるので、半角英小文字・数字だけで、作成後は変えられない
+ */
+export const SERIES_ID_PATTERN = /^[a-z][a-z0-9]{1,19}$/
+export type BlogSeriesId = string
 
 export const BLOG_STATUSES = ['draft', 'in_review', 'published'] as const
 export type BlogStatus = (typeof BLOG_STATUSES)[number]
@@ -51,7 +47,7 @@ export type BlogPostContent = {
 /** 2026-05-16 + yugyou → 26-05-16-yugyou（連番を付ける前の記事ID） */
 export function articleIdBase(eventDate: string, series: string): string {
   const m = eventDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (!m || !BLOG_SERIES_IDS.includes(series as BlogSeriesId)) return ''
+  if (!m || !SERIES_ID_PATTERN.test(series)) return ''
   return `${m[1].slice(2)}-${m[2]}-${m[3]}-${series}`
 }
 
@@ -100,16 +96,19 @@ export function buildMarkdown(content: BlogPostContent): string {
 }
 
 /**
- * PR作成（提出）前のチェック。
+ * PR作成（提出）前のチェック。seriesIds は今あるイベント種別のID。
  * 旧ルールで記事IDが決まっている記事は、イベント種別未選択でも提出できる（seriesOptional）
  */
-export function validateForSubmit(content: BlogPostContent, { seriesOptional = false } = {}): string[] {
+export function validateForSubmit(
+  content: BlogPostContent,
+  { seriesOptional = false, seriesIds }: { seriesOptional?: boolean; seriesIds: readonly string[] },
+): string[] {
   const errors: string[] = []
   if (!content.title.trim()) errors.push('タイトルを入力してください')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(content.eventDate)) errors.push('イベント実施日を入力してください')
   if (!content.series) {
     if (!seriesOptional) errors.push('イベント種別を選択してください')
-  } else if (!BLOG_SERIES_IDS.includes(content.series as BlogSeriesId)) errors.push('イベント種別が正しくありません')
+  } else if (!seriesIds.includes(content.series)) errors.push('イベント種別が正しくありません')
   if (!content.description.trim()) errors.push('一覧用の説明文を入力してください')
   if (!content.authorName.trim()) errors.push('執筆者名を入力してください')
   if (content.tags.length === 0) errors.push('タグを1つ以上選択してください')

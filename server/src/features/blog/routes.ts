@@ -22,7 +22,8 @@ import { resolveArticleId } from './article-id'
 import { contentOf, hasUnsubmittedChanges, imagesOf } from './content'
 import { notifySubmitted } from './notifications'
 import { BlogPublisher } from './publisher'
-import { assertCanView, authorLabelOf, findPost, listReviewerIds } from './queries'
+import { assertCanView, authorLabelOf, findPost, listReviewerIds, listSeries } from './queries'
+import { blogSeriesRoute } from './series'
 import { blogTagsRoute } from './tags'
 
 const WEBP_MAGIC = { riff: 'RIFF', webp: 'WEBP' }
@@ -39,6 +40,7 @@ function newImageFileName(): string {
 export const blogRoute = new Hono<AppEnv>()
   .use(requireAuth)
   .route('/tags', blogTagsRoute)
+  .route('/series', blogSeriesRoute)
 
   .get('/posts', validate('query', z.object({ scope: z.enum(['mine', 'all']).default('all') })), async (c) => {
     const { scope } = c.req.valid('query')
@@ -91,9 +93,11 @@ export const blogRoute = new Hono<AppEnv>()
     assertCanView(session, post)
     const { submittedContent: _snapshot, ...rest } = post
     const availableTags = await db.select({ id: blogTags.id, label: blogTags.label }).from(blogTags).orderBy(blogTags.sortOrder, blogTags.createdAt)
+    const availableSeries = await listSeries(db)
     return c.json({
       post: rest,
       availableTags,
+      availableSeries,
       canEdit: canManage(session, post.authorId),
       hasUnsubmittedChanges: hasUnsubmittedChanges(post),
       githubConfigured: isGitHubConfigured(c.env),
@@ -107,6 +111,9 @@ export const blogRoute = new Hono<AppEnv>()
     assertCanManage(c.get('session'), post.authorId)
     if (post.publishedAt && (input.eventDate !== post.eventDate || input.series !== post.series)) {
       throw badRequest('公開済みの記事は日付とイベント種別を変更できません')
+    }
+    if (input.series && !(await listSeries(db)).some((series) => series.id === input.series)) {
+      throw badRequest('イベント種別が正しくありません。画面を読み込み直してください')
     }
     // 管理者が削除したタグが付いたままの記事も保存できるよう、すでに付いているタグは許可する
     const knownTags = new Set((await db.select({ label: blogTags.label }).from(blogTags)).map((tag) => tag.label))
@@ -184,7 +191,8 @@ export const blogRoute = new Hono<AppEnv>()
     assertCanManage(c.get('session'), post.authorId)
 
     const content = contentOf(post)
-    const errors = validateForSubmit(content, { seriesOptional: !!post.articleId })
+    const seriesIds = (await listSeries(db)).map((series) => series.id)
+    const errors = validateForSubmit(content, { seriesOptional: !!post.articleId, seriesIds })
     if (errors.length > 0) throw badRequest(errors.join('\n'))
     if (post.publishedAt) {
       const submitted = post.submittedContent

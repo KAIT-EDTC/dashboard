@@ -1,4 +1,3 @@
-import { EVENT_CATEGORY_LABELS, type EventCategory } from '@edtc/shared'
 import type { Db } from '../../db'
 import type { Bindings } from '../../env'
 import { EMBED_COLORS, mention, notify } from '../../lib/discord'
@@ -6,7 +5,8 @@ import { EMBED_COLORS, mention, notify } from '../../lib/discord'
 type EventSummary = {
   id: string
   title: string
-  category: EventCategory
+  /** 種類の表示名 */
+  categoryLabel: string
   startsAt: string
   location: string
   rsvpDeadline: string | null
@@ -37,7 +37,7 @@ export function notifyEventCreated(
         color: EMBED_COLORS.info,
         fields: [
           { name: '日時', value: formatDateTime(event.startsAt), inline: true },
-          { name: '種類', value: EVENT_CATEGORY_LABELS[event.category], inline: true },
+          { name: '種類', value: event.categoryLabel, inline: true },
           ...(event.location ? [{ name: '場所', value: event.location, inline: true }] : []),
           ...(event.rsvpDeadline ? [{ name: '出欠締切', value: formatDateTime(event.rsvpDeadline), inline: true }] : []),
           { name: '主催', value: organizerName, inline: true },

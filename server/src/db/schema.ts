@@ -2,10 +2,10 @@ import { relations, sql } from 'drizzle-orm'
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import {
   BLOG_STATUSES,
-  EVENT_CATEGORIES,
   ITEM_KINDS,
   RSVP_STATUSES,
   type BlogPostContent,
+  type CategoryTone,
   type Division,
   type ProfileLinks,
 } from '@edtc/shared'
@@ -105,6 +105,24 @@ export const blogPosts = sqliteTable(
   (t) => [index('blog_posts_author_idx').on(t.authorId), index('blog_posts_pr_idx').on(t.prNumber)],
 )
 
+/** ブログ記事のイベント種別。id は記事IDの末尾（管理者が作成時に決め、後から変えられない） */
+export const blogSeries = sqliteTable('blog_series', {
+  id: text('id').primaryKey(),
+  label: text('label').notNull().unique(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamps.createdAt,
+})
+
+/** イベントの種類（活動・ミーティングなど）。名前を変えても id は変わらない */
+export const eventCategories = sqliteTable('event_categories', {
+  id: text('id').primaryKey(),
+  label: text('label').notNull().unique(),
+  /** バッジ・カレンダーの色（CATEGORY_TONES） */
+  tone: text('tone').$type<CategoryTone>().notNull().default('neutral'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamps.createdAt,
+})
+
 /** 記事に付けられるタグ。管理者がダッシュボードで管理し、記事には表示名で保存する */
 export const blogTags = sqliteTable('blog_tags', {
   id: text('id').primaryKey(),
@@ -165,7 +183,8 @@ export const events = sqliteTable(
   {
     id: text('id').primaryKey(),
     title: text('title').notNull(),
-    category: text('category', { enum: EVENT_CATEGORIES }).notNull(),
+    /** event_categories の id（管理者が増減する。使用中の種類は削除できない） */
+    category: text('category').notNull(),
     description: text('description').notNull().default(''),
     location: text('location').notNull().default(''),
     /** 日本時間 YYYY-MM-DDTHH:mm */
