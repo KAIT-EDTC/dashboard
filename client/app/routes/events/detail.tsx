@@ -105,13 +105,10 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
               </ButtonLink>
             ) : (
               canWriteReport && (
-                <Form method="post" action="/reports?index">
-                  <input type="hidden" name="eventId" value={event.id} />
-                  <Button type="submit">
-                    <FileTextIcon size={16} />
-                    報告書を書く
-                  </Button>
-                </Form>
+                <ButtonLink to={`/reports/new?eventId=${encodeURIComponent(event.id)}`}>
+                  <FileTextIcon size={16} />
+                  報告書を書く
+                </ButtonLink>
               )
             )}
             {/* イベントのタイトルと日付を引き継いだブログの下書きを作る */}

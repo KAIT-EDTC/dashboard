@@ -10,6 +10,7 @@ export function contentOf(report: ReportDetail): ReportContent {
     reflection: report.reflection,
     rating: report.rating,
     notes: report.notes,
+    approverId: report.approverId,
   }
 }
 

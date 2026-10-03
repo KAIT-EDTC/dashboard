@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { createMiddleware } from 'hono/factory'
-import type { Division } from '@edtc/shared'
+import { canApproveStep, type ApprovalStep, type Division } from '@edtc/shared'
 import { createDb } from '../db'
 import { users } from '../db/schema'
 import type { AppEnv, Session } from '../env'
@@ -15,13 +15,13 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   if (!userId) throw unauthorized()
 
   const user = await createDb(c.env)
-    .select({ id: users.id, role: users.role, headOf: users.headOf })
+    .select({ id: users.id, role: users.role, headOf: users.headOf, officer: users.officer })
     .from(users)
     .where(eq(users.id, userId))
     .get()
   if (!user) throw unauthorized()
 
-  c.set('session', { userId: user.id, role: user.role, headOf: user.headOf })
+  c.set('session', { userId: user.id, role: user.role, headOf: user.headOf, officer: user.officer })
   await next()
 })
 
@@ -34,8 +34,15 @@ export function assertCanManage(session: Session, ownerId: string) {
   if (!canManage(session, ownerId)) throw forbidden()
 }
 
-/** 活動報告書を承認・差し戻しできる: 報告した部署の部長か管理者（自分の報告書は除く） */
-export function canReview(session: Session, report: { authorId: string; division: Division | null }): boolean {
-  if (report.authorId === session.userId) return false
-  return session.role === 'admin' || (!!report.division && session.headOf.includes(report.division))
+type ReviewTarget = { authorId: string; division: Division | null; approverId: string | null; approvalSteps: ApprovalStep[] }
+
+/** 活動報告書のその段階を承認・差し戻しできるか（自分の報告書は除く。管理者は関わらない） */
+export function canReviewStep(session: Session, report: ReviewTarget, step: ApprovalStep | undefined): boolean {
+  if (!step || report.authorId === session.userId) return false
+  return canApproveStep({ ...session, id: session.userId }, step, report)
+}
+
+/** 承認の流れのどこかを担当している（提出後の報告書を見られる） */
+export function isApprover(session: Session, report: ReviewTarget): boolean {
+  return report.approvalSteps.some((step) => canReviewStep(session, report, step))
 }

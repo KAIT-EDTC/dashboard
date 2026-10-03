@@ -1,5 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types'
-import type { Division } from '@edtc/shared'
+import type { Division, Officer } from '@edtc/shared'
 
 // クライアントが AppType を型importする際にも解決できるよう、グローバル型に頼らず明示的にimportする
 export type Bindings = {
@@ -17,8 +17,14 @@ export type Bindings = {
   DISCORD_ADMIN_ROLE_IDS?: string
   /** 部署ごとの部長ロールID（例: 営業部:123,総務部:456）。活動報告書の承認者になる */
   DISCORD_DIVISION_HEAD_ROLE_IDS?: string
+  /** 本部長のロールID（カンマ区切り）。部署長の次に活動報告書を承認する */
+  DISCORD_GENERAL_MANAGER_ROLE_IDS?: string
+  /** 代表のロールID（カンマ区切り）。本部長の活動報告書を承認する */
+  DISCORD_REPRESENTATIVE_ROLE_IDS?: string
   /** 通知用Webhook URL。未設定なら通知しない */
   DISCORD_WEBHOOK_URL?: string
+  /** 活動報告書の通知を関係者だけにDMで送るためのBotトークン。未設定ならDMを送らない */
+  DISCORD_BOT_TOKEN?: string
   /** ブログ提出時にメンションするロールID（例: 広報部） */
   DISCORD_BLOG_REVIEWER_ROLE_ID?: string
 
@@ -38,8 +44,10 @@ export type Role = 'member' | 'admin'
 export type Session = {
   userId: string
   role: Role
-  /** 部長を務める部署 */
+  /** 部署長を務める部署 */
   headOf: Division[]
+  /** 代表・本部長 */
+  officer: Officer | null
 }
 
 export type AppEnv = {

@@ -3,15 +3,18 @@ import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'driz
 import {
   BLOG_STATUSES,
   EVENT_CATEGORIES,
+  APPROVAL_STEPS,
+  COMMENTABLE_FIELDS,
   ITEM_KINDS,
+  OFFICERS,
   PARTICIPANT_ROLES,
   REPORT_STATUSES,
   RSVP_STATUSES,
   type BlogPostContent,
   type BlogTag,
   type Division,
+  type ApprovalStep,
   type ProfileLinks,
-  type ReportField,
 } from '@edtc/shared'
 
 const nowIso = sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`
@@ -37,6 +40,8 @@ export const users = sqliteTable('users', {
   role: text('role', { enum: ['member', 'admin'] }).notNull().default('member'),
   /** 部長を務める部署。ログインのたびにDiscordの部長ロールから再計算される */
   headOf: text('head_of', { mode: 'json' }).$type<Division[]>().notNull().default(sql`'[]'`),
+  /** 代表・本部長。ログインのたびにDiscordロールから再計算される */
+  officer: text('officer', { enum: OFFICERS }),
 
   lastName: text('last_name').notNull(),
   firstName: text('first_name').notNull(),
@@ -225,11 +230,13 @@ export const activityReports = sqliteTable(
 
     status: text('status', { enum: REPORT_STATUSES }).notNull().default('draft'),
     submittedAt: text('submitted_at'),
-    reviewerId: text('reviewer_id').references(() => users.id, { onDelete: 'set null' }),
-    reviewedAt: text('reviewed_at'),
-    /** 差し戻し時に指摘された項目とコメント */
-    rejectionFields: text('rejection_fields', { mode: 'json' }).$type<ReportField[]>().notNull().default(sql`'[]'`),
-    rejectionComment: text('rejection_comment').notNull().default(''),
+    /** 提出時に提出者の立場から決めた承認の流れ（部員: 部署長 / 役職者: 選んだ承認者） */
+    approvalSteps: text('approval_steps', { mode: 'json' }).$type<ApprovalStep[]>().notNull().default(sql`'[]'`),
+    /** 役職者が選んだ承認者（自分以外の部署長・本部長・代表） */
+    approverId: text('approver_id').references(() => users.id, { onDelete: 'set null' }),
+    /** いま確認している段階（approvalSteps の位置）。差し戻されても進んだ段階は保つ */
+    currentStep: integer('current_step').notNull().default(0),
+    approvedAt: text('approved_at'),
 
     ...timestamps,
   },
@@ -238,6 +245,43 @@ export const activityReports = sqliteTable(
     index('activity_reports_author_idx').on(t.authorId),
     index('activity_reports_status_division_idx').on(t.status, t.division),
   ],
+)
+
+/** 承認・差し戻しの履歴（段階ごとに1行） */
+export const activityReportReviews = sqliteTable(
+  'activity_report_reviews',
+  {
+    id: text('id').primaryKey(),
+    reportId: text('report_id')
+      .notNull()
+      .references(() => activityReports.id, { onDelete: 'cascade' }),
+    reviewerId: text('reviewer_id').references(() => users.id, { onDelete: 'set null' }),
+    step: text('step', { enum: APPROVAL_STEPS }).notNull(),
+    decision: text('decision', { enum: ['approve', 'reject'] }).notNull(),
+    /** 報告書全体へのコメント */
+    comment: text('comment').notNull().default(''),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [index('activity_report_reviews_report_idx').on(t.reportId)],
+)
+
+/** 差し戻し時に本文の範囲へ付けるコメント（PRレビューの行コメントのようなもの） */
+export const activityReportComments = sqliteTable(
+  'activity_report_comments',
+  {
+    id: text('id').primaryKey(),
+    reviewId: text('review_id')
+      .notNull()
+      .references(() => activityReportReviews.id, { onDelete: 'cascade' }),
+    field: text('field', { enum: COMMENTABLE_FIELDS }).notNull(),
+    /** コメントした時点の本文での位置（UTF-16）。本文が直されたら quote で探し直す */
+    start: integer('start').notNull(),
+    end: integer('end').notNull(),
+    quote: text('quote').notNull(),
+    body: text('body').notNull(),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [index('activity_report_comments_review_idx').on(t.reviewId)],
 )
 
 // ---------------------------------------------------------------------------
@@ -274,8 +318,19 @@ export const eventItemsRelations = relations(eventItems, ({ one }) => ({
   assignee: one(users, { fields: [eventItems.assigneeId], references: [users.id] }),
 }))
 
-export const activityReportsRelations = relations(activityReports, ({ one }) => ({
+export const activityReportsRelations = relations(activityReports, ({ one, many }) => ({
   event: one(events, { fields: [activityReports.eventId], references: [events.id] }),
   author: one(users, { fields: [activityReports.authorId], references: [users.id], relationName: 'reportAuthor' }),
-  reviewer: one(users, { fields: [activityReports.reviewerId], references: [users.id], relationName: 'reportReviewer' }),
+  approver: one(users, { fields: [activityReports.approverId], references: [users.id], relationName: 'reportApprover' }),
+  reviews: many(activityReportReviews),
+}))
+
+export const activityReportReviewsRelations = relations(activityReportReviews, ({ one, many }) => ({
+  report: one(activityReports, { fields: [activityReportReviews.reportId], references: [activityReports.id] }),
+  reviewer: one(users, { fields: [activityReportReviews.reviewerId], references: [users.id] }),
+  comments: many(activityReportComments),
+}))
+
+export const activityReportCommentsRelations = relations(activityReportComments, ({ one }) => ({
+  review: one(activityReportReviews, { fields: [activityReportComments.reviewId], references: [activityReportReviews.id] }),
 }))

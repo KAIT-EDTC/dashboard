@@ -1,12 +1,18 @@
-import { reportDraftSchema, reportReviewSchema, reportSubmitSchema } from '@edtc/shared'
+import { isLeader, reportDraftSchema, reportReviewSchema, reportSubmitSchema } from '@edtc/shared'
+import { useMemo } from 'react'
 import { redirect } from 'react-router'
 import { css } from 'styled-system/css'
 import { PageHeader } from '~/components/ui/PageHeader'
 import { useCurrentUser } from '~/features/auth/use-current-user'
+import { ApprovalProgress } from '~/features/reports/ApprovalProgress'
+import { saveDraft } from '~/features/reports/autosave'
+import { contentOf } from '~/features/reports/content'
 import { ReportForm, type ReportActionData, type ReportIntent } from '~/features/reports/ReportForm'
 import { ReportStatusBadge } from '~/features/reports/ReportStatusBadge'
 import { ReportView } from '~/features/reports/ReportView'
-import { ReviewPanel, ReviewStatus } from '~/features/reports/ReviewPanel'
+import { ReviewHistory } from '~/features/reports/ReviewHistory'
+import { ReviewStatus, ReviewWorkspace } from '~/features/reports/ReviewPanel'
+import { latestRejection } from '~/features/reports/types'
 import { api, unwrap } from '~/lib/api'
 import { catchApiError, zodErrors } from '~/lib/form'
 import { fullName } from '~/lib/format'
@@ -15,7 +21,11 @@ import type { Route } from './+types/detail'
 export const meta: Route.MetaFunction = ({ data }) => [{ title: `活動報告書: ${data?.report.event.title ?? ''} | EDTC ダッシュボード` }]
 
 export async function clientLoader({ params }: Route.ClientLoaderArgs) {
-  return unwrap(api.reports[':id'].$get({ param: { id: params.reportId } }))
+  const [detail, { approvers }] = await Promise.all([
+    unwrap(api.reports[':id'].$get({ param: { id: params.reportId } })),
+    unwrap(api.reports.approvers.$get()),
+  ])
+  return { ...detail, approvers }
 }
 
 /** フォームから JSON で { intent, content } か { intent: 'review', review } が送られてくる */
@@ -31,7 +41,7 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
   switch (intent) {
     case 'delete': {
       const result = await run(() => unwrap(api.reports[':id'].$delete({ param })))
-      return 'ok' in result ? redirect('/reports?tab=mine') : result
+      return 'ok' in result ? redirect('/reports') : result
     }
     case 'save': {
       const parsed = reportDraftSchema.safeParse(content)
@@ -43,6 +53,8 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
       if (!parsed.success) return { ...zodErrors(parsed.error), intent }
       return run(() => unwrap(api.reports[':id'].submit.$post({ param, json: parsed.data })))
     }
+    case 'withdraw':
+      return run(() => unwrap(api.reports[':id'].withdraw.$post({ param })))
     case 'review': {
       const parsed = reportReviewSchema.safeParse(review)
       if (!parsed.success) return { ...zodErrors(parsed.error), intent }
@@ -54,9 +66,10 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
 
 export default function ReportPage({ loaderData }: Route.ComponentProps) {
-  const { report, authorRole, canEdit, canReview } = loaderData
+  const { report, authorRole, canEdit, canDelete, canReview, canWithdraw, approvers } = loaderData
   const me = useCurrentUser()
   const isAuthor = report.authorId === me.id
+  const autosave = useMemo(() => saveDraft(report.id), [report.id])
 
   return (
     <>
@@ -64,20 +77,41 @@ export default function ReportPage({ loaderData }: Route.ComponentProps) {
         title={report.event.title}
         description={
           <span className={css({ display: 'inline-flex', alignItems: 'center', gap: 'sm' })}>
-            <ReportStatusBadge status={report.status} />
+            <ReportStatusBadge status={report.status} step={report.approvalSteps[report.currentStep]} />
             活動報告書 · {fullName(report.author)}
           </span>
         }
-        back={isAuthor ? { to: '/reports?tab=mine', label: '自分の報告書' } : canReview ? { to: '/reports?tab=review', label: '承認待ち' } : { to: `/events/${report.event.id}`, label: 'イベント' }}
+        back={
+          isAuthor
+            ? { to: '/reports?tab=mine', label: '自分の報告書' }
+            : canReview
+              ? { to: '/reports?tab=review', label: '承認待ち' }
+              : { to: `/events/${report.event.id}`, label: 'イベント' }
+        }
       />
       {canEdit ? (
-        <ReportForm key={report.id} {...loaderData} divisions={me.divisions} />
-      ) : (
-        <ReportView
-          report={report}
-          authorRole={authorRole}
-          aside={canReview ? <ReviewPanel key={report.updatedAt} report={report} /> : <ReviewStatus report={report} isAuthor={isAuthor} />}
+        <ReportForm
+          key={report.updatedAt}
+          context={{ event: report.event, author: report.author, authorRole, submittedAt: report.submittedAt }}
+          initial={contentOf(report)}
+          status={report.status}
+          divisions={me.divisions}
+          canDelete={canDelete}
+          rejection={latestRejection(report.reviews)}
+          isLeader={isLeader(me)}
+          approvers={approvers}
+          autosave={autosave}
+          aside={
+            <>
+              <ApprovalProgress report={report} />
+              <ReviewHistory reviews={report.reviews} />
+            </>
+          }
         />
+      ) : canReview ? (
+        <ReviewWorkspace key={`${report.id}-${report.currentStep}`} report={report} authorRole={authorRole} />
+      ) : (
+        <ReportView report={report} authorRole={authorRole} aside={<ReviewStatus report={report} isAuthor={isAuthor} canWithdraw={canWithdraw} />} />
       )}
     </>
   )

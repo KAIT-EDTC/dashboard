@@ -11,6 +11,7 @@ import {
   fetchGuildMember,
   headDivisionsOf,
   isAdminMember,
+  officerOf,
 } from '../../lib/discord'
 import { badRequest, conflict, unauthorized } from '../../lib/errors'
 import { validate } from '../../lib/validator'
@@ -48,14 +49,15 @@ export const authRoute = new Hono<AppEnv>()
 
       const role = isAdminMember(c.env, member) ? 'admin' : 'member'
       const headOf = headDivisionsOf(c.env, member)
+      const officer = officerOf(c.env, member)
       const db = createDb(c.env)
       const existing = await db.select({ id: users.id }).from(users).where(eq(users.id, discordUser.id)).get()
 
       if (existing) {
-        // アイコン・ユーザー名・ロール（管理者・部長）はDiscord側を正とする
+        // アイコン・ユーザー名・ロール（管理者・部署長・代表・本部長）はDiscord側を正とする
         await db
           .update(users)
-          .set({ discordUsername: discordUser.username, discordAvatar: discordUser.avatar, role, headOf })
+          .set({ discordUsername: discordUser.username, discordAvatar: discordUser.avatar, role, headOf, officer })
           .where(eq(users.id, discordUser.id))
         await startSession(c, discordUser.id)
         return c.redirect(c.env.FRONTEND_URL)
@@ -68,6 +70,7 @@ export const authRoute = new Hono<AppEnv>()
         nick: member.nick,
         role,
         headOf,
+        officer,
       })
       return c.redirect(`${c.env.FRONTEND_URL}/register`)
     } catch (error) {
@@ -120,6 +123,7 @@ export const authRoute = new Hono<AppEnv>()
         discordAvatar: claims.avatar,
         role: claims.role,
         headOf: claims.headOf ?? [],
+        officer: claims.officer ?? null,
         lastName: input.lastName,
         firstName: input.firstName,
         lastNameKana: input.lastNameKana,

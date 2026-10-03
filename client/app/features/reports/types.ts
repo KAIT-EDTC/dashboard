@@ -6,3 +6,20 @@ export type MyReport = InferResponseType<typeof api.reports.mine.$get, 200>['rep
 export type ReviewItem = InferResponseType<typeof api.reports.review.$get, 200>['reports'][number]
 export type ReportDetailResponse = InferResponseType<(typeof api.reports)[':id']['$get'], 200>
 export type ReportDetail = ReportDetailResponse['report']
+export type ReportReview = ReportDetail['reviews'][number]
+export type ReportComment = ReportReview['comments'][number]
+export type ApproverCandidate = InferResponseType<typeof api.reports.approvers.$get, 200>['approvers'][number]
+export type SubmissionStatusEvent = InferResponseType<typeof api.reports.status.$get, 200>['events'][number]
+export type NewReportResponse = InferResponseType<typeof api.reports.new.$get, 200>
+export type NewReportDraft = NonNullable<NewReportResponse['draft']>
+
+/** 自動で入る欄（イベント・本人・役割）。作成前と作成後で共通。学籍番号は見られる人にだけ届く */
+export type ReportContext = Pick<NewReportDraft, 'event' | 'authorRole'> & {
+  author: Omit<NewReportDraft['author'], 'studentId'> & { studentId: string | null }
+  submittedAt: string | null
+}
+
+/** いちばん新しい差し戻し（本人が直すときに見る） */
+export function latestRejection(reviews: ReportReview[]): ReportReview | undefined {
+  return [...reviews].reverse().find((review) => review.decision === 'reject')
+}

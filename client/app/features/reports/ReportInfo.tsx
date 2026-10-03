@@ -1,11 +1,10 @@
-import type { ParticipantRole } from '@edtc/shared'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { css } from 'styled-system/css'
 import { Card } from '~/components/ui/Card'
 import { RoleBadge } from '~/features/events/EventBadges'
 import { formatRange, formatTimestamp, fullName } from '~/lib/format'
-import type { ReportDetail } from './types'
+import type { ReportContext } from './types'
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -17,8 +16,8 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** イベントとメンバー情報から自動で入る欄（Excel様式の上半分） */
-export function ReportInfo({ report, authorRole }: { report: ReportDetail; authorRole: ParticipantRole | null }) {
-  const { event, author } = report
+export function ReportInfo({ context }: { context: ReportContext }) {
+  const { event, author, authorRole, submittedAt } = context
   return (
     <Card title="活動の情報">
       <dl className={css({ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'md' })}>
@@ -34,7 +33,7 @@ export function ReportInfo({ report, authorRole }: { report: ReportDetail; autho
         <Row label="役割">{authorRole ? <RoleBadge role={authorRole} /> : '—'}</Row>
         <Row label="氏名">{fullName(author)}</Row>
         {author.studentId && <Row label="学籍番号">{author.studentId}</Row>}
-        <Row label="提出日">{report.submittedAt ? formatTimestamp(report.submittedAt) : '未提出'}</Row>
+        <Row label="提出日">{submittedAt ? formatTimestamp(submittedAt) : '未提出'}</Row>
       </dl>
       <p className={css({ mt: 'md', fontSize: 'xs', color: 'fg.subtle' })}>
         日時・場所はイベント、役割は主催者の設定から入ります。違っている場合は主催者に連絡してください。

@@ -1,4 +1,4 @@
-import { DIVISIONS, type Division } from '@edtc/shared'
+import { DIVISIONS, type Division, type Officer } from '@edtc/shared'
 import type { Bindings } from '../env'
 
 const API = 'https://discord.com/api/v10'
@@ -70,12 +70,25 @@ export async function fetchGuildMember(accessToken: string, guildId: string): Pr
   return res.json()
 }
 
-export function isAdminMember(env: Bindings, member: DiscordGuildMember): boolean {
-  const adminRoles = (env.DISCORD_ADMIN_ROLE_IDS ?? '')
+const roleIds = (value: string | undefined) =>
+  (value ?? '')
     .split(',')
     .map((id) => id.trim())
     .filter(Boolean)
+
+export function isAdminMember(env: Bindings, member: DiscordGuildMember): boolean {
+  const adminRoles = roleIds(env.DISCORD_ADMIN_ROLE_IDS)
   return member.roles.some((role) => adminRoles.includes(role))
+}
+
+const officerRoleIds = (env: Bindings, officer: Officer) =>
+  roleIds(officer === 'representative' ? env.DISCORD_REPRESENTATIVE_ROLE_IDS : env.DISCORD_GENERAL_MANAGER_ROLE_IDS)
+
+/** 代表・本部長のロールを持っていればその役職（両方なら代表） */
+export function officerOf(env: Bindings, member: DiscordGuildMember): Officer | null {
+  if (officerRoleIds(env, 'representative').some((id) => member.roles.includes(id))) return 'representative'
+  if (officerRoleIds(env, 'general_manager').some((id) => member.roles.includes(id))) return 'general_manager'
+  return null
 }
 
 /** DISCORD_DIVISION_HEAD_ROLE_IDS（部署:ロールID をカンマ区切り）を読む。部署名の誤りは無視する */
@@ -91,11 +104,6 @@ function divisionHeadRoles(env: Bindings): Map<Division, string> {
 /** 部長ロールを持っている部署 */
 export function headDivisionsOf(env: Bindings, member: DiscordGuildMember): Division[] {
   return [...divisionHeadRoles(env)].filter(([, roleId]) => member.roles.includes(roleId)).map(([division]) => division)
-}
-
-/** 通知でメンションする部長ロール */
-export function divisionHeadRoleId(env: Bindings, division: Division): string | undefined {
-  return divisionHeadRoles(env).get(division)
 }
 
 // ---------------------------------------------------------------------------
@@ -141,4 +149,46 @@ export async function notify(
   } catch (error) {
     console.error('Discord通知に失敗しました', error)
   }
+}
+
+// ---------------------------------------------------------------------------
+// DM（Bot）。常駐はせず、送るときにREST APIを呼ぶだけ
+// ---------------------------------------------------------------------------
+
+/**
+ * 1人にDMを送る。Botと同じサーバーにいて、サーバーメンバーからのDMを許可している人にだけ届く。
+ * notify と同じく、失敗しても本来の処理は止めずログだけ残す
+ */
+export async function sendDirectMessage(
+  env: Bindings,
+  userId: string,
+  message: { content: string; embeds?: DiscordEmbed[] },
+): Promise<void> {
+  if (!env.DISCORD_BOT_TOKEN) return
+  const headers = { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`, 'Content-Type': 'application/json' }
+  try {
+    const channelRes = await fetch(`${API}/users/@me/channels`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ recipient_id: userId }),
+    })
+    if (!channelRes.ok) {
+      console.error('DMチャンネルを開けませんでした', userId, channelRes.status, await channelRes.text())
+      return
+    }
+    const channel = (await channelRes.json()) as { id: string }
+    const res = await fetch(`${API}/channels/${channel.id}/messages`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...message, allowed_mentions: { parse: [] } }),
+    })
+    if (!res.ok) console.error('DMを送れませんでした', userId, res.status, await res.text())
+  } catch (error) {
+    console.error('DMを送れませんでした', userId, error)
+  }
+}
+
+/** 複数人に同じDMを送る（人数は承認者数人程度なので順番に送る） */
+export async function sendDirectMessages(env: Bindings, userIds: string[], message: { content: string; embeds?: DiscordEmbed[] }) {
+  for (const userId of new Set(userIds)) await sendDirectMessage(env, userId, message)
 }

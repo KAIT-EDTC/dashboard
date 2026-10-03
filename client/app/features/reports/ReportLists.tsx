@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react'
-import { Form, Link, useNavigation } from 'react-router'
+import { Link } from 'react-router'
 import { css, cx } from 'styled-system/css'
 import { Avatar } from '~/components/ui/Avatar'
 import { Badge } from '~/components/ui/Badge'
-import { Button, ButtonLink } from '~/components/ui/Button'
 import { Card } from '~/components/ui/Card'
 import { EmptyState } from '~/components/ui/EmptyState'
 import { CalendarIcon, CheckIcon, EditIcon, FileTextIcon, PenIcon } from '~/components/ui/Icons'
@@ -31,10 +30,8 @@ function ListCard({ empty, children }: { empty: ReactNode | null; children: Reac
   return <Card padded={false}>{empty ?? <ul>{children}</ul>}</Card>
 }
 
-/** 報告書を書けるイベント（参加した・開始済み） */
+/** 報告書を書けるイベント（参加した・開始済み）。選ぶと作成ページ（書いていればその報告書）へ */
 export function TargetList({ targets }: { targets: ReportTarget[] }) {
-  const navigation = useNavigation()
-  const creating = navigation.state === 'submitting' ? navigation.formData?.get('eventId') : null
   return (
     <ListCard
       empty={
@@ -45,39 +42,40 @@ export function TargetList({ targets }: { targets: ReportTarget[] }) {
         ) : null
       }
     >
-      {targets.map((target) => (
-        <li key={target.eventId} className={rowStyle}>
-          <span className={dateStyle}>{formatDateTime(target.startsAt)}</span>
-          <Link to={`/events/${target.eventId}`} className={titleStyle}>
-            {target.eventTitle}
-          </Link>
-          <RoleBadge role={target.role} />
-          <ReportStatusBadge status={target.reportStatus} />
-          {target.reportId ? (
-            <ButtonLink to={`/reports/${target.reportId}`} size="sm">
-              {target.reportStatus === 'draft' || target.reportStatus === 'rejected' ? (
-                <>
-                  <EditIcon size={14} />
-                  続きを書く
-                </>
-              ) : (
-                <>
-                  <FileTextIcon size={14} />
-                  見る
-                </>
-              )}
-            </ButtonLink>
-          ) : (
-            <Form method="post">
-              <input type="hidden" name="eventId" value={target.eventId} />
-              <Button type="submit" size="sm" variant="primary" loading={creating === target.eventId}>
-                <PenIcon size={14} />
-                書く
-              </Button>
-            </Form>
-          )}
-        </li>
-      ))}
+      {targets.map((target) => {
+        const editable = target.reportStatus === 'draft' || target.reportStatus === 'rejected'
+        return (
+          <li key={target.eventId}>
+            <Link
+              to={target.reportId ? `/reports/${target.reportId}` : `/reports/new?eventId=${encodeURIComponent(target.eventId)}`}
+              className={cx(rowStyle, rowLinkStyle)}
+            >
+              <span className={dateStyle}>{formatDateTime(target.startsAt)}</span>
+              <span className={titleStyle}>{target.eventTitle}</span>
+              <RoleBadge role={target.role} />
+              <ReportStatusBadge status={target.reportStatus} />
+              <span className={css({ display: 'inline-flex', alignItems: 'center', gap: 'xs', fontSize: 'sm', fontWeight: '600', color: 'accent.fg', minW: '84px', justifyContent: 'flex-end' })}>
+                {!target.reportId ? (
+                  <>
+                    <PenIcon size={14} />
+                    書く
+                  </>
+                ) : editable ? (
+                  <>
+                    <EditIcon size={14} />
+                    続きを書く
+                  </>
+                ) : (
+                  <>
+                    <FileTextIcon size={14} />
+                    見る
+                  </>
+                )}
+              </span>
+            </Link>
+          </li>
+        )
+      })}
     </ListCard>
   )
 }
@@ -91,7 +89,7 @@ export function MyReportList({ reports }: { reports: MyReport[] }) {
             <span className={dateStyle}>{formatDateTime(report.startsAt)}</span>
             <span className={titleStyle}>{report.eventTitle}</span>
             {report.division && <Badge>{report.division}</Badge>}
-            <ReportStatusBadge status={report.status} />
+            <ReportStatusBadge status={report.status} step={report.approvalSteps[report.currentStep]} />
             <span className={css({ fontSize: 'xs', color: 'fg.subtle' })}>{formatTimestamp(report.updatedAt)}</span>
           </Link>
         </li>
@@ -112,6 +110,7 @@ export function ReviewList({ reports }: { reports: ReviewItem[] }) {
             </span>
             <span className={titleStyle}>{report.event.title}</span>
             {report.division && <Badge tone="accent">{report.division}</Badge>}
+            <ReportStatusBadge status={report.status} step={report.approvalSteps[report.currentStep]} />
             {report.submittedAt && <span className={css({ fontSize: 'xs', color: 'fg.subtle' })}>{formatTimestamp(report.submittedAt)} 提出</span>}
           </Link>
         </li>
