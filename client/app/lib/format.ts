@@ -31,6 +31,13 @@ export function formatTimestamp(iso: string): string {
   return new Date(iso).toLocaleString('ja-JP', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+/** バイト数 → 1.2 MB のような表記 */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
 export const formatYen = (value: number) => `${value.toLocaleString('ja-JP')}円`
 
 type NamedMember = { lastName: string; firstName: string; nickname?: string }

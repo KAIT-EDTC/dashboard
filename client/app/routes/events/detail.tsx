@@ -1,16 +1,18 @@
 import { ITEM_KINDS, RSVP_STATUSES } from '@edtc/shared'
-import { Form } from 'react-router'
+import { Form, useSearchParams } from 'react-router'
 import { css } from 'styled-system/css'
 import { Button, ButtonLink } from '~/components/ui/Button'
 import { EditIcon, PenIcon } from '~/components/ui/Icons'
 import { PageHeader } from '~/components/ui/PageHeader'
 import { useCurrentUser } from '~/features/auth/use-current-user'
 import { CategoryBadge } from '~/features/events/EventBadges'
+import { Alert } from '~/components/ui/Alert'
+import { filesFrom, uploadAttachments } from '~/features/events/attachments'
 import { EventInfo } from '~/features/events/EventInfo'
 import { ItemList } from '~/features/events/ItemList'
 import { ParticipantList } from '~/features/events/ParticipantList'
 import { RsvpPanel } from '~/features/events/RsvpPanel'
-import { api, unwrap } from '~/lib/api'
+import { ApiError, api, unwrap } from '~/lib/api'
 import { catchApiError, text, type FormErrors } from '~/lib/form'
 import type { Route } from './+types/detail'
 
@@ -61,6 +63,15 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
         )
       case 'delete-item':
         return unwrap(api.events[':id'].items[':itemId'].$delete({ param: { id, itemId: text(form, 'itemId') } }))
+      case 'upload-attachment': {
+        const files = filesFrom(form, 'file')
+        if (files.length === 0) throw new ApiError(400, 'ファイルを選択してください')
+        const failed = await uploadAttachments(id, files)
+        if (failed.length > 0) throw new ApiError(400, failed.join('\n'))
+        return { ok: true }
+      }
+      case 'delete-attachment':
+        return unwrap(api.events[':id'].attachments[':attachmentId'].$delete({ param: { id, attachmentId: text(form, 'attachmentId') } }))
       case 'update-participant':
         return unwrap(
           api.events[':id'].participants[':userId'].$patch({
@@ -80,6 +91,8 @@ export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteEr
 export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
   const { event, canManage, isTarget, pending } = loaderData
   const me = useCurrentUser()
+  const [params] = useSearchParams()
+  const attachFailed = Number(params.get('attachFailed')) || 0
 
   return (
     <>
@@ -106,9 +119,14 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
           </>
         }
       />
+      {attachFailed > 0 && (
+        <div className={css({ mb: 'lg' })}>
+          <Alert tone="warning">{`イベントは保存しましたが、添付ファイルの追加・削除に失敗したものが${attachFailed}件あります。「概要」の添付ファイルを確認して、もう一度操作してください。`}</Alert>
+        </div>
+      )}
       <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', lg: '3fr 2fr' }, gap: 'lg', alignItems: 'start' })}>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
-          <EventInfo event={event} />
+          <EventInfo event={event} canManage={canManage} />
           <ItemList event={event} userId={me.id} canManage={canManage} />
         </div>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
