@@ -4,11 +4,13 @@ import { csrf } from 'hono/csrf'
 import { HTTPException } from 'hono/http-exception'
 import type { AppEnv } from './env'
 import { adminRoute } from './features/admin/routes'
+import { devLoginRoute } from './features/auth/dev-login'
 import { authRoute } from './features/auth/routes'
 import { blogRoute } from './features/blog/routes'
 import { githubWebhookRoute } from './features/blog/webhook'
 import { eventsRoute } from './features/events/routes'
 import { membersRoute } from './features/members/routes'
+import { reportsRoute } from './features/reports/routes'
 
 const app = new Hono<AppEnv>()
 
@@ -28,10 +30,12 @@ app.notFound((c) => c.json({ error: 'Not Found' }, 404))
 
 const routes = app
   .route('/api/auth', authRoute)
+  .route('/api/auth/dev', devLoginRoute)
   .route('/api/admin', adminRoute)
   .route('/api/members', membersRoute)
   .route('/api/events', eventsRoute)
   .route('/api/blog', blogRoute)
+  .route('/api/reports', reportsRoute)
   .route('/api/webhooks/github', githubWebhookRoute)
 
 export default app

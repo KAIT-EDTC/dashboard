@@ -12,6 +12,8 @@ const ENABLED_COLUMNS = {
   blogPublished: 'onBlogPublished',
   blogClosed: 'onBlogClosed',
   blogFeedback: 'onBlogFeedback',
+  reportReviewRequested: 'onReportReviewRequested',
+  reportReviewed: 'onReportReviewed',
 } as const satisfies Record<NotificationKind, keyof typeof notificationSettings.$inferSelect>
 
 export type NotificationSettings = {

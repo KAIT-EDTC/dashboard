@@ -1,9 +1,17 @@
 import { relations, sql } from 'drizzle-orm'
-import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import {
+  APPROVAL_STEPS,
   BLOG_STATUSES,
+  COMMENTABLE_FIELDS,
   ITEM_KINDS,
+  OFFICERS,
+  PARTICIPANT_ROLES,
+  HOSTINGS,
+  REPORT_KINDS,
+  REPORT_STATUSES,
   RSVP_STATUSES,
+  type ApprovalStep,
   type BlogPostContent,
   type CategoryTone,
   type Division,
@@ -31,6 +39,10 @@ export const users = sqliteTable('users', {
   discordAvatar: text('discord_avatar'),
   /** 管理者がダッシュボードの「ユーザー管理」で変更する。最初に登録した人は管理者になる */
   role: text('role', { enum: ['member', 'admin'] }).notNull().default('member'),
+  /** 部長を務める部署。ログインのたびにDiscordの部長ロールから再計算される */
+  headOf: text('head_of', { mode: 'json' }).$type<Division[]>().notNull().default(sql`'[]'`),
+  /** 代表・本部長。ログインのたびにDiscordロールから再計算される */
+  officer: text('officer', { enum: OFFICERS }),
 
   lastName: text('last_name').notNull(),
   firstName: text('first_name').notNull(),
@@ -151,6 +163,9 @@ export const notificationSettings = sqliteTable('notification_settings', {
   onBlogPublished: integer('on_blog_published', { mode: 'boolean' }).notNull().default(true),
   onBlogClosed: integer('on_blog_closed', { mode: 'boolean' }).notNull().default(true),
   onBlogFeedback: integer('on_blog_feedback', { mode: 'boolean' }).notNull().default(true),
+  /** 活動報告書の通知（Webhookではなく、関係者へのDM） */
+  onReportReviewRequested: integer('on_report_review_requested', { mode: 'boolean' }).notNull().default(true),
+  onReportReviewed: integer('on_report_reviewed', { mode: 'boolean' }).notNull().default(true),
   updatedAt: timestamps.updatedAt,
 })
 
@@ -197,6 +212,8 @@ export const events = sqliteTable(
     createdBy: text('created_by')
       .notNull()
       .references(() => users.id),
+    /** まとめ報告書の担当者（主催者が指名する）。未指名なら講師が担当 */
+    summaryWriterId: text('summary_writer_id').references(() => users.id, { onDelete: 'set null' }),
     ...timestamps,
   },
   (t) => [index('events_starts_at_idx').on(t.startsAt)],
@@ -213,6 +230,8 @@ export const eventParticipants = sqliteTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     status: text('status', { enum: RSVP_STATUSES }).notNull(),
     comment: text('comment').notNull().default(''),
+    /** 活動での役割（主催者が決める）。講師は1イベントにつき1人まで */
+    role: text('role', { enum: PARTICIPANT_ROLES }).notNull().default('assistant'),
     /** 当日の出席（主催者が記録） */
     attended: integer('attended', { mode: 'boolean' }).notNull().default(false),
     /** 参加費の支払い（主催者が記録） */
@@ -270,6 +289,107 @@ export const eventTargetUsers = sqliteTable(
 )
 
 // ---------------------------------------------------------------------------
+// 活動報告書
+// ---------------------------------------------------------------------------
+
+/**
+ * 活動日時・活動名・実施場所はイベント、役割は event_participants が正なので持たない。
+ * 1イベントにつき1人1枚
+ */
+export const activityReports = sqliteTable(
+  'activity_reports',
+  {
+    id: text('id').primaryKey(),
+    eventId: text('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    authorId: text('author_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** 活動報告書（参加者それぞれ）か、まとめ報告書（イベントに1つ） */
+    kind: text('kind', { enum: REPORT_KINDS }).notNull().default('activity'),
+    /** 報告する所属部署。この部署の部長が承認する */
+    division: text('division').$type<Division>(),
+    /** 活動内容（まとめ報告書では「・」の箇条書き3行まで） */
+    content: text('content').notNull().default(''),
+    /** 事後報告（活動報告書のみ） */
+    reflection: text('reflection').notNull().default(''),
+    /** 活動評価・総合評価 1(悪)〜5(良) */
+    rating: integer('rating'),
+    /** 伝言事項・特記事項。承認後にイベントの連絡事項へ表示される（活動報告書のみ） */
+    notes: text('notes').notNull().default(''),
+
+    // --- まとめ報告書のみ ---
+    /** 主催か参加か */
+    hosting: text('hosting', { enum: HOSTINGS }),
+    /** 参加者ごとの自己分析（評価は各自の活動報告書のものを使う） */
+    analyses: text('analyses', { mode: 'json' }).$type<{ userId: string; text: string }[]>().notNull().default(sql`'[]'`),
+    /** 総評 */
+    overview: text('overview').notNull().default(''),
+    /** 所感 */
+    impressions: text('impressions').notNull().default(''),
+
+    status: text('status', { enum: REPORT_STATUSES }).notNull().default('draft'),
+    submittedAt: text('submitted_at'),
+    /** 提出時に提出者の立場から決めた承認の流れ（部員: 部署長 / 役職者: 選んだ承認者） */
+    approvalSteps: text('approval_steps', { mode: 'json' }).$type<ApprovalStep[]>().notNull().default(sql`'[]'`),
+    /** 役職者が選んだ承認者（自分以外の部署長・本部長・代表） */
+    approverId: text('approver_id').references(() => users.id, { onDelete: 'set null' }),
+    /** いま確認している段階（approvalSteps の位置）。差し戻されても進んだ段階は保つ */
+    currentStep: integer('current_step').notNull().default(0),
+    approvedAt: text('approved_at'),
+
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('activity_reports_event_author_idx').on(t.eventId, t.authorId, t.kind),
+    // まとめ報告書はイベントに1つ
+    uniqueIndex('activity_reports_event_summary_idx').on(t.eventId).where(sql`kind = 'summary'`),
+    index('activity_reports_author_idx').on(t.authorId),
+    index('activity_reports_status_division_idx').on(t.status, t.division),
+  ],
+)
+
+/** 承認・差し戻しの履歴（段階ごとに1行） */
+export const activityReportReviews = sqliteTable(
+  'activity_report_reviews',
+  {
+    id: text('id').primaryKey(),
+    reportId: text('report_id')
+      .notNull()
+      .references(() => activityReports.id, { onDelete: 'cascade' }),
+    reviewerId: text('reviewer_id').references(() => users.id, { onDelete: 'set null' }),
+    step: text('step', { enum: APPROVAL_STEPS }).notNull(),
+    decision: text('decision', { enum: ['approve', 'reject'] }).notNull(),
+    /** 報告書全体へのコメント */
+    comment: text('comment').notNull().default(''),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [index('activity_report_reviews_report_idx').on(t.reportId)],
+)
+
+/** 差し戻し時に本文の範囲へ付けるコメント（PRレビューの行コメントのようなもの） */
+export const activityReportComments = sqliteTable(
+  'activity_report_comments',
+  {
+    id: text('id').primaryKey(),
+    reviewId: text('review_id')
+      .notNull()
+      .references(() => activityReportReviews.id, { onDelete: 'cascade' }),
+    field: text('field', { enum: COMMENTABLE_FIELDS }).notNull(),
+    /** コメントした時点の本文での位置（UTF-16）。本文が直されたら quote で探し直す */
+    start: integer('start').notNull(),
+    end: integer('end').notNull(),
+    quote: text('quote').notNull(),
+    body: text('body').notNull(),
+    /** 書き直し案（あれば本人が1クリックで反映できる） */
+    suggestion: text('suggestion'),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [index('activity_report_comments_review_idx').on(t.reviewId)],
+)
+
+// ---------------------------------------------------------------------------
 // Relations（db.query で使う）
 // ---------------------------------------------------------------------------
 
@@ -292,6 +412,7 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   items: many(eventItems),
   targetDivisions: many(eventTargetDivisions),
   targetUsers: many(eventTargetUsers),
+  reports: many(activityReports),
 }))
 
 export const eventTargetDivisionsRelations = relations(eventTargetDivisions, ({ one }) => ({
@@ -311,4 +432,21 @@ export const eventParticipantsRelations = relations(eventParticipants, ({ one })
 export const eventItemsRelations = relations(eventItems, ({ one }) => ({
   event: one(events, { fields: [eventItems.eventId], references: [events.id] }),
   assignee: one(users, { fields: [eventItems.assigneeId], references: [users.id] }),
+}))
+
+export const activityReportsRelations = relations(activityReports, ({ one, many }) => ({
+  event: one(events, { fields: [activityReports.eventId], references: [events.id] }),
+  author: one(users, { fields: [activityReports.authorId], references: [users.id], relationName: 'reportAuthor' }),
+  approver: one(users, { fields: [activityReports.approverId], references: [users.id], relationName: 'reportApprover' }),
+  reviews: many(activityReportReviews),
+}))
+
+export const activityReportReviewsRelations = relations(activityReportReviews, ({ one, many }) => ({
+  report: one(activityReports, { fields: [activityReportReviews.reportId], references: [activityReports.id] }),
+  reviewer: one(users, { fields: [activityReportReviews.reviewerId], references: [users.id] }),
+  comments: many(activityReportComments),
+}))
+
+export const activityReportCommentsRelations = relations(activityReportComments, ({ one }) => ({
+  review: one(activityReportReviews, { fields: [activityReportComments.reviewId], references: [activityReportReviews.id] }),
 }))

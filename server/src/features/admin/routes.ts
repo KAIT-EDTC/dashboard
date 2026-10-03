@@ -1,6 +1,6 @@
-import { eq, inArray } from 'drizzle-orm'
+import { eq, inArray, isNotNull, ne, or } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { blogReviewersSchema, notificationSettingsSchema, userRoleSchema } from '@edtc/shared'
+import { blogReviewersSchema, notificationSettingsSchema, positionsSchema, userRoleSchema, type Division, type Officer } from '@edtc/shared'
 import { createDb } from '../../db'
 import { blogReviewers, users } from '../../db/schema'
 import type { AppEnv } from '../../env'
@@ -28,6 +28,31 @@ export const adminRoute = new Hono<AppEnv>()
       .where(eq(users.id, id))
       .returning({ id: users.id })
     if (updated.length === 0) throw notFound('メンバーが見つかりません')
+    return c.json({ ok: true })
+  })
+
+  // 役職（部署長・本部長・代表）。活動報告書の承認者になる。送られた内容で全員分を置き換える
+  .put('/positions', validate('json', positionsSchema), async (c) => {
+    const { representatives, generalManagers, divisionHeads } = c.req.valid('json')
+    const next = new Map<string, { officer: Officer | null; headOf: Division[] }>()
+    const entry = (id: string) => next.get(id) ?? next.set(id, { officer: null, headOf: [] }).get(id)!
+    for (const id of representatives) entry(id).officer = 'representative'
+    for (const id of generalManagers) entry(id).officer = 'general_manager'
+    for (const [division, ids] of Object.entries(divisionHeads) as [Division, string[]][]) {
+      for (const id of ids) entry(id).headOf.push(division)
+    }
+
+    const db = createDb(c.env)
+    const ids = [...next.keys()]
+    if (ids.length > 0) {
+      const found = await db.select({ id: users.id }).from(users).where(inArray(users.id, ids))
+      if (found.length !== ids.length) throw badRequest('メンバーが見つかりません。画面を読み込み直してください')
+    }
+    await db.batch([
+      // いったん全員の役職を外してから、指定された人に付け直す
+      db.update(users).set({ officer: null, headOf: [] }).where(or(isNotNull(users.officer), ne(users.headOf, []))),
+      ...[...next].map(([id, position]) => db.update(users).set(position).where(eq(users.id, id))),
+    ])
     return c.json({ ok: true })
   })
 
