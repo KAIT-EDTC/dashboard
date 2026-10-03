@@ -1,4 +1,4 @@
-import { APPROVAL_STEP_LABELS, type ApprovalStep, type Division, type NotificationKind } from '@edtc/shared'
+import { APPROVAL_STEP_LABELS, REPORT_KIND_LABELS, type ApprovalStep, type Division, type NotificationKind, type ReportKind } from '@edtc/shared'
 import type { Db } from '../../db'
 import type { Bindings } from '../../env'
 import { EMBED_COLORS, sendDirectMessage, sendDirectMessages } from '../../lib/discord'
@@ -6,7 +6,7 @@ import { getNotificationSettings } from '../admin/notification-settings'
 import { approverIdsOf } from './queries'
 
 /**
- * 活動報告書の通知は、関係者（その段階の承認者・書いた本人）だけにDMで送る。
+ * 活動報告書・まとめ報告書の通知は、関係者（その段階の承認者・書いた本人）だけにDMで送る。
  * 通知チャンネルに流すと関係ない人まで通知されるため
  */
 
@@ -25,6 +25,7 @@ async function isEnabled(env: Bindings, db: Db, kind: NotificationKind): Promise
 
 type ReportSummary = {
   id: string
+  kind: ReportKind
   authorId: string
   eventTitle: string
   authorName: string
@@ -43,13 +44,14 @@ export async function notifyAwaitingReview(
   if (!(await isEnabled(env, db, 'reportReviewRequested'))) return
   const approverIds = await approverIdsOf(db, step, report)
   if (approverIds.length === 0) {
-    console.warn(`活動報告書 ${report.id} を確認できる${APPROVAL_STEP_LABELS[step]}が見つからないため、DMを送れませんでした`)
+    console.warn(`${REPORT_KIND_LABELS[report.kind]} ${report.id} を確認できる${APPROVAL_STEP_LABELS[step]}が見つからないため、DMを送れませんでした`)
     return
   }
+  const label = REPORT_KIND_LABELS[report.kind]
   const message = {
-    submitted: '📝 活動報告書が提出されました。確認をお願いします。',
-    resubmitted: '🔄 修正依頼した活動報告書が再提出されました。確認をお願いします。',
-    advanced: '📝 活動報告書の確認をお願いします。',
+    submitted: `📝 ${label}が提出されました。確認をお願いします。`,
+    resubmitted: `🔄 修正依頼した${label}が再提出されました。確認をお願いします。`,
+    advanced: `📝 ${label}の確認をお願いします。`,
   }[reason]
   await sendDirectMessages(env, approverIds, {
     content: message,
@@ -71,7 +73,7 @@ export async function notifyAwaitingReview(
 export async function notifyApproved(env: Bindings, db: Db, report: ReportSummary) {
   if (!(await isEnabled(env, db, 'reportReviewed'))) return
   await sendDirectMessage(env, report.authorId, {
-    content: '✅ 活動報告書が承認されました。',
+    content: `✅ ${REPORT_KIND_LABELS[report.kind]}が承認されました。`,
     embeds: [{ title: report.eventTitle, url: dashboardUrl(env, report.id), color: EMBED_COLORS.success }],
   })
 }
@@ -84,7 +86,7 @@ export async function notifyRejected(
 ) {
   if (!(await isEnabled(env, db, 'reportReviewed'))) return
   await sendDirectMessage(env, report.authorId, {
-    content: '✏️ 活動報告書に修正依頼が届きました。',
+    content: `✏️ ${REPORT_KIND_LABELS[report.kind]}に修正依頼が届きました。`,
     embeds: [
       {
         title: report.eventTitle,

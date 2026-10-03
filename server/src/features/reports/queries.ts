@@ -1,14 +1,17 @@
 import { and, asc, eq, isNotNull, ne, or } from 'drizzle-orm'
 import { canApproveStep, isLeader, positionLabels, type ApprovalStep, type Division } from '@edtc/shared'
 import { memberSummaryColumns, type Db } from '../../db'
-import { activityReports, users } from '../../db/schema'
+import { activityReports, eventParticipants, events, users } from '../../db/schema'
+
+/** 報告書の対象: 参加と回答した人か、当日出席した人 */
+export const isTargetParticipant = or(eq(eventParticipants.status, 'going'), eq(eventParticipants.attended, true))
 
 /** イベント詳細に載せる承認済みの報告書（伝言事項は連絡事項として表示する） */
 export function approvedReportsOf(db: Db, eventId: string) {
   return db.query.activityReports.findMany({
     columns: { id: true, authorId: true, division: true, content: true, rating: true, notes: true, approvedAt: true },
     with: { author: { columns: memberSummaryColumns } },
-    where: and(eq(activityReports.eventId, eventId), eq(activityReports.status, 'approved')),
+    where: and(eq(activityReports.eventId, eventId), eq(activityReports.kind, 'activity'), eq(activityReports.status, 'approved')),
     orderBy: asc(activityReports.submittedAt),
   })
 }
@@ -18,7 +21,86 @@ export function myReportOf(db: Db, eventId: string, userId: string) {
   return db
     .select({ id: activityReports.id, status: activityReports.status })
     .from(activityReports)
-    .where(and(eq(activityReports.eventId, eventId), eq(activityReports.authorId, userId)))
+    .where(and(eq(activityReports.eventId, eventId), eq(activityReports.authorId, userId), eq(activityReports.kind, 'activity')))
+    .get()
+}
+
+// --- まとめ報告書 -------------------------------------------------------------
+
+/** まとめ報告書の担当者。主催者が指名した人、いなければ講師。どちらもいなければ null */
+export async function summaryWriterIdOf(db: Db, event: { id: string; summaryWriterId: string | null }): Promise<string | null> {
+  if (event.summaryWriterId) return event.summaryWriterId
+  const lecturer = await db
+    .select({ userId: eventParticipants.userId })
+    .from(eventParticipants)
+    .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.role, 'lecturer'), isTargetParticipant))
+    .get()
+  return lecturer?.userId ?? null
+}
+
+/** イベントのまとめ報告書（なければ undefined） */
+export function summaryReportOf(db: Db, eventId: string) {
+  return db
+    .select({
+      id: activityReports.id,
+      authorId: activityReports.authorId,
+      status: activityReports.status,
+      approvalSteps: activityReports.approvalSteps,
+      currentStep: activityReports.currentStep,
+    })
+    .from(activityReports)
+    .where(and(eq(activityReports.eventId, eventId), eq(activityReports.kind, 'summary')))
+    .get()
+}
+
+/**
+ * まとめ報告書に載せる参加者と、それぞれの活動報告書（下書きは未提出として扱う）。
+ * 並びは講師を先頭に、参加を回答した順
+ */
+export async function summaryMembersOf(db: Db, eventId: string) {
+  const [participants, reports] = await Promise.all([
+    db.query.eventParticipants.findMany({
+      columns: { userId: true, role: true },
+      with: { user: { columns: { ...memberSummaryColumns, lastNameKana: true, firstNameKana: true, studentId: true } } },
+      where: and(eq(eventParticipants.eventId, eventId), isTargetParticipant),
+      orderBy: asc(eventParticipants.createdAt),
+    }),
+    db
+      .select({
+        id: activityReports.id,
+        authorId: activityReports.authorId,
+        status: activityReports.status,
+        rating: activityReports.rating,
+        reflection: activityReports.reflection,
+      })
+      .from(activityReports)
+      .where(and(eq(activityReports.eventId, eventId), eq(activityReports.kind, 'activity'))),
+  ])
+  return participants
+    .sort((a, b) => Number(b.role === 'lecturer') - Number(a.role === 'lecturer'))
+    .map((p) => {
+      const report = reports.find((r) => r.authorId === p.userId && r.status !== 'draft')
+      return { user: p.user, role: p.role, report: report ?? null }
+    })
+}
+export type SummaryMember = Awaited<ReturnType<typeof summaryMembersOf>>[number]
+
+/**
+ * 提出済み（承認待ち・承認済み）の活動報告書の数と、提出が必要な人数。
+ * まとめ報告書の担当者は活動報告書を書かなくてよいので数えない
+ */
+export function submissionProgress(members: SummaryMember[], writerId: string | null) {
+  const required = members.filter((m) => m.user.id !== writerId)
+  const submitted = required.filter((m) => m.report?.status === 'submitted' || m.report?.status === 'approved').length
+  return { submitted, total: required.length }
+}
+
+/** まとめ報告書の担当者を決めるときに使うイベントの情報 */
+export function findEventForSummary(db: Db, eventId: string) {
+  return db
+    .select({ id: events.id, title: events.title, startsAt: events.startsAt, summaryWriterId: events.summaryWriterId, createdBy: events.createdBy })
+    .from(events)
+    .where(eq(events.id, eventId))
     .get()
 }
 

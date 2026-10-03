@@ -1,4 +1,4 @@
-import { COMMENTABLE_FIELDS, REPORT_FIELD_LABELS, type CommentableField, type ParticipantRole, type ReportField } from '@edtc/shared'
+import { REPORT_FIELD_LABELS, type CommentableField, type ParticipantRole, type ReportField } from '@edtc/shared'
 import type { ReactNode } from 'react'
 import { css } from 'styled-system/css'
 import { Card } from '~/components/ui/Card'
@@ -17,7 +17,8 @@ function Section({ field, children, after }: { field: ReportField; children: Rea
   )
 }
 
-const EMPTY_TEXT: Record<CommentableField, string> = { content: '—', reflection: '—', notes: 'なし' }
+type ActivityTextField = 'content' | 'reflection' | 'notes'
+const EMPTY_TEXT: Record<ActivityTextField, string> = { content: '—', reflection: '—', notes: 'なし' }
 
 type Props = {
   report: ReportDetail
@@ -33,7 +34,7 @@ type Props = {
 
 /** 報告書の読み取り表示（Excel様式の本書と同じ並び） */
 export function ReportView({ report, authorRole, aside, renderText, renderAfter, hint }: Props) {
-  const text = (field: CommentableField) => {
+  const text = (field: ActivityTextField) => {
     const value = report[field]
     if (!value) return EMPTY_TEXT[field]
     return renderText ? renderText(field, value) : <CommentableText text={value} />
@@ -44,7 +45,7 @@ export function ReportView({ report, authorRole, aside, renderText, renderAfter,
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
           {hint}
           <Section field="division">{report.division ?? '未選択'}</Section>
-          {COMMENTABLE_FIELDS.slice(0, 2).map((field) => (
+          {(['content', 'reflection'] as const).map((field) => (
             <Section key={field} field={field} after={renderAfter?.(field)}>
               {text(field)}
             </Section>

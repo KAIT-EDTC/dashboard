@@ -9,7 +9,7 @@ import { CalendarIcon, CheckIcon, EditIcon, FileTextIcon, PenIcon } from '~/comp
 import { RoleBadge } from '~/features/events/EventBadges'
 import { formatDateTime, formatTimestamp, fullName } from '~/lib/format'
 import { ReportStatusBadge } from './ReportStatusBadge'
-import type { MyReport, ReportTarget, ReviewItem } from './types'
+import type { MyReport, ReportTarget, ReviewItem, SummaryTarget } from './types'
 
 const rowStyle = css({
   display: 'flex',
@@ -26,8 +26,65 @@ const rowLinkStyle = css({ _hover: { bg: 'surface.subtle', color: 'fg' } })
 const dateStyle = css({ fontSize: 'sm', color: 'fg.muted', minW: '112px', flexShrink: 0 })
 const titleStyle = css({ flex: 1, minW: '160px', fontWeight: '500', truncate: true })
 
-function ListCard({ empty, children }: { empty: ReactNode | null; children: ReactNode }) {
-  return <Card padded={false}>{empty ?? <ul>{children}</ul>}</Card>
+function ListCard({ title, empty, children }: { title?: ReactNode; empty: ReactNode | null; children: ReactNode }) {
+  return (
+    <Card title={title} padded={false}>
+      {empty ?? <ul>{children}</ul>}
+    </Card>
+  )
+}
+
+const actionStyle = css({ display: 'inline-flex', alignItems: 'center', gap: 'xs', fontSize: 'sm', fontWeight: '600', color: 'accent.fg', minW: '84px', justifyContent: 'flex-end' })
+
+/** 書く・続きを書く・見る */
+function RowAction({ exists, editable }: { exists: boolean; editable: boolean }) {
+  return (
+    <span className={actionStyle}>
+      {!exists ? (
+        <>
+          <PenIcon size={14} />
+          書く
+        </>
+      ) : editable ? (
+        <>
+          <EditIcon size={14} />
+          続きを書く
+        </>
+      ) : (
+        <>
+          <FileTextIcon size={14} />
+          見る
+        </>
+      )}
+    </span>
+  )
+}
+
+const isEditable = (status: string | null) => status === 'draft' || status === 'rejected'
+
+/** 自分が担当するまとめ報告書。参加者全員の活動報告書の提出状況も出す */
+export function SummaryTargetList({ summaries }: { summaries: SummaryTarget[] }) {
+  if (summaries.length === 0) return null
+  return (
+    <ListCard title="まとめ報告書" empty={null}>
+      {summaries.map((summary) => (
+        <li key={summary.eventId}>
+          <Link
+            to={summary.reportId ? `/reports/${summary.reportId}` : `/reports/summaries/new?eventId=${encodeURIComponent(summary.eventId)}`}
+            className={cx(rowStyle, rowLinkStyle)}
+          >
+            <span className={dateStyle}>{formatDateTime(summary.startsAt)}</span>
+            <span className={titleStyle}>{summary.eventTitle}</span>
+            <Badge tone={summary.submitted === summary.total && summary.total > 0 ? 'success' : 'neutral'}>
+              活動報告書 {summary.submitted} / {summary.total}
+            </Badge>
+            <ReportStatusBadge status={summary.reportStatus} />
+            <RowAction exists={!!summary.reportId} editable={isEditable(summary.reportStatus)} />
+          </Link>
+        </li>
+      ))}
+    </ListCard>
+  )
 }
 
 /** 報告書を書けるイベント（参加した・開始済み）。選ぶと作成ページ（書いていればその報告書）へ */
@@ -40,40 +97,20 @@ export function TargetList({ targets }: { targets: ReportTarget[] }) {
         ) : null
       }
     >
-      {targets.map((target) => {
-        const editable = target.reportStatus === 'draft' || target.reportStatus === 'rejected'
-        return (
-          <li key={target.eventId}>
-            <Link
-              to={target.reportId ? `/reports/${target.reportId}` : `/reports/new?eventId=${encodeURIComponent(target.eventId)}`}
-              className={cx(rowStyle, rowLinkStyle)}
-            >
-              <span className={dateStyle}>{formatDateTime(target.startsAt)}</span>
-              <span className={titleStyle}>{target.eventTitle}</span>
-              <RoleBadge role={target.role} />
-              <ReportStatusBadge status={target.reportStatus} />
-              <span className={css({ display: 'inline-flex', alignItems: 'center', gap: 'xs', fontSize: 'sm', fontWeight: '600', color: 'accent.fg', minW: '84px', justifyContent: 'flex-end' })}>
-                {!target.reportId ? (
-                  <>
-                    <PenIcon size={14} />
-                    書く
-                  </>
-                ) : editable ? (
-                  <>
-                    <EditIcon size={14} />
-                    続きを書く
-                  </>
-                ) : (
-                  <>
-                    <FileTextIcon size={14} />
-                    見る
-                  </>
-                )}
-              </span>
-            </Link>
-          </li>
-        )
-      })}
+      {targets.map((target) => (
+        <li key={target.eventId}>
+          <Link
+            to={target.reportId ? `/reports/${target.reportId}` : `/reports/new?eventId=${encodeURIComponent(target.eventId)}`}
+            className={cx(rowStyle, rowLinkStyle)}
+          >
+            <span className={dateStyle}>{formatDateTime(target.startsAt)}</span>
+            <span className={titleStyle}>{target.eventTitle}</span>
+            <RoleBadge role={target.role} />
+            <ReportStatusBadge status={target.reportStatus} />
+            <RowAction exists={!!target.reportId} editable={isEditable(target.reportStatus)} />
+          </Link>
+        </li>
+      ))}
     </ListCard>
   )
 }
@@ -86,6 +123,7 @@ export function MyReportList({ reports }: { reports: MyReport[] }) {
           <Link to={`/reports/${report.id}`} className={cx(rowStyle, rowLinkStyle)}>
             <span className={dateStyle}>{formatDateTime(report.startsAt)}</span>
             <span className={titleStyle}>{report.eventTitle}</span>
+            {report.kind === 'summary' && <Badge tone="accent">まとめ</Badge>}
             {report.division && <Badge>{report.division}</Badge>}
             <ReportStatusBadge status={report.status} step={report.approvalSteps[report.currentStep]} />
             <span className={css({ fontSize: 'xs', color: 'fg.subtle' })}>{formatTimestamp(report.updatedAt)}</span>
@@ -107,6 +145,7 @@ export function ReviewList({ reports }: { reports: ReviewItem[] }) {
               <span className={css({ fontSize: 'sm', fontWeight: '500' })}>{fullName(report.author)}</span>
             </span>
             <span className={titleStyle}>{report.event.title}</span>
+            {report.kind === 'summary' && <Badge tone="accent">まとめ</Badge>}
             {report.division && <Badge tone="accent">{report.division}</Badge>}
             <ReportStatusBadge status={report.status} step={report.approvalSteps[report.currentStep]} />
             {report.submittedAt && <span className={css({ fontSize: 'xs', color: 'fg.subtle' })}>{formatTimestamp(report.submittedAt)} 提出</span>}

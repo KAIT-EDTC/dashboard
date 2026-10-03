@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { DIVISIONS } from '../divisions'
-import { COMMENTABLE_FIELDS, countChars, RATING_MAX, RATING_MIN, REPORT_LIMITS } from '../reports'
+import { COMMENTABLE_FIELDS, countChars, HOSTINGS, RATING_MAX, RATING_MIN, REPORT_LIMITS, SUMMARY_LIMITS } from '../reports'
 
 const maxChars = (label: string, max: number) =>
   z
@@ -32,6 +32,48 @@ export const reportSubmitSchema = reportDraftSchema.extend({
 
 /** 新しく作るとき（イベント選択後の作成ページから） */
 export const reportCreateSchema = reportDraftSchema.extend({ eventId: z.string().min(1) })
+
+// --- まとめ報告書 -------------------------------------------------------------
+
+/** 参加者1人分の自己分析 */
+const analysis = z.object({
+  userId: z.string().min(1),
+  text: maxChars('自己分析', SUMMARY_LIMITS.analysis.max),
+})
+
+/** 下書き保存。上限だけ確認し、未入力でもよい */
+export const summaryDraftSchema = z.object({
+  division: z.enum(DIVISIONS).nullable(),
+  content: maxChars('活動内容', SUMMARY_LIMITS.content.max).refine(
+    (v) => v.split('\n').length <= SUMMARY_LIMITS.content.lines,
+    `活動内容は${SUMMARY_LIMITS.content.lines}行以内にしてください`,
+  ),
+  hosting: z.enum(HOSTINGS).nullable(),
+  analyses: z.array(analysis).max(200),
+  overview: maxChars('総評', SUMMARY_LIMITS.overview.max),
+  impressions: maxChars('所感', SUMMARY_LIMITS.impressions.max),
+  rating: rating.nullable(),
+  notes: maxChars('特記事項', SUMMARY_LIMITS.notes.max),
+  approverId: z.string().min(1).nullable(),
+})
+export type SummaryDraftInput = z.input<typeof summaryDraftSchema>
+
+/** 提出。必須項目を確認する（参加者全員の自己分析と活動報告書の提出はサーバーで確認する） */
+export const summarySubmitSchema = summaryDraftSchema.extend({
+  division: z.enum(DIVISIONS, '所属部署を選んでください'),
+  content: summaryDraftSchema.shape.content.refine((v) => v.length > 0, '活動内容を入力してください'),
+  hosting: z.enum(HOSTINGS, '主催か参加かを選んでください'),
+  overview: summaryDraftSchema.shape.overview.refine((v) => v.length > 0, '総評を入力してください'),
+  impressions: summaryDraftSchema.shape.impressions.refine((v) => v.length > 0, '所感を入力してください'),
+  rating: rating.nullable().refine((v) => v !== null, '総合評価を選んでください'),
+})
+
+export const summaryCreateSchema = summaryDraftSchema.extend({ eventId: z.string().min(1) })
+
+/** まとめ報告書の担当者の指名。null で講師に戻す */
+export const summaryWriterSchema = z.object({ userId: z.string().min(1).nullable() })
+
+// --- 確認 -----------------------------------------------------------------------
 
 const reviewComment = z
   .string()

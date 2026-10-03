@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import { css, cx } from 'styled-system/css'
+import { css, cva, cx } from 'styled-system/css'
 import { Avatar } from '~/components/ui/Avatar'
 import { Badge } from '~/components/ui/Badge'
 import { Card } from '~/components/ui/Card'
@@ -22,10 +22,42 @@ const memberStyle = css({
 })
 const memberLinkStyle = css({ _hover: { bg: 'surface.subtle', color: 'fg' } })
 
+const summaryRowStyle = cva({
+  base: { display: 'flex', alignItems: 'center', gap: 'sm', px: 'sm', py: 'xs', mb: 'sm', borderRadius: 'md', bg: 'surface.subtle', color: 'fg', fontSize: 'sm' },
+  variants: { link: { true: { _hover: { bg: 'surface.muted', color: 'fg' } } } },
+})
+
+/** まとめ報告書の担当者と状況 */
+function SummaryRow({ summary }: { summary: SubmissionStatusEvent['summary'] }) {
+  const body = (
+    <>
+      <span className={css({ fontWeight: '600', flexShrink: 0 })}>まとめ報告書</span>
+      {summary.writer ? (
+        <>
+          <Avatar user={summary.writer} size={24} />
+          <span className={css({ flex: 1, minW: 0, truncate: true })}>{fullName(summary.writer)}</span>
+        </>
+      ) : (
+        <span className={css({ flex: 1, color: 'fg.subtle' })}>担当者未定</span>
+      )}
+      <ReportStatusBadge status={summary.status} emptyLabel="未提出" />
+    </>
+  )
+  return summary.reportId ? (
+    <Link to={`/reports/${summary.reportId}`} className={summaryRowStyle({ link: true })}>
+      {body}
+    </Link>
+  ) : (
+    <div className={summaryRowStyle()}>{body}</div>
+  )
+}
+
 function EventStatus({ event }: { event: SubmissionStatusEvent }) {
-  const count = (status: string | null) => event.members.filter((m) => m.status === status).length
+  // まとめ報告書の担当者は活動報告書を書かなくてよいので数えない
+  const required = event.members.filter((m) => !m.isSummaryWriter || m.status)
+  const count = (status: string | null) => required.filter((m) => m.status === status).length
   const approved = count('approved')
-  const total = event.members.length
+  const total = required.length
   return (
     <Card
       title={
@@ -45,7 +77,8 @@ function EventStatus({ event }: { event: SubmissionStatusEvent }) {
         </span>
       }
     >
-      {total === 0 ? (
+      <SummaryRow summary={event.summary} />
+      {event.members.length === 0 ? (
         <p className={css({ fontSize: 'sm', color: 'fg.subtle' })}>参加者がいません</p>
       ) : (
         <ul className={css({ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 'xs' })}>
@@ -55,7 +88,7 @@ function EventStatus({ event }: { event: SubmissionStatusEvent }) {
                 <Avatar user={member.user} size={24} />
                 <span className={css({ flex: 1, minW: 0, truncate: true })}>{fullName(member.user)}</span>
                 <RoleBadge role={member.role} />
-                <ReportStatusBadge status={member.status} emptyLabel="未提出" />
+                {member.isSummaryWriter && !member.status ? <Badge tone="accent">まとめ担当</Badge> : <ReportStatusBadge status={member.status} emptyLabel="未提出" />}
               </>
             )
             return (

@@ -9,18 +9,37 @@ import {
   nowInJst,
   participantUpdateSchema,
   rsvpSchema,
+  summaryWriterSchema,
   type CategoryTone,
   type Division,
   type RsvpStatus,
 } from '@edtc/shared'
 import { createDb, memberSummaryColumns, type Db } from '../../db'
-import { eventCategories, eventItems, eventParticipants, events, eventTargetDivisions, eventTargetUsers, userDivisions, users } from '../../db/schema'
+import {
+  activityReports,
+  eventCategories,
+  eventItems,
+  eventParticipants,
+  events,
+  eventTargetDivisions,
+  eventTargetUsers,
+  userDivisions,
+  users,
+} from '../../db/schema'
 import type { AppEnv } from '../../env'
 import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
 import { validate } from '../../lib/validator'
 import { assertCanManage, canManage, requireAuth } from '../../middleware/auth'
-import { approvedReportsOf, myReportOf } from '../reports/queries'
+import {
+  approvedReportsOf,
+  isTargetParticipant,
+  myReportOf,
+  submissionProgress,
+  summaryMembersOf,
+  summaryReportOf,
+  summaryWriterIdOf,
+} from '../reports/queries'
 import { eventCategoriesRoute } from './categories'
 import { notifyEventCreated } from './notifications'
 
@@ -233,11 +252,17 @@ export const eventsRoute = new Hono<AppEnv>()
     if (!found) throw notFound('イベントが見つかりません')
 
     const { targetDivisions, targetUsers, ...event } = found
-    const [category, reports, myReport] = await Promise.all([
+    const [category, reports, myReport, summary, summaryMembers, defaultWriterId] = await Promise.all([
       db.select().from(eventCategories).where(eq(eventCategories.id, event.category)).get(),
       approvedReportsOf(db, event.id),
       myReportOf(db, event.id, userId),
+      summaryReportOf(db, event.id),
+      summaryMembersOf(db, event.id),
+      summaryWriterIdOf(db, { id: event.id, summaryWriterId: null }),
     ])
+    // まとめ報告書の担当者: 書き始めた人、指名された人、講師の順
+    const writerId = summary?.authorId ?? event.summaryWriterId ?? defaultWriterId
+    const writer = writerId ? (event.participants.find((p) => p.userId === writerId)?.user ?? null) : null
     const targeted = targetDivisions.length > 0 || targetUsers.length > 0
     const targetMembers = targeted ? await findTargetMembers(db, event.id) : []
     const answered = new Set(event.participants.map((p) => p.userId))
@@ -257,6 +282,19 @@ export const eventsRoute = new Hono<AppEnv>()
       /** 承認済みの活動報告書と、自分の報告書の状態 */
       reports,
       myReport: myReport ?? null,
+      /** まとめ報告書。下書きは担当者にだけ見せる */
+      summary: {
+        writer,
+        /** 指名された担当者（いなければ講師が担当） */
+        assignedId: event.summaryWriterId,
+        report:
+          summary && (summary.status !== 'draft' || summary.authorId === userId)
+            ? { id: summary.id, status: summary.status, approvalSteps: summary.approvalSteps, currentStep: summary.currentStep }
+            : null,
+        /** 書き始めたか（提出前に担当を替えられるかの目安） */
+        started: !!summary,
+        ...submissionProgress(summaryMembers, writerId),
+      },
     })
   })
 
@@ -358,6 +396,38 @@ export const eventsRoute = new Hono<AppEnv>()
     } else {
       await update
     }
+    return c.json({ ok: true })
+  })
+
+  // まとめ報告書の担当者を指名する（主催者・管理者）。null で講師に戻す。
+  // 書きかけ（下書き・修正依頼）のまとめ報告書は新しい担当者に引き継ぐ。提出後は替えられない
+  .put('/:id/summary-writer', validate('json', summaryWriterSchema), async (c) => {
+    const { userId } = c.req.valid('json')
+    const db = createDb(c.env)
+    const event = await findEvent(db, c.req.param('id'))
+    assertCanManage(c.get('session'), event.createdBy)
+
+    if (userId) {
+      const participant = await db
+        .select({ userId: eventParticipants.userId })
+        .from(eventParticipants)
+        .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, userId), isTargetParticipant))
+        .get()
+      if (!participant) throw badRequest('担当者は参加者から選んでください')
+    }
+    const summary = await summaryReportOf(db, event.id)
+    if (summary && summary.status !== 'draft' && summary.status !== 'rejected') {
+      throw conflict('提出済みのまとめ報告書があるため、担当者を変更できません')
+    }
+
+    const nextWriterId = userId ?? (await summaryWriterIdOf(db, { id: event.id, summaryWriterId: null }))
+    await db.batch([
+      db.update(events).set({ summaryWriterId: userId }).where(eq(events.id, event.id)),
+      // 所属部署と承認者は前の担当者が選んだものなので外す
+      ...(summary && nextWriterId && nextWriterId !== summary.authorId
+        ? [db.update(activityReports).set({ authorId: nextWriterId, division: null, approverId: null }).where(eq(activityReports.id, summary.id))]
+        : []),
+    ])
     return c.json({ ok: true })
   })
 

@@ -9,8 +9,6 @@ import {
   exchangeCode,
   fetchCurrentUser,
   fetchGuildMember,
-  headDivisionsOf,
-  officerOf,
 } from '../../lib/discord'
 import { badRequest, conflict, unauthorized } from '../../lib/errors'
 import { validate } from '../../lib/validator'
@@ -46,17 +44,14 @@ export const authRoute = new Hono<AppEnv>()
       ])
       if (!member) return loginPage('not_a_member')
 
-      // 部署長・本部長・代表はDiscordロールで判定する（管理者はダッシュボードで管理する）
-      const headOf = headDivisionsOf(c.env, member)
-      const officer = officerOf(c.env, member)
       const db = createDb(c.env)
       const existing = await db.select({ id: users.id }).from(users).where(eq(users.id, discordUser.id)).get()
 
       if (existing) {
-        // アイコン・ユーザー名・役職（部署長・本部長・代表）はDiscord側を正とする（管理者はダッシュボードで管理する）
+        // アイコン・ユーザー名はDiscord側を正とする（ロールはダッシュボードで管理する）
         await db
           .update(users)
-          .set({ discordUsername: discordUser.username, discordAvatar: discordUser.avatar, headOf, officer })
+          .set({ discordUsername: discordUser.username, discordAvatar: discordUser.avatar })
           .where(eq(users.id, discordUser.id))
         await startSession(c, discordUser.id)
         return c.redirect(c.env.FRONTEND_URL)
@@ -67,8 +62,6 @@ export const authRoute = new Hono<AppEnv>()
         username: discordUser.username,
         avatar: discordUser.avatar,
         nick: member.nick,
-        headOf,
-        officer,
       })
       return c.redirect(`${c.env.FRONTEND_URL}/register`)
     } catch (error) {
@@ -121,8 +114,6 @@ export const authRoute = new Hono<AppEnv>()
         discordAvatar: claims.avatar,
         // 管理者が1人もいないとき（最初の登録者）だけ管理者にする
         role: sql`CASE WHEN EXISTS (SELECT 1 FROM users WHERE role = 'admin') THEN 'member' ELSE 'admin' END`,
-        headOf: claims.headOf ?? [],
-        officer: claims.officer ?? null,
         lastName: input.lastName,
         firstName: input.firstName,
         lastNameKana: input.lastNameKana,

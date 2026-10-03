@@ -8,13 +8,18 @@ import { FileTextIcon } from '~/components/ui/Icons'
 import { RoleBadge } from '~/features/events/EventBadges'
 import type { EventDetail, EventReport } from '~/features/events/types'
 import { fullName } from '~/lib/format'
+import { ExportButton } from './ExportButton'
 import { RatingMeter } from './Rating'
 
 /** イベント詳細: 承認済みの活動報告書 */
 export function EventReports({ event, reports }: { event: EventDetail; reports: EventReport[] }) {
   const roleOf = (userId: string) => event.participants.find((p) => p.userId === userId)?.role
   return (
-    <Card title={`活動報告書（${reports.length}）`} padded={false}>
+    <Card
+      title={`活動報告書（${reports.length}）`}
+      action={reports.length > 0 && <ExportButton size="sm" eventId={event.id} zipName={`活動報告書_${event.title.replace(/[\\/:*?"<>|]/g, '_')}.zip`} />}
+      padded={false}
+    >
       {reports.length === 0 ? (
         <EmptyState icon={<FileTextIcon size={28} />} title="承認された報告書はまだありません" />
       ) : (

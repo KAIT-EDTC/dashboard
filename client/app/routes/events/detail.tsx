@@ -11,6 +11,7 @@ import { ItemList } from '~/features/events/ItemList'
 import { ParticipantList } from '~/features/events/ParticipantList'
 import { RsvpPanel } from '~/features/events/RsvpPanel'
 import { EventNotices, EventReports } from '~/features/reports/EventReports'
+import { EventSummary, SummaryButton } from '~/features/reports/EventSummary'
 import { api, unwrap } from '~/lib/api'
 import { catchApiError, text, type FormErrors } from '~/lib/form'
 import type { Route } from './+types/detail'
@@ -60,6 +61,8 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
             },
           }),
         )
+      case 'summary-writer':
+        return unwrap(api.events[':id']['summary-writer'].$put({ param: { id }, json: { userId: text(form, 'userId') || null } }))
       case 'delete-item':
         return unwrap(api.events[':id'].items[':itemId'].$delete({ param: { id, itemId: text(form, 'itemId') } }))
       case 'update-participant':
@@ -83,12 +86,12 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
 
 export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
-  const { event, canManage, isTarget, pending, reports, myReport } = loaderData
+  const { event, canManage, isTarget, pending, reports, myReport, summary } = loaderData
   const me = useCurrentUser()
   const mine = event.participants.find((p) => p.userId === me.id)
   const started = event.startsAt <= nowInJst()
-  // 参加した人は、イベントが始まったら報告書を書ける
-  const canWriteReport = started && !!mine && (mine.status === 'going' || mine.attended)
+  // 参加した人は、イベントが始まったら報告書を書ける（まとめ報告書の担当者は書かなくてよい）
+  const canWriteReport = started && !!mine && (mine.status === 'going' || mine.attended) && summary.writer?.id !== me.id
 
   return (
     <>
@@ -111,6 +114,7 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
                 </ButtonLink>
               )
             )}
+            <SummaryButton eventId={event.id} summary={summary} userId={me.id} started={started} />
             {/* イベントのタイトルと日付を引き継いだブログの下書きを作る */}
             <Form method="post" action="/blog?index">
               <input type="hidden" name="eventId" value={event.id} />
@@ -132,6 +136,7 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
           <EventInfo event={event} />
           <EventNotices reports={reports} />
+          <EventSummary event={event} summary={summary} canManage={canManage} started={started} />
           {started && <EventReports event={event} reports={reports} />}
           <ItemList event={event} userId={me.id} canManage={canManage} />
         </div>

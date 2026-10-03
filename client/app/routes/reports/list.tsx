@@ -1,8 +1,10 @@
+import { todayInJst } from '@edtc/shared'
 import { css } from 'styled-system/css'
 import { PageHeader } from '~/components/ui/PageHeader'
 import { TabLinks } from '~/components/ui/Tabs'
 import { useCurrentUser } from '~/features/auth/use-current-user'
-import { MyReportList, ReviewList, TargetList } from '~/features/reports/ReportLists'
+import { ExportButton } from '~/features/reports/ExportButton'
+import { MyReportList, ReviewList, SummaryTargetList, TargetList } from '~/features/reports/ReportLists'
 import { SubmissionStatus } from '~/features/reports/SubmissionStatus'
 import { api, unwrap } from '~/lib/api'
 import type { Route } from './+types/list'
@@ -16,26 +18,26 @@ export async function clientLoader({ request }: Route.ClientLoaderArgs) {
   const param = new URL(request.url).searchParams.get('tab')
   const tab: Tab = (TABS as readonly string[]).includes(param ?? '') ? (param as Tab) : 'targets'
   // 承認待ちの件数はタブに出すので常に読む（承認する立場でなければ空）。提出状況はそのタブを開いたときだけ
-  const [{ targets }, { reports: mine }, { reports: review }, status] = await Promise.all([
+  const [{ targets, summaries }, { reports: mine }, { reports: review }, status] = await Promise.all([
     unwrap(api.reports.targets.$get()),
     unwrap(api.reports.mine.$get()),
     unwrap(api.reports.review.$get()),
     tab === 'status' ? unwrap(api.reports.status.$get()) : Promise.resolve({ events: [] }),
   ])
-  return { tab, targets, mine, review, statusEvents: status.events }
+  return { tab, targets, summaries, mine, review, statusEvents: status.events }
 }
 
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
 
 export default function ReportsPage({ loaderData }: Route.ComponentProps) {
-  const { tab, targets, mine, review, statusEvents } = loaderData
+  const { tab, targets, summaries, mine, review, statusEvents } = loaderData
   const me = useCurrentUser()
   const isReviewer = !!me.officer || me.headOf.length > 0
-  const unwritten = targets.filter((t) => !t.reportStatus).length
+  const unwritten = targets.filter((t) => !t.reportStatus).length + summaries.filter((s) => !s.reportStatus).length
 
   return (
     <>
-      <PageHeader title="活動報告書" />
+      <PageHeader title="活動報告書" actions={<ExportButton zipName={`活動報告書_${todayInJst()}.zip`} />} />
       <div className={css({ mb: 'lg' })}>
         <TabLinks
           items={[
@@ -46,7 +48,12 @@ export default function ReportsPage({ loaderData }: Route.ComponentProps) {
           ]}
         />
       </div>
-      {tab === 'targets' && <TargetList targets={targets} />}
+      {tab === 'targets' && (
+        <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
+          <SummaryTargetList summaries={summaries} />
+          <TargetList targets={targets} />
+        </div>
+      )}
       {tab === 'mine' && <MyReportList reports={mine} />}
       {tab === 'review' && <ReviewList reports={review} />}
       {tab === 'status' && <SubmissionStatus events={statusEvents} />}

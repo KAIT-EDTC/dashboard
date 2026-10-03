@@ -1,16 +1,14 @@
-import { and, asc, desc, eq, inArray, lte, or } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, lte, or } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import {
-  approvalStepsFor,
+  COMMENTABLE_FIELDS_OF,
   isLeader,
   nowInJst,
   reportCreateSchema,
   reportDraftSchema,
   reportReviewSchema,
   reportSubmitSchema,
-  type Division,
-  type ReportStatus,
 } from '@edtc/shared'
 import { createDb, memberSummaryColumns, type Db } from '../../db'
 import {
@@ -22,18 +20,15 @@ import {
   userDivisions,
   users,
 } from '../../db/schema'
-import type { AppEnv, Session } from '../../env'
+import type { AppEnv } from '../../env'
 import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
 import { validate } from '../../lib/validator'
 import { canReviewStep, isApprover, requireAuth } from '../../middleware/auth'
+import { assertEditable, assertOwnDivision, canView, EDITABLE, findReport, submitReport, summaryOf, updateIfUnchanged, assertApprover } from './common'
 import { notifyApproved, notifyAwaitingReview, notifyRejected } from './notifications'
-import { approverCandidatesFor } from './queries'
-
-type ReportRow = typeof activityReports.$inferSelect
-
-/** 報告書の対象: 参加と回答した人か、当日出席した人 */
-const isTargetParticipant = or(eq(eventParticipants.status, 'going'), eq(eventParticipants.attended, true))
+import { approverCandidatesFor, isTargetParticipant, submissionProgress, summaryMembersOf } from './queries'
+import { summariesRoute, visibleMembers } from './summaries'
 
 /** 報告書の一覧に出すイベントの情報 */
 const eventColumns = {
@@ -43,31 +38,14 @@ const eventColumns = {
   endsAt: events.endsAt,
 }
 
-const EDITABLE: ReportStatus[] = ['draft', 'rejected']
-
-async function findReport(db: Db, id: string): Promise<ReportRow> {
-  const report = await db.select().from(activityReports).where(eq(activityReports.id, id)).get()
-  if (!report) throw notFound('報告書が見つかりません')
-  return report
-}
+const isActivity = eq(activityReports.kind, 'activity')
 
 function findOwnReport(db: Db, eventId: string, userId: string) {
   return db
     .select({ id: activityReports.id })
     .from(activityReports)
-    .where(and(eq(activityReports.eventId, eventId), eq(activityReports.authorId, userId)))
+    .where(and(eq(activityReports.eventId, eventId), eq(activityReports.authorId, userId), isActivity))
     .get()
-}
-
-/** 承認済みはメンバー全員、それ以外は本人と承認の流れにいる人（部署長・本部長・代表）だけが見られる */
-function canView(session: Session, report: ReportRow): boolean {
-  if (report.status === 'approved' || report.authorId === session.userId) return true
-  return report.status !== 'draft' && isApprover(session, report)
-}
-
-function assertEditable(session: Session, report: ReportRow) {
-  if (report.authorId !== session.userId) throw forbidden()
-  if (!EDITABLE.includes(report.status)) throw conflict('提出済みの報告書は編集できません')
 }
 
 /** 報告書を書けるのは、参加したイベントが始まってから */
@@ -82,64 +60,51 @@ async function assertCanWrite(db: Db, eventId: string, userId: string) {
   if (participation.startsAt > nowInJst()) throw badRequest('報告書はイベントが始まってから書けます')
 }
 
-/** 所属部署は本人が所属している部署から選ぶ */
-async function assertOwnDivision(db: Db, userId: string, division: Division | null) {
-  if (!division) return
-  const row = await db
-    .select({ division: userDivisions.division })
-    .from(userDivisions)
-    .where(and(eq(userDivisions.userId, userId), eq(userDivisions.division, division)))
-    .get()
-  if (!row) throw badRequest('所属していない部署は選べません。プロフィールの所属部署を確認してください。')
-}
-
-/** 役職者が選ぶ承認者は、自分以外の部署長・本部長・代表 */
-async function assertApprover(db: Db, userId: string, approverId: string | null) {
-  if (!approverId) return
-  const approver = await db.select({ headOf: users.headOf, officer: users.officer }).from(users).where(eq(users.id, approverId)).get()
-  if (approverId === userId || !approver || !isLeader(approver)) {
-    throw badRequest('承認者は自分以外の部署長・本部長・代表から選んでください')
-  }
-}
-
-/** 状態が変わっていないことを条件に更新する（同時に承認・再提出された場合に上書きしない） */
-async function updateIfUnchanged(db: Db, report: ReportRow, from: ReportStatus[], values: Partial<ReportRow>) {
-  const updated = await db
-    .update(activityReports)
-    .set(values)
+/** 自分が担当するまとめ報告書（始まったイベントで、指名された・講師として担当する・すでに書いている） */
+async function summaryTargetsOf(db: Db, userId: string) {
+  const lecturing = db
+    .select({ eventId: eventParticipants.eventId })
+    .from(eventParticipants)
+    .where(and(eq(eventParticipants.userId, userId), eq(eventParticipants.role, 'lecturer'), isTargetParticipant))
+  const rows = await db
+    .select({
+      ...eventColumns,
+      reportId: activityReports.id,
+      reportStatus: activityReports.status,
+      reportAuthorId: activityReports.authorId,
+    })
+    .from(events)
+    .leftJoin(activityReports, and(eq(activityReports.eventId, events.id), eq(activityReports.kind, 'summary')))
     .where(
       and(
-        eq(activityReports.id, report.id),
-        inArray(activityReports.status, from),
-        eq(activityReports.currentStep, report.currentStep),
+        lte(events.startsAt, nowInJst()),
+        or(
+          eq(events.summaryWriterId, userId),
+          and(isNull(events.summaryWriterId), inArray(events.id, lecturing)),
+          eq(activityReports.authorId, userId),
+        ),
       ),
     )
-    .returning({ id: activityReports.id })
-  if (updated.length === 0) throw conflict('報告書の状態が変わりました。ページを再読み込みしてください。')
-}
-
-async function summaryOf(db: Db, report: ReportRow) {
-  const [event, author] = await Promise.all([
-    db.select({ title: events.title }).from(events).where(eq(events.id, report.eventId)).get(),
-    db.select({ lastName: users.lastName, firstName: users.firstName }).from(users).where(eq(users.id, report.authorId)).get(),
-  ])
-  return {
-    id: report.id,
-    authorId: report.authorId,
-    eventTitle: event?.title ?? '',
-    authorName: author ? `${author.lastName} ${author.firstName}` : '',
-    division: report.division,
-    approverId: report.approverId,
-  }
+    .orderBy(desc(events.startsAt))
+    .limit(50)
+  // 担当が別の人に移った（その人がすでに書き始めた）ものは除く
+  const mine = rows.filter((row) => !row.reportAuthorId || row.reportAuthorId === userId)
+  return Promise.all(
+    mine.map(async ({ reportAuthorId: _, ...row }) => ({ ...row, ...submissionProgress(await summaryMembersOf(db, row.eventId), userId) })),
+  )
 }
 
 export const reportsRoute = new Hono<AppEnv>()
   .use(requireAuth)
 
+  // まとめ報告書の作成・保存・提出・書き出し（確認・取り消し・削除は活動報告書と共通の /:id を使う）
+  .route('/summaries', summariesRoute)
+
   // 報告書を書ける（開始済みで自分が参加した）イベントと、自分の報告書の状態
   .get('/targets', async (c) => {
     const { userId } = c.get('session')
-    const targets = await createDb(c.env)
+    const db = createDb(c.env)
+    const targets = await db
       .select({
         ...eventColumns,
         location: events.location,
@@ -149,17 +114,21 @@ export const reportsRoute = new Hono<AppEnv>()
       })
       .from(eventParticipants)
       .innerJoin(events, eq(events.id, eventParticipants.eventId))
-      .leftJoin(activityReports, and(eq(activityReports.eventId, events.id), eq(activityReports.authorId, userId)))
+      .leftJoin(activityReports, and(eq(activityReports.eventId, events.id), eq(activityReports.authorId, userId), isActivity))
       .where(and(eq(eventParticipants.userId, userId), isTargetParticipant, lte(events.startsAt, nowInJst())))
       .orderBy(desc(events.startsAt))
       .limit(50)
-    return c.json({ targets })
+    const summaries = await summaryTargetsOf(db, userId)
+    // まとめ報告書の担当者は、そのイベントの活動報告書を書かなくてよい（書き始めていれば出す）
+    const writing = new Set(summaries.map((s) => s.eventId))
+    return c.json({ targets: targets.filter((t) => t.reportId || !writing.has(t.eventId)), summaries })
   })
 
   .get('/mine', async (c) => {
     const reports = await createDb(c.env)
       .select({
         id: activityReports.id,
+        kind: activityReports.kind,
         status: activityReports.status,
         division: activityReports.division,
         approvalSteps: activityReports.approvalSteps,
@@ -180,7 +149,7 @@ export const reportsRoute = new Hono<AppEnv>()
     if (!session.officer && session.headOf.length === 0) return c.json({ reports: [] })
 
     const submitted = await createDb(c.env).query.activityReports.findMany({
-      columns: { id: true, authorId: true, status: true, division: true, approverId: true, submittedAt: true, approvalSteps: true, currentStep: true },
+      columns: { id: true, kind: true, authorId: true, status: true, division: true, approverId: true, submittedAt: true, approvalSteps: true, currentStep: true },
       with: {
         author: { columns: memberSummaryColumns },
         event: { columns: { id: true, title: true, startsAt: true, endsAt: true } },
@@ -197,12 +166,12 @@ export const reportsRoute = new Hono<AppEnv>()
     return c.json({ approvers: await approverCandidatesFor(createDb(c.env), c.get('session').userId) })
   })
 
-  // 提出状況: 始まったイベントごとに、対象の参加者全員の状況（中身は見せない。下書きは未提出扱い）
+  // 提出状況: 始まったイベントごとに、対象の参加者全員の状況とまとめ報告書の状況（中身は見せない。下書きは未提出扱い）
   .get('/status', async (c) => {
     const { userId } = c.get('session')
     const db = createDb(c.env)
     const recent = await db
-      .select({ id: events.id, title: events.title, startsAt: events.startsAt, endsAt: events.endsAt })
+      .select({ id: events.id, title: events.title, startsAt: events.startsAt, endsAt: events.endsAt, summaryWriterId: events.summaryWriterId })
       .from(events)
       .where(lte(events.startsAt, nowInJst()))
       .orderBy(desc(events.startsAt))
@@ -218,30 +187,88 @@ export const reportsRoute = new Hono<AppEnv>()
         orderBy: asc(eventParticipants.createdAt),
       }),
       db
-        .select({ id: activityReports.id, eventId: activityReports.eventId, authorId: activityReports.authorId, status: activityReports.status })
+        .select({
+          id: activityReports.id,
+          kind: activityReports.kind,
+          eventId: activityReports.eventId,
+          authorId: activityReports.authorId,
+          status: activityReports.status,
+        })
         .from(activityReports)
         .where(inArray(activityReports.eventId, eventIds)),
     ])
+    // 開けるのは承認済みと自分の報告書だけ
+    const visibleId = (report: (typeof reports)[number]) => (report.status === 'approved' || report.authorId === userId ? report.id : null)
+    const shownStatus = (report: (typeof reports)[number] | undefined) => (report && report.status !== 'draft' ? report.status : null)
 
     return c.json({
-      events: recent.map((event) => ({
-        ...event,
-        members: participants
-          .filter((p) => p.eventId === event.id)
-          .map((p) => {
-            const report = reports.find((r) => r.eventId === event.id && r.authorId === p.userId)
-            const status = report && report.status !== 'draft' ? report.status : null
+      events: recent.map(({ summaryWriterId, ...event }) => {
+        const members = participants.filter((p) => p.eventId === event.id)
+        const summary = reports.find((r) => r.eventId === event.id && r.kind === 'summary')
+        // 担当者: 書き始めた人、指名された人、講師の順
+        const writerId = summary?.authorId ?? summaryWriterId ?? members.find((m) => m.role === 'lecturer')?.userId
+        return {
+          ...event,
+          members: members.map((p) => {
+            const report = reports.find((r) => r.eventId === event.id && r.kind === 'activity' && r.authorId === p.userId)
             return {
               user: p.user,
               role: p.role,
-              status,
-              // 開けるのは承認済みと自分の報告書だけ
-              reportId: report && (report.status === 'approved' || report.authorId === userId) ? report.id : null,
+              status: shownStatus(report),
+              reportId: report ? visibleId(report) : null,
+              /** まとめ報告書の担当者（活動報告書は書かなくてよい） */
+              isSummaryWriter: p.userId === writerId,
             }
           }),
-      })),
+          summary: {
+            writer: members.find((m) => m.userId === writerId)?.user ?? null,
+            status: shownStatus(summary),
+            reportId: summary ? visibleId(summary) : null,
+          },
+        }
+      }),
     })
   })
+
+  // Excel（活動報告書の様式）に書き出す承認済みの報告書。eventId・reportId で絞れる。学籍番号は管理者・役職者と本人にだけ渡す
+  .get(
+    '/export',
+    validate('query', z.object({ eventId: z.string().min(1).optional(), reportId: z.string().min(1).optional() })),
+    async (c) => {
+      const { eventId, reportId } = c.req.valid('query')
+      const session = c.get('session')
+      const db = createDb(c.env)
+      const rows = await db.query.activityReports.findMany({
+        columns: { id: true, eventId: true, authorId: true, division: true, content: true, reflection: true, rating: true, notes: true, submittedAt: true },
+        with: {
+          author: { columns: { lastName: true, firstName: true, lastNameKana: true, firstNameKana: true, studentId: true } },
+          event: { columns: { title: true, startsAt: true, endsAt: true, location: true } },
+        },
+        where: and(
+          isActivity,
+          eq(activityReports.status, 'approved'),
+          eventId ? eq(activityReports.eventId, eventId) : undefined,
+          reportId ? eq(activityReports.id, reportId) : undefined,
+        ),
+      })
+      const roles = rows.length
+        ? await db
+            .select({ eventId: eventParticipants.eventId, userId: eventParticipants.userId, role: eventParticipants.role })
+            .from(eventParticipants)
+            .where(inArray(eventParticipants.eventId, [...new Set(rows.map((r) => r.eventId))]))
+        : []
+      const privileged = session.role === 'admin' || isLeader(session)
+
+      const reports = rows
+        .map(({ author: { studentId, ...author }, ...report }) => ({
+          ...report,
+          author: { ...author, studentId: privileged || report.authorId === session.userId ? studentId : null },
+          role: roles.find((r) => r.eventId === report.eventId && r.userId === report.authorId)?.role ?? null,
+        }))
+        .sort((a, b) => b.event.startsAt.localeCompare(a.event.startsAt) || a.author.lastNameKana.localeCompare(b.author.lastNameKana, 'ja'))
+      return c.json({ reports })
+    },
+  )
 
   // 作成ページの初期表示（イベント・役割・本人の情報）。すでに書いていればその報告書のIDを返す
   .get('/new', validate('query', z.object({ eventId: z.string().min(1) })), async (c) => {
@@ -318,9 +345,12 @@ export const reportsRoute = new Hono<AppEnv>()
     // 学籍番号は本人と承認の流れにいる人にだけ見せる
     const isAuthor = row.authorId === session.userId
     const { studentId, ...author } = row.author
+    // まとめ報告書: 参加者と、それぞれの活動報告書の提出状況・評価
+    const members = row.kind === 'summary' ? visibleMembers(session, row, await summaryMembersOf(db, row.eventId)) : []
     return c.json({
       report: { ...row, author: { ...author, studentId: isAuthor || isApprover(session, row) ? studentId : null } },
       authorRole: participant?.role ?? null,
+      members,
       canEdit: isAuthor && EDITABLE.includes(row.status),
       canDelete: isAuthor && row.status === 'draft',
       canWithdraw: isAuthor && row.status === 'submitted',
@@ -333,7 +363,7 @@ export const reportsRoute = new Hono<AppEnv>()
     const session = c.get('session')
     const input = c.req.valid('json')
     const db = createDb(c.env)
-    const report = await findReport(db, c.req.param('id'))
+    const report = await findReport(db, c.req.param('id'), 'activity')
     assertEditable(session, report)
     await assertOwnDivision(db, session.userId, input.division)
     await assertApprover(db, session.userId, input.approverId)
@@ -345,27 +375,10 @@ export const reportsRoute = new Hono<AppEnv>()
     const session = c.get('session')
     const input = c.req.valid('json')
     const db = createDb(c.env)
-    const report = await findReport(db, c.req.param('id'))
+    const report = await findReport(db, c.req.param('id'), 'activity')
     assertEditable(session, report)
     await assertOwnDivision(db, session.userId, input.division)
-
-    // 部員は所属部署の部署長、役職者（部署長・本部長・代表）は自分で選んだ承認者が承認する
-    const approvalSteps = approvalStepsFor(session)
-    const designated = approvalSteps[0] === 'designated'
-    if (designated && !input.approverId) throw badRequest('承認者を選んでください')
-    const approverId = designated ? input.approverId : null
-    await assertApprover(db, session.userId, approverId)
-    await updateIfUnchanged(db, report, EDITABLE, {
-      ...input,
-      approverId,
-      status: 'submitted',
-      submittedAt: new Date().toISOString(),
-      approvalSteps,
-      currentStep: 0,
-    })
-
-    const summary = await summaryOf(db, { ...report, division: input.division, approverId })
-    runInBackground(c, notifyAwaitingReview(c.env, db, summary, approvalSteps[0], report.status === 'rejected' ? 'resubmitted' : 'submitted'))
+    await submitReport(c, db, report, input)
     return c.json({ ok: true })
   })
 
@@ -392,6 +405,7 @@ export const reportsRoute = new Hono<AppEnv>()
     // 範囲コメントは、確認している本文のその位置を指していること
     const comments = input.decision === 'reject' ? input.comments : []
     for (const comment of comments) {
+      if (!COMMENTABLE_FIELDS_OF[report.kind].includes(comment.field)) throw badRequest('コメントできない項目です')
       if (report[comment.field].slice(comment.start, comment.end) !== comment.quote) {
         throw badRequest('コメントした範囲の本文が変わっています。ページを再読み込みしてください。')
       }

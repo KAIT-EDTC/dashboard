@@ -7,6 +7,8 @@ import {
   ITEM_KINDS,
   OFFICERS,
   PARTICIPANT_ROLES,
+  HOSTINGS,
+  REPORT_KINDS,
   REPORT_STATUSES,
   RSVP_STATUSES,
   type ApprovalStep,
@@ -210,6 +212,8 @@ export const events = sqliteTable(
     createdBy: text('created_by')
       .notNull()
       .references(() => users.id),
+    /** まとめ報告書の担当者（主催者が指名する）。未指名なら講師が担当 */
+    summaryWriterId: text('summary_writer_id').references(() => users.id, { onDelete: 'set null' }),
     ...timestamps,
   },
   (t) => [index('events_starts_at_idx').on(t.startsAt)],
@@ -302,14 +306,28 @@ export const activityReports = sqliteTable(
     authorId: text('author_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    /** 活動報告書（参加者それぞれ）か、まとめ報告書（イベントに1つ） */
+    kind: text('kind', { enum: REPORT_KINDS }).notNull().default('activity'),
     /** 報告する所属部署。この部署の部長が承認する */
     division: text('division').$type<Division>(),
+    /** 活動内容（まとめ報告書では「・」の箇条書き3行まで） */
     content: text('content').notNull().default(''),
+    /** 事後報告（活動報告書のみ） */
     reflection: text('reflection').notNull().default(''),
-    /** 活動評価 1(悪)〜5(良) */
+    /** 活動評価・総合評価 1(悪)〜5(良) */
     rating: integer('rating'),
-    /** 伝言事項・特記事項。承認後にイベントの連絡事項へ表示される */
+    /** 伝言事項・特記事項。承認後にイベントの連絡事項へ表示される（活動報告書のみ） */
     notes: text('notes').notNull().default(''),
+
+    // --- まとめ報告書のみ ---
+    /** 主催か参加か */
+    hosting: text('hosting', { enum: HOSTINGS }),
+    /** 参加者ごとの自己分析（評価は各自の活動報告書のものを使う） */
+    analyses: text('analyses', { mode: 'json' }).$type<{ userId: string; text: string }[]>().notNull().default(sql`'[]'`),
+    /** 総評 */
+    overview: text('overview').notNull().default(''),
+    /** 所感 */
+    impressions: text('impressions').notNull().default(''),
 
     status: text('status', { enum: REPORT_STATUSES }).notNull().default('draft'),
     submittedAt: text('submitted_at'),
@@ -324,7 +342,9 @@ export const activityReports = sqliteTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('activity_reports_event_author_idx').on(t.eventId, t.authorId),
+    uniqueIndex('activity_reports_event_author_idx').on(t.eventId, t.authorId, t.kind),
+    // まとめ報告書はイベントに1つ
+    uniqueIndex('activity_reports_event_summary_idx').on(t.eventId).where(sql`kind = 'summary'`),
     index('activity_reports_author_idx').on(t.authorId),
     index('activity_reports_status_division_idx').on(t.status, t.division),
   ],

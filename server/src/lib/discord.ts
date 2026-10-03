@@ -1,4 +1,4 @@
-import { DIVISIONS, type Division, type NotificationKind, type Officer } from '@edtc/shared'
+import type { NotificationKind } from '@edtc/shared'
 import type { Db } from '../db'
 import type { Bindings } from '../env'
 import { getNotificationSettings, resolveWebhook } from '../features/admin/notification-settings'
@@ -24,8 +24,6 @@ export type DiscordUser = {
 
 export type DiscordGuildMember = {
   nick: string | null
-  /** 部署長・本部長・代表の判定に使う */
-  roles: string[]
 }
 
 export function authorizeUrl(env: Bindings, state: string): string {
@@ -71,37 +69,6 @@ export async function fetchGuildMember(accessToken: string, guildId: string): Pr
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`Discord guild member fetch failed: ${res.status}`)
   return res.json()
-}
-
-const roleIds = (value: string | undefined) =>
-  (value ?? '')
-    .split(',')
-    .map((id) => id.trim())
-    .filter(Boolean)
-
-const officerRoleIds = (env: Bindings, officer: Officer) =>
-  roleIds(officer === 'representative' ? env.DISCORD_REPRESENTATIVE_ROLE_IDS : env.DISCORD_GENERAL_MANAGER_ROLE_IDS)
-
-/** 代表・本部長のロールを持っていればその役職（両方なら代表） */
-export function officerOf(env: Bindings, member: DiscordGuildMember): Officer | null {
-  if (officerRoleIds(env, 'representative').some((id) => member.roles.includes(id))) return 'representative'
-  if (officerRoleIds(env, 'general_manager').some((id) => member.roles.includes(id))) return 'general_manager'
-  return null
-}
-
-/** DISCORD_DIVISION_HEAD_ROLE_IDS（部署:ロールID をカンマ区切り）を読む。部署名の誤りは無視する */
-function divisionHeadRoles(env: Bindings): Map<Division, string> {
-  const map = new Map<Division, string>()
-  for (const entry of (env.DISCORD_DIVISION_HEAD_ROLE_IDS ?? '').split(',')) {
-    const [division, roleId] = entry.split(/[:：]/).map((v) => v.trim())
-    if (roleId && (DIVISIONS as readonly string[]).includes(division)) map.set(division as Division, roleId)
-  }
-  return map
-}
-
-/** 部署長ロールを持っている部署 */
-export function headDivisionsOf(env: Bindings, member: DiscordGuildMember): Division[] {
-  return [...divisionHeadRoles(env)].filter(([, roleId]) => member.roles.includes(roleId)).map(([division]) => division)
 }
 
 // ---------------------------------------------------------------------------

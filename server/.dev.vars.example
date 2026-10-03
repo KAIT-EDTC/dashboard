@@ -6,13 +6,6 @@ DISCORD_CLIENT_SECRET=
 DISCORD_REDIRECT_URI=http://localhost:8787/api/auth/callback
 # EDTCサーバーのID
 DISCORD_GUILD_ID=
-# 活動報告書の承認者のロールID
-# 部署長（部署ごと。例: 営業部:1234,総務部:5678）
-DISCORD_DIVISION_HEAD_ROLE_IDS=
-# 本部長（カンマ区切り）
-DISCORD_GENERAL_MANAGER_ROLE_IDS=
-# 代表（カンマ区切り）
-DISCORD_REPRESENTATIVE_ROLE_IDS=
 # 通知先チャンネルのWebhook URL。ダッシュボードの「通知設定」で登録するなら不要（画面の設定が優先される）
 DISCORD_WEBHOOK_URL=
 # 活動報告書の通知を関係者にDMで送るBotのトークン（未設定ならDMを送らない）
@@ -28,3 +21,8 @@ GITHUB_APP_ID=
 # PEM（改行は \n でエスケープ可）。PKCS#1 / PKCS#8 どちらでも可
 GITHUB_APP_PRIVATE_KEY=
 GITHUB_WEBHOOK_SECRET=
+
+# --- ローカル開発 ---
+# true にすると、ログイン画面からシードのダミーユーザー（npm run db:seed）を選んでログインできる。
+# FRONTEND_URL が http://localhost のときだけ有効。本番では設定しないこと
+DEV_LOGIN=
