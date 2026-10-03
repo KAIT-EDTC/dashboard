@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import type { CookieOptions } from 'hono/utils/cookie'
 import { sign, verify } from 'hono/jwt'
-import type { AppEnv, Role } from '../../env'
+import type { AppEnv } from '../../env'
 
 const SESSION_COOKIE = 'session'
 const REGISTRATION_COOKIE = 'registration'
@@ -62,7 +62,6 @@ export type RegistrationClaims = {
   username: string
   avatar: string | null
   nick: string | null
-  role: Role
 }
 
 export async function startRegistration(c: Context<AppEnv>, claims: RegistrationClaims) {

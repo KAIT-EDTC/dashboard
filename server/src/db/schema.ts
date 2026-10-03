@@ -29,7 +29,7 @@ export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
   discordUsername: text('discord_username').notNull(),
   discordAvatar: text('discord_avatar'),
-  /** ログインのたびにDiscordロールから再計算される */
+  /** 管理者がダッシュボードの「ユーザー管理」で変更する。最初に登録した人は管理者になる */
   role: text('role', { enum: ['member', 'admin'] }).notNull().default('member'),
 
   lastName: text('last_name').notNull(),
@@ -110,6 +110,14 @@ export const blogTags = sqliteTable('blog_tags', {
   id: text('id').primaryKey(),
   label: text('label').notNull().unique(),
   sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamps.createdAt,
+})
+
+/** ブログ提出時にDiscordでメンションするレビュー担当。管理者が「ユーザー管理」で選ぶ */
+export const blogReviewers = sqliteTable('blog_reviewers', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
   createdAt: timestamps.createdAt,
 })
 
