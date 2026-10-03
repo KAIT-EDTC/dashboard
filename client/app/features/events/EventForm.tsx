@@ -1,15 +1,20 @@
-import { EVENT_CATEGORIES, EVENT_CATEGORY_LABELS, type EventInput } from '@edtc/shared'
-import type { ReactNode } from 'react'
+import { EVENT_CATEGORIES, EVENT_CATEGORY_LABELS, type Division, type EventInput } from '@edtc/shared'
+import { useState, type ReactNode } from 'react'
 import { Form } from 'react-router'
 import { css } from 'styled-system/css'
 import { Alert } from '~/components/ui/Alert'
 import { Button } from '~/components/ui/Button'
 import { Card } from '~/components/ui/Card'
 import { SelectField, TextareaField, TextField } from '~/components/ui/Field'
+import { DivisionPicker } from '~/features/members/DivisionPicker'
+import { MemberPicker } from '~/features/members/MemberPicker'
+import type { MemberListItem } from '~/features/members/types'
 import type { FormErrors } from '~/lib/form'
 
 type EventFormProps = {
   defaultValue?: Partial<EventInput>
+  /** 対象者の選択と人数の表示に使う */
+  members: MemberListItem[]
   errors?: FormErrors
   submitting: boolean
   submitLabel: string
@@ -17,8 +22,12 @@ type EventFormProps = {
   secondaryActions?: ReactNode
 }
 
-export function EventForm({ defaultValue = {}, errors, submitting, submitLabel, secondaryActions }: EventFormProps) {
+export function EventForm({ defaultValue = {}, members, errors, submitting, submitLabel, secondaryActions }: EventFormProps) {
   const e = errors?.fieldErrors ?? {}
+  const [targetDivisions, setTargetDivisions] = useState<Division[]>(defaultValue.targetDivisions ?? [])
+  const [targetUserIds, setTargetUserIds] = useState<string[]>(defaultValue.targetUserIds ?? [])
+  const targetCount = members.filter((m) => targetUserIds.includes(m.id) || m.divisions.some((d) => targetDivisions.includes(d))).length
+  const targeted = targetDivisions.length > 0 || targetUserIds.length > 0
   const grid = css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: '1fr 1fr' }, gap: 'md' })
   return (
     <Form method="post" className={css({ display: 'flex', flexDirection: 'column', gap: 'lg', maxW: '760px' })}>
@@ -47,6 +56,35 @@ export function EventForm({ defaultValue = {}, errors, submitting, submitLabel, 
           <TextField label="出欠の回答期限" name="rsvpDeadline" type="datetime-local" defaultValue={defaultValue.rsvpDeadline ?? ''} error={e.rsvpDeadline} hint="期限後は主催者のみ出欠を変更できます" />
           <TextField label="定員" name="capacity" type="number" min={1} defaultValue={defaultValue.capacity ?? ''} placeholder="なし" error={e.capacity} />
           <TextField label="参加費（円）" name="fee" type="number" min={0} step={1} defaultValue={defaultValue.fee ?? ''} placeholder="なし" error={e.fee} hint="設定すると参加者ごとに集金状況を記録できます" />
+        </div>
+      </Card>
+
+      <Card
+        title="対象"
+        action={
+          <span className={css({ fontSize: 'sm', fontWeight: '600', color: targeted ? 'accent.fg' : 'fg.subtle' })}>
+            {targeted ? `対象 ${targetCount}人` : '指定なし（全員）'}
+          </span>
+        }
+      >
+        <div className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
+          <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
+            部署のミーティングなど、一部のメンバー向けのイベントは対象を指定してください。対象者だけに未回答の催促とDiscordのメンションが届きます（対象外の人も参加は回答できます）。部署で指定すると、あとからその部署に入った人も対象になります。
+          </p>
+          <DivisionPicker
+            name="targetDivisions"
+            label="部署"
+            hint="選んだ部署のメンバー全員が対象"
+            required={false}
+            defaultValue={defaultValue.targetDivisions}
+            onChange={setTargetDivisions}
+            error={e.targetDivisions}
+          />
+          <MemberPicker members={members} value={targetUserIds} onChange={setTargetUserIds} label="個人で追加" />
+          {targetUserIds.map((id) => (
+            <input key={id} type="hidden" name="targetUserIds" value={id} />
+          ))}
+          {e.targetUserIds && <p className={css({ fontSize: 'xs', color: 'danger.fg' })}>{e.targetUserIds}</p>}
         </div>
       </Card>
 

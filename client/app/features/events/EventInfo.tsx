@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { css } from 'styled-system/css'
 import { Avatar } from '~/components/ui/Avatar'
 import { Card } from '~/components/ui/Card'
-import { ClockIcon, MapPinIcon, UsersIcon, WalletIcon } from '~/components/ui/Icons'
+import { ClockIcon, MapPinIcon, UserIcon, UsersIcon, WalletIcon } from '~/components/ui/Icons'
 import { formatDateTime, formatRange, formatYen, fullName } from '~/lib/format'
 import type { EventDetail } from './types'
 
@@ -35,6 +35,11 @@ export function EventInfo({ event }: { event: EventDetail }) {
         </Row>
         <Row icon={<WalletIcon size={16} />} label="参加費">
           {event.fee ? formatYen(event.fee) : 'なし'}
+        </Row>
+        <Row icon={<UserIcon size={16} />} label="対象">
+          {event.targetDivisions.length === 0 && event.targetUsers.length === 0
+            ? '全員'
+            : [...event.targetDivisions, ...event.targetUsers.map((user) => fullName(user))].join('、')}
         </Row>
       </dl>
       {event.description && <p className={css({ mt: 'lg', whiteSpace: 'pre-wrap', lineHeight: '1.8' })}>{event.description}</p>}

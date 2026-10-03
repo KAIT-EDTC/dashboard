@@ -5,7 +5,7 @@ import { Avatar } from '~/components/ui/Avatar'
 import { Card } from '~/components/ui/Card'
 import { Checkbox } from '~/components/ui/Field'
 import { formatYen, fullName } from '~/lib/format'
-import type { EventDetail, EventParticipant } from './types'
+import type { EventDetail, EventParticipant, PendingMember } from './types'
 
 /** 出席・支払いのチェック（主催者・管理者のみ） */
 function ParticipantToggles({ participant, showPaid }: { participant: EventParticipant; showPaid: boolean }) {
@@ -24,7 +24,7 @@ function ParticipantToggles({ participant, showPaid }: { participant: EventParti
   )
 }
 
-export function ParticipantList({ event, canManage }: { event: EventDetail; canManage: boolean }) {
+export function ParticipantList({ event, pending, canManage }: { event: EventDetail; pending: PendingMember[]; canManage: boolean }) {
   const going = event.participants.filter((p) => p.status === 'going')
   const paidCount = going.filter((p) => p.paid).length
 
@@ -58,7 +58,22 @@ export function ParticipantList({ event, canManage }: { event: EventDetail; canM
           </section>
         )
       })}
-      {event.participants.length === 0 && <p className={css({ p: 'lg', fontSize: 'sm', color: 'fg.subtle' })}>まだ回答がありません</p>}
+      {pending.length > 0 && (
+        <section className={css({ px: 'lg', py: 'md', borderTopWidth: '1px', _first: { borderTopWidth: '0' } })}>
+          <h3 className={css({ fontSize: 'xs', fontWeight: '700', color: 'danger.fg', mb: 'sm' })}>未回答の対象者（{pending.length}人）</h3>
+          <ul className={css({ display: 'flex', flexWrap: 'wrap', gap: 'sm' })}>
+            {pending.map((member) => (
+              <li key={member.id}>
+                <Link to={`/members/${member.id}`} className={css({ display: 'inline-flex', alignItems: 'center', gap: 'xs', fontSize: 'sm', color: 'fg.muted', _hover: { color: 'accent' } })}>
+                  <Avatar user={member} size={22} />
+                  {fullName(member)}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {event.participants.length === 0 && pending.length === 0 && <p className={css({ p: 'lg', fontSize: 'sm', color: 'fg.subtle' })}>まだ回答がありません</p>}
     </Card>
   )
 }

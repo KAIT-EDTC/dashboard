@@ -207,6 +207,34 @@ export const eventItems = sqliteTable(
   (t) => [index('event_items_event_idx').on(t.eventId), index('event_items_assignee_idx').on(t.assigneeId)],
 )
 
+/**
+ * イベントの対象者。対象の部署と個人のどちらも無ければ全員向け。
+ * 部署は指定だけを保存し、その時点の部署のメンバーを対象とする（後から部署に入った人も含む）
+ */
+export const eventTargetDivisions = sqliteTable(
+  'event_target_divisions',
+  {
+    eventId: text('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    division: text('division').$type<Division>().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.division] })],
+)
+
+export const eventTargetUsers = sqliteTable(
+  'event_target_users',
+  {
+    eventId: text('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.userId] }), index('event_target_users_user_idx').on(t.userId)],
+)
+
 // ---------------------------------------------------------------------------
 // Relations（db.query で使う）
 // ---------------------------------------------------------------------------
@@ -228,6 +256,17 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   creator: one(users, { fields: [events.createdBy], references: [users.id] }),
   participants: many(eventParticipants),
   items: many(eventItems),
+  targetDivisions: many(eventTargetDivisions),
+  targetUsers: many(eventTargetUsers),
+}))
+
+export const eventTargetDivisionsRelations = relations(eventTargetDivisions, ({ one }) => ({
+  event: one(events, { fields: [eventTargetDivisions.eventId], references: [events.id] }),
+}))
+
+export const eventTargetUsersRelations = relations(eventTargetUsers, ({ one }) => ({
+  event: one(events, { fields: [eventTargetUsers.eventId], references: [events.id] }),
+  user: one(users, { fields: [eventTargetUsers.userId], references: [users.id] }),
 }))
 
 export const eventParticipantsRelations = relations(eventParticipants, ({ one }) => ({

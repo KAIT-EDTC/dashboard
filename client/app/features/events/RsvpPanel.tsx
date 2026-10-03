@@ -25,7 +25,7 @@ const optionStyle = css({
   '&:has(input:focus-visible)': { shadow: 'focus' },
 })
 
-export function RsvpPanel({ event, userId, canManage }: { event: EventDetail; userId: string; canManage: boolean }) {
+export function RsvpPanel({ event, userId, canManage, isTarget }: { event: EventDetail; userId: string; canManage: boolean; isTarget: boolean }) {
   const fetcher = useFetcher<FormErrors | { ok: true }>()
   const mine = event.participants.find((p) => p.userId === userId)
   const closed = !!event.rsvpDeadline && nowInJst() > event.rsvpDeadline && !canManage
@@ -37,6 +37,11 @@ export function RsvpPanel({ event, userId, canManage }: { event: EventDetail; us
         <input type="hidden" name="intent" value="rsvp" />
         {closed && <Alert tone="warning">回答期限を過ぎています。変更したい場合は主催者に連絡してください。</Alert>}
         {error && <Alert>{error}</Alert>}
+        {!isTarget && !mine && (
+          <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
+            このイベントは{event.targetDivisions.length > 0 ? `${event.targetDivisions.join('・')}向け` : '対象者限定'}ですが、参加する場合は回答できます。
+          </p>
+        )}
         <fieldset disabled={closed} className={css({ display: 'flex', gap: 'sm' })}>
           <legend className={css({ srOnly: true })}>出欠</legend>
           {RSVP_STATUSES.map((status: RsvpStatus) => (
