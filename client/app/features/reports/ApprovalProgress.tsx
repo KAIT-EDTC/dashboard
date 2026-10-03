@@ -44,9 +44,9 @@ export function ApprovalProgress({ report }: { report: Pick<ReportDetail, 'statu
                   : state === 'current'
                     ? '確認中'
                     : state === 'rejected'
-                      ? '差し戻し（直して再提出すると、もう一度確認に回ります）'
+                      ? '修正依頼'
                       : withdrawn
-                        ? '提出を取り消し中'
+                        ? '取り消し中'
                         : ''}
               </span>
             </li>

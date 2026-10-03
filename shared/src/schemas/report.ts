@@ -38,16 +38,21 @@ const reviewComment = z
   .trim()
   .refine((v) => countChars(v) <= REPORT_LIMITS.reviewComment.max, `コメントは${REPORT_LIMITS.reviewComment.max}文字以内にしてください`)
 
-/** 本文の範囲に付けるコメント。start / end は項目の文字列上の位置（UTF-16） */
+/**
+ * 本文の範囲に付ける修正依頼。start / end は項目の文字列上の位置（UTF-16）。
+ * suggestion は書き直し案（PRの suggested change のように、本人が1クリックで反映できる）。コメントか書き直し案のどちらかは必須
+ */
 export const inlineCommentSchema = z
   .object({
     field: z.enum(COMMENTABLE_FIELDS),
     start: z.number().int().min(0),
     end: z.number().int().min(1),
     quote: z.string().min(1).max(2000),
-    body: reviewComment.refine((v) => v.length > 0, 'コメントを入力してください'),
+    body: reviewComment,
+    suggestion: z.string().max(2000).nullable().default(null),
   })
   .refine((v) => v.end > v.start, { path: ['end'], message: '範囲が正しくありません' })
+  .refine((v) => v.body.length > 0 || v.suggestion !== null, { path: ['body'], message: 'コメントか書き直し案を入力してください' })
 export type InlineCommentInput = z.input<typeof inlineCommentSchema>
 
 export const reportReviewSchema = z.discriminatedUnion('decision', [

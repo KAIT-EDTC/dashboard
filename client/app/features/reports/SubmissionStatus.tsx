@@ -40,7 +40,7 @@ function EventStatus({ event }: { event: SubmissionStatusEvent }) {
             承認済み {approved} / {total}
           </Badge>
           {count('submitted') > 0 && <Badge tone="warning">承認待ち {count('submitted')}</Badge>}
-          {count('rejected') > 0 && <Badge tone="danger">差し戻し {count('rejected')}</Badge>}
+          {count('rejected') > 0 && <Badge tone="danger">修正依頼 {count('rejected')}</Badge>}
           {count(null) > 0 && <Badge>未提出 {count(null)}</Badge>}
         </span>
       }
@@ -81,9 +81,6 @@ export function SubmissionStatus({ events }: { events: SubmissionStatusEvent[] }
   if (events.length === 0) return <EmptyState icon={<CalendarIcon size={28} />} title="まだ始まったイベントはありません" />
   return (
     <div className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
-      <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
-        直近20件のイベントについて、参加した人全員の提出状況を表示しています。中身を見られるのは承認済みの報告書と自分の報告書だけです。
-      </p>
       {events.map((event) => (
         <EventStatus key={event.id} event={event} />
       ))}

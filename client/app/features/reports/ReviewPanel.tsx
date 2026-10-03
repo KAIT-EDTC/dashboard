@@ -1,6 +1,5 @@
 import {
-  APPROVAL_STEP_LABELS,
-  REPORT_FIELD_LABELS,
+  COMMENTABLE_FIELDS,
   REPORT_LIMITS,
   type CommentableField,
   type InlineCommentInput,
@@ -14,99 +13,99 @@ import { Button } from '~/components/ui/Button'
 import { Card } from '~/components/ui/Card'
 import { TextareaField } from '~/components/ui/Field'
 import { CheckIcon, EditIcon, TrashIcon, XIcon } from '~/components/ui/Icons'
-import { fullName } from '~/lib/format'
 import { ApprovalProgress } from './ApprovalProgress'
 import { CharCount } from './CharCount'
-import { CommentableText, type Highlight, type TextRange } from './CommentableText'
-import { InlineCommentComposer, InlineCommentItem } from './InlineComment'
+import { CommentableText, type Mark, type RequestMode, type TextRange } from './CommentableText'
+import { RequestCard, RequestComposer } from './InlineComment'
 import type { ReportActionData } from './ReportForm'
 import { ReportStatusBadge } from './ReportStatusBadge'
 import { ReportView } from './ReportView'
 import { ReviewHistory } from './ReviewHistory'
 import type { ReportDetail, ReportDetailResponse } from './types'
 
-type PendingComment = InlineCommentInput & { key: string }
+type PendingRequest = Required<InlineCommentInput> & { key: string }
+type Draft = TextRange & { field: CommentableField; mode: RequestMode }
 
-/**
- * 確認する人の画面。本文をドラッグで選んで範囲にコメントを付け（PRレビューのように）、
- * 全体へのコメントと合わせて承認・差し戻しする
- */
+const byPosition = (a: { field: CommentableField; start: number }, b: { field: CommentableField; start: number }) =>
+  COMMENTABLE_FIELDS.indexOf(a.field) - COMMENTABLE_FIELDS.indexOf(b.field) || a.start - b.start
+
+/** 確認する人の画面。本文を選ぶとその場でコメント・書き直し案を付けられ、まとめて承認・差し戻しする */
 export function ReviewWorkspace({ report, authorRole }: Pick<ReportDetailResponse, 'report' | 'authorRole'>) {
   const fetcher = useFetcher<ReportActionData>()
-  const [comments, setComments] = useState<PendingComment[]>([])
-  const [selection, setSelection] = useState<(TextRange & { field: CommentableField }) | null>(null)
+  const [requests, setRequests] = useState<PendingRequest[]>([])
+  const [draft, setDraft] = useState<Draft | null>(null)
   const [comment, setComment] = useState('')
   const pending = fetcher.state !== 'idle' ? (fetcher.json as { review?: ReportReviewInput } | undefined)?.review?.decision : undefined
   const data = fetcher.state === 'idle' ? fetcher.data : undefined
-  const step = report.approvalSteps[report.currentStep]
-  const canReject = comment.trim().length > 0 || comments.length > 0
+  const canReject = comment.trim().length > 0 || requests.length > 0
+
+  // 番号は項目の順・本文の位置の順。書いている途中のものも並びに入れる
+  const ordered = [...requests, ...(draft ? [{ ...draft, key: 'draft' }] : [])].sort(byPosition)
+  const numberOf = (key: string) => ordered.findIndex((r) => r.key === key) + 1
 
   const send = (review: ReportReviewInput) => fetcher.submit({ intent: 'review', review }, { method: 'post', encType: 'application/json' })
-  const strip = (list: PendingComment[]): InlineCommentInput[] =>
-    list.map(({ field, start, end, quote, body }) => ({ field, start, end, quote, body }))
+  const strip = (list: PendingRequest[]): InlineCommentInput[] =>
+    list.map(({ field, start, end, quote, body, suggestion }) => ({ field, start, end, quote, body, suggestion }))
 
-  const highlightsFor = (field: CommentableField): Highlight[] => [
-    ...comments.filter((c) => c.field === field).map((c) => ({ start: c.start, end: c.end, tone: 'comment' as const })),
-    ...(selection?.field === field ? [{ start: selection.start, end: selection.end, tone: 'selecting' as const }] : []),
+  const marksFor = (field: CommentableField): Mark[] => [
+    ...requests.filter((r) => r.field === field).map((r) => ({ start: r.start, end: r.end, tone: 'request' as const, number: numberOf(r.key) })),
+    ...(draft?.field === field ? [{ start: draft.start, end: draft.end, tone: 'selecting' as const, number: numberOf('draft') }] : []),
   ]
 
   return (
     <ReportView
       report={report}
       authorRole={authorRole}
-      hint={<Alert tone="info">直してほしいところは、本文をドラッグして選ぶとその範囲にコメントできます。</Alert>}
-      renderText={(field, text) => <CommentableText text={text} highlights={highlightsFor(field)} onSelect={(range) => setSelection({ field, ...range })} />}
-      renderAfter={(field) => (
-        <>
-          {comments
-            .filter((c) => c.field === field)
-            .map((c) => (
-              <InlineCommentItem
-                key={c.key}
-                quote={c.quote}
-                body={c.body}
-                action={
-                  <Button size="sm" variant="ghost" onClick={() => setComments((prev) => prev.filter((p) => p.key !== c.key))}>
+      renderText={(field, text) => (
+        <CommentableText text={text} marks={marksFor(field)} onRequest={(range, mode) => setDraft({ field, mode, ...range })} />
+      )}
+      renderAfter={(field) => {
+        const list = requests.filter((r) => r.field === field).sort(byPosition)
+        if (list.length === 0 && draft?.field !== field) return null
+        return (
+          <div className={css({ display: 'flex', flexDirection: 'column', gap: 'sm', mt: 'xs' })}>
+            {list.map((r) => (
+              <RequestCard
+                key={r.key}
+                number={numberOf(r.key)}
+                quote={r.quote}
+                suggestion={r.suggestion}
+                body={r.body}
+                actions={
+                  <Button size="sm" variant="ghost" onClick={() => setRequests((prev) => prev.filter((p) => p.key !== r.key))}>
                     <TrashIcon size={14} />
                     取り消す
                   </Button>
                 }
               />
             ))}
-          {selection?.field === field && (
-            <InlineCommentComposer
-              key={`${selection.start}-${selection.end}`}
-              quote={selection.quote}
-              onCancel={() => setSelection(null)}
-              onAdd={(body) => {
-                setComments((prev) => [...prev, { ...selection, body, key: crypto.randomUUID() }])
-                setSelection(null)
-                window.getSelection()?.removeAllRanges()
-              }}
-            />
-          )}
-        </>
-      )}
+            {draft?.field === field && (
+              <RequestComposer
+                key={`${draft.start}-${draft.end}-${draft.mode}`}
+                number={numberOf('draft')}
+                quote={draft.quote}
+                mode={draft.mode}
+                onCancel={() => setDraft(null)}
+                onAdd={({ body, suggestion }) => {
+                  const { field, start, end, quote } = draft
+                  setRequests((prev) => [...prev, { field, start, end, quote, body, suggestion, key: crypto.randomUUID() }])
+                  setDraft(null)
+                }}
+              />
+            )}
+          </div>
+        )
+      }}
       aside={
         <>
           <Card title="確認">
             <div className={css({ display: 'flex', flexDirection: 'column', gap: 'md', fontSize: 'sm' })}>
-              <p className={css({ color: 'fg.muted' })}>
-                {step && `${APPROVAL_STEP_LABELS[step]}として確認しています。`}
-                承認するとイベントページに載り、差し戻すと提出者にコメントが届きます（DiscordのDMで通知）。
-              </p>
               {data && 'error' in data && data.error && <Alert>{data.error}</Alert>}
-              {comments.length > 0 && (
-                <p>
-                  本文へのコメント: <strong>{comments.length}件</strong>（{[...new Set(comments.map((c) => REPORT_FIELD_LABELS[c.field]))].join('、')}）
-                </p>
-              )}
               <TextareaField
                 label="全体へのコメント"
                 value={comment}
                 onChange={(e) => setComment(e.currentTarget.value)}
                 rows={3}
-                placeholder="報告書全体について（承認時は任意）"
                 error={data && 'fieldErrors' in data ? data.fieldErrors?.comment : undefined}
                 hint={<CharCount value={comment} max={REPORT_LIMITS.reviewComment.max} />}
               />
@@ -115,10 +114,10 @@ export function ReviewWorkspace({ report, authorRole }: Pick<ReportDetailRespons
                   variant="danger"
                   loading={pending === 'reject'}
                   disabled={!canReject || (!!pending && pending !== 'reject')}
-                  onClick={() => send({ decision: 'reject', comment, comments: strip(comments) })}
+                  onClick={() => send({ decision: 'reject', comment, comments: strip(requests) })}
                 >
                   <XIcon size={16} />
-                  差し戻す
+                  修正を依頼{requests.length > 0 && `（${requests.length}）`}
                 </Button>
                 <Button
                   variant="primary"
@@ -126,15 +125,13 @@ export function ReviewWorkspace({ report, authorRole }: Pick<ReportDetailRespons
                   loading={pending === 'approve'}
                   disabled={!!pending && pending !== 'approve'}
                   onClick={() => {
-                    const message = comments.length > 0 ? '本文へのコメントは承認では送られません。承認しますか？' : 'この報告書を承認しますか？'
-                    if (confirm(message)) send({ decision: 'approve', comment })
+                    if (requests.length === 0 || confirm('修正依頼が付いています。依頼せずに承認しますか？')) send({ decision: 'approve', comment })
                   }}
                 >
                   <CheckIcon size={16} />
-                  承認する
+                  承認
                 </Button>
               </div>
-              {!canReject && <p className={css({ fontSize: 'xs', color: 'fg.subtle' })}>差し戻すには、全体へのコメントか本文へのコメントを付けてください。</p>}
             </div>
           </Card>
           <ApprovalProgress report={report} />
@@ -149,7 +146,7 @@ export function ReviewWorkspace({ report, authorRole }: Pick<ReportDetailRespons
 function WithdrawButton() {
   const fetcher = useFetcher<ReportActionData>()
   const data = fetcher.state === 'idle' ? fetcher.data : undefined
-  const message = '提出を取り消して下書きに戻しますか？\n承認待ちから外れます。直して再提出すると、もう一度確認に回ります。'
+  const message = '提出を取り消して下書きに戻しますか？'
   return (
     <>
       {data && 'error' in data && data.error && <Alert>{data.error}</Alert>}
@@ -165,7 +162,7 @@ function WithdrawButton() {
 }
 
 /** 確認する権限がない人・本人向けの右側の列 */
-export function ReviewStatus({ report, isAuthor, canWithdraw }: { report: ReportDetail; isAuthor: boolean; canWithdraw: boolean }) {
+export function ReviewStatus({ report, canWithdraw }: { report: ReportDetail; canWithdraw: boolean }) {
   const step = report.approvalSteps[report.currentStep]
   return (
     <>
@@ -174,13 +171,6 @@ export function ReviewStatus({ report, isAuthor, canWithdraw }: { report: Report
           <div>
             <ReportStatusBadge status={report.status} step={step} />
           </div>
-          {report.status === 'submitted' && step && (
-            <p className={css({ color: 'fg.muted' })}>
-              {isAuthor ? '提出済みです。' : ''}
-              {step === 'designated' && report.approver ? `${fullName(report.approver)}さん` : step === 'division_head' && report.division ? `${report.division}長` : APPROVAL_STEP_LABELS[step]}
-              の確認を待っています。
-            </p>
-          )}
           {canWithdraw && <WithdrawButton />}
         </div>
       </Card>

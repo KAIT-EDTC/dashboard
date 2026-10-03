@@ -10,7 +10,7 @@ export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
   draft: '下書き',
   submitted: '承認待ち',
   approved: '承認済み',
-  rejected: '差し戻し',
+  rejected: '修正依頼',
 }
 
 /** 本人が書く項目 */

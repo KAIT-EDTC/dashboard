@@ -35,9 +35,6 @@ export function ReportInfo({ context }: { context: ReportContext }) {
         {author.studentId && <Row label="学籍番号">{author.studentId}</Row>}
         <Row label="提出日">{submittedAt ? formatTimestamp(submittedAt) : '未提出'}</Row>
       </dl>
-      <p className={css({ mt: 'md', fontSize: 'xs', color: 'fg.subtle' })}>
-        日時・場所はイベント、役割は主催者の設定から入ります。違っている場合は主催者に連絡してください。
-      </p>
     </Card>
   )
 }

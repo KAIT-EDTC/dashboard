@@ -133,6 +133,7 @@ export const FileTextIcon = icon(
     <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
   </>,
 )
+export const MessageIcon = icon(<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />)
 export const LinkIcon = icon(
   <>
     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />

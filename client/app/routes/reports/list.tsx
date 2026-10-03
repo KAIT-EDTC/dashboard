@@ -35,10 +35,7 @@ export default function ReportsPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
-      <PageHeader
-        title="活動報告書"
-        description="参加したイベントを選んで報告書を書き、提出します。日時・活動名・場所・役割はイベントから自動で入ります。"
-      />
+      <PageHeader title="活動報告書" />
       <div className={css({ mb: 'lg' })}>
         <TabLinks
           items={[

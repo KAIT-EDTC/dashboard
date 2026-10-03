@@ -36,8 +36,8 @@ export async function notifyAwaitingReview(
   }
   const message = {
     submitted: '📝 活動報告書が提出されました。確認をお願いします。',
-    resubmitted: '🔄 差し戻した活動報告書が修正されました。確認をお願いします。',
-    advanced: '📝 活動報告書が前の段階で承認されました。確認をお願いします。',
+    resubmitted: '🔄 修正依頼した活動報告書が再提出されました。確認をお願いします。',
+    advanced: '📝 活動報告書の確認をお願いします。',
   }[reason]
   await sendDirectMessages(env, approverIds, {
     content: message,
@@ -58,7 +58,7 @@ export async function notifyAwaitingReview(
 
 export function notifyApproved(env: Bindings, report: ReportSummary) {
   return sendDirectMessage(env, report.authorId, {
-    content: '✅ 活動報告書がすべての承認を受けました。イベントページに載りました。',
+    content: '✅ 活動報告書が承認されました。',
     embeds: [{ title: report.eventTitle, url: dashboardUrl(env, report.id), color: EMBED_COLORS.success }],
   })
 }
@@ -69,7 +69,7 @@ export function notifyRejected(
   review: { reviewerName: string; step: ApprovalStep; comment: string; inlineCount: number },
 ) {
   return sendDirectMessage(env, report.authorId, {
-    content: '✏️ 活動報告書が差し戻されました。コメントを確認して再提出してください。',
+    content: '✏️ 活動報告書に修正依頼が届きました。',
     embeds: [
       {
         title: report.eventTitle,
@@ -78,7 +78,7 @@ export function notifyRejected(
         color: EMBED_COLORS.warning,
         fields: [
           { name: '確認者', value: `${review.reviewerName}（${APPROVAL_STEP_LABELS[review.step]}）`, inline: true },
-          ...(review.inlineCount > 0 ? [{ name: '本文へのコメント', value: `${review.inlineCount}件`, inline: true }] : []),
+          ...(review.inlineCount > 0 ? [{ name: '修正依頼', value: `${review.inlineCount}件`, inline: true }] : []),
         ],
       },
     ],

@@ -111,7 +111,7 @@ export default function ReportPage({ loaderData }: Route.ComponentProps) {
       ) : canReview ? (
         <ReviewWorkspace key={`${report.id}-${report.currentStep}`} report={report} authorRole={authorRole} />
       ) : (
-        <ReportView report={report} authorRole={authorRole} aside={<ReviewStatus report={report} isAuthor={isAuthor} canWithdraw={canWithdraw} />} />
+        <ReportView report={report} authorRole={authorRole} aside={<ReviewStatus report={report} canWithdraw={canWithdraw} />} />
       )}
     </>
   )

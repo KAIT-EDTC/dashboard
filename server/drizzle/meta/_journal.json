@@ -29,6 +29,13 @@
       "when": 1790937968555,
       "tag": "0003_report_designated_approver",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791019562420,
+      "tag": "0004_report_comment_suggestion",
+      "breakpoints": true
     }
   ]
 }

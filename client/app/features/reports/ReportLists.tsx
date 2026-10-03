@@ -36,9 +36,7 @@ export function TargetList({ targets }: { targets: ReportTarget[] }) {
     <ListCard
       empty={
         targets.length === 0 ? (
-          <EmptyState icon={<CalendarIcon size={28} />} title="報告書を書けるイベントはありません">
-            イベントに「参加」と回答し、イベントが始まるとここに表示されます
-          </EmptyState>
+          <EmptyState icon={<CalendarIcon size={28} />} title="報告書を書けるイベントはありません" />
         ) : null
       }
     >

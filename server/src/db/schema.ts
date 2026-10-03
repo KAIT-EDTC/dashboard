@@ -279,6 +279,8 @@ export const activityReportComments = sqliteTable(
     end: integer('end').notNull(),
     quote: text('quote').notNull(),
     body: text('body').notNull(),
+    /** 書き直し案（あれば本人が1クリックで反映できる） */
+    suggestion: text('suggestion'),
     createdAt: timestamps.createdAt,
   },
   (t) => [index('activity_report_comments_review_idx').on(t.reviewId)],
