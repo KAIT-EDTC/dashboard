@@ -11,9 +11,12 @@ import type { Route } from './+types/edit'
 export const meta: Route.MetaFunction = () => [{ title: 'イベントを編集 | EDTC ダッシュボード' }]
 
 export async function clientLoader({ params }: Route.ClientLoaderArgs) {
-  const { event, canManage } = await unwrap(api.events[':id'].$get({ param: { id: params.eventId } }))
+  const [{ event, canManage }, { members }] = await Promise.all([
+    unwrap(api.events[':id'].$get({ param: { id: params.eventId } })),
+    unwrap(api.members.$get()),
+  ])
   if (!canManage) throw redirect(`/events/${event.id}`)
-  return { event }
+  return { event, members }
 }
 
 export async function clientAction({ request, params }: Route.ClientActionArgs) {
@@ -36,7 +39,7 @@ export async function clientAction({ request, params }: Route.ClientActionArgs) 
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
 
 export default function EditEventPage({ loaderData, actionData }: Route.ComponentProps) {
-  const { event } = loaderData
+  const { event, members } = loaderData
   const navigation = useNavigation()
   const submit = useSubmit()
   const deleting = navigation.formData?.get('intent') === 'delete'
@@ -51,7 +54,8 @@ export default function EditEventPage({ loaderData, actionData }: Route.Componen
     <>
       <PageHeader title="イベントを編集" back={{ to: `/events/${event.id}`, label: event.title }} />
       <EventForm
-        defaultValue={event}
+        defaultValue={{ ...event, targetUserIds: event.targetUsers.map((user) => user.id) }}
+        members={members}
         errors={actionData}
         submitting={navigation.state === 'submitting' && !deleting}
         submitLabel="保存する"

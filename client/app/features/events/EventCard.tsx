@@ -2,7 +2,7 @@ import { Link } from 'react-router'
 import { css } from 'styled-system/css'
 import { ClockIcon, MapPinIcon, UsersIcon } from '~/components/ui/Icons'
 import { formatRange } from '~/lib/format'
-import { CategoryBadge, RsvpBadge } from './EventBadges'
+import { CategoryBadge, RsvpBadge, TargetBadge } from './EventBadges'
 import type { EventListItem } from './types'
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
@@ -40,7 +40,8 @@ export function EventCard({ event }: { event: EventListItem }) {
       <div className={css({ flex: 1, minW: 0, display: 'flex', flexDirection: 'column', gap: '6px' })}>
         <div className={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'xs' })}>
           <CategoryBadge category={event.category} />
-          <RsvpBadge status={event.myStatus} />
+          <TargetBadge divisions={event.targetDivisions} userCount={event.targetUserCount} />
+          <RsvpBadge status={event.myStatus} isTarget={event.isTarget} />
         </div>
         <p className={css({ fontWeight: '600', fontSize: 'md' })}>{event.title}</p>
         <div className={css({ display: 'flex', flexWrap: 'wrap', gap: 'md', fontSize: 'sm', color: 'fg.muted' })}>

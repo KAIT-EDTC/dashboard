@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DIVISIONS } from '../divisions'
 import { EVENT_CATEGORIES, ITEM_KINDS, RSVP_STATUSES } from '../events'
 
 /** 日本時間の YYYY-MM-DDTHH:mm */
@@ -15,6 +16,9 @@ export const eventInputSchema = z
     rsvpDeadline: dateTime.nullable(),
     capacity: z.number().int().min(1, '定員は1以上にしてください').max(1000).nullable(),
     fee: z.number().int().min(0, '参加費は0以上にしてください').max(1_000_000).nullable(),
+    /** 対象の部署と個人。どちらも空なら全員向け */
+    targetDivisions: z.array(z.enum(DIVISIONS)).max(DIVISIONS.length).default([]),
+    targetUserIds: z.array(z.string().min(1)).max(100, '対象者は100人までにしてください').default([]),
   })
   .refine((v) => !v.endsAt || v.endsAt >= v.startsAt, {
     path: ['endsAt'],

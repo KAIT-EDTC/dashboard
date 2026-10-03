@@ -9,6 +9,10 @@ import type { Route } from './+types/new'
 
 export const meta: Route.MetaFunction = () => [{ title: 'イベントを作成 | EDTC ダッシュボード' }]
 
+export async function clientLoader() {
+  return unwrap(api.members.$get())
+}
+
 export async function clientAction({ request }: Route.ClientActionArgs) {
   const parsed = parseEventForm(await request.formData())
   if (!parsed.success) return zodErrors(parsed.error)
@@ -19,12 +23,13 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
 
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
 
-export default function NewEventPage({ actionData }: Route.ComponentProps) {
+export default function NewEventPage({ loaderData, actionData }: Route.ComponentProps) {
   const navigation = useNavigation()
   return (
     <>
       <PageHeader title="イベントを作成" description="作成するとDiscordに通知され、メンバーが出欠を回答できるようになります。" back={{ to: '/events', label: 'イベント一覧' }} />
       <EventForm
+        members={loaderData.members}
         errors={actionData}
         submitting={navigation.state === 'submitting'}
         submitLabel="作成する"
