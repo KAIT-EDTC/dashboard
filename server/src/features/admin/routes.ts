@@ -1,12 +1,14 @@
 import { eq, inArray } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { blogReviewersSchema, userRoleSchema } from '@edtc/shared'
+import { blogReviewersSchema, notificationSettingsSchema, userRoleSchema } from '@edtc/shared'
 import { createDb } from '../../db'
 import { blogReviewers, users } from '../../db/schema'
 import type { AppEnv } from '../../env'
 import { badRequest, notFound } from '../../lib/errors'
+import { sendWebhook } from '../../lib/discord'
 import { validate } from '../../lib/validator'
 import { assertAdmin, requireAuth } from '../../middleware/auth'
+import { getNotificationSettings, resolveWebhook, saveNotificationSettings, webhookHint } from './notification-settings'
 
 /** 管理者専用の設定（ユーザーの権限・通知のメンション先） */
 export const adminRoute = new Hono<AppEnv>()
@@ -46,5 +48,34 @@ export const adminRoute = new Hono<AppEnv>()
       db.delete(blogReviewers),
       ...(userIds.length > 0 ? [db.insert(blogReviewers).values(userIds.map((userId) => ({ userId })))] : []),
     ])
+    return c.json({ ok: true })
+  })
+
+  // --- 通知設定 ---------------------------------------------------------------
+
+  /** Webhook URL は返さない（知っていれば誰でも投稿できるため）。設定の有無・出どころ・末尾だけ返す */
+  .get('/notifications', async (c) => {
+    const settings = await getNotificationSettings(createDb(c.env))
+    const webhook = resolveWebhook(c.env, settings)
+    return c.json({
+      webhook: { source: webhook.source, hint: webhook.url ? webhookHint(webhook.url) : null },
+      enabled: settings.enabled,
+    })
+  })
+
+  .put('/notifications', validate('json', notificationSettingsSchema), async (c) => {
+    await saveNotificationSettings(createDb(c.env), c.req.valid('json'))
+    return c.json({ ok: true })
+  })
+
+  /** 今の通知先にテストメッセージを送る（通知の種類のオン/オフは見ない） */
+  .post('/notifications/test', async (c) => {
+    const { url } = resolveWebhook(c.env, await getNotificationSettings(createDb(c.env)))
+    if (!url) throw badRequest('通知先が設定されていません')
+    const result = await sendWebhook(url, { content: '✅ EDTCダッシュボードからのテスト通知です。この通知が見えていれば設定は正しく動いています。' })
+    if (!result.ok) {
+      console.error('テスト通知に失敗しました', result.error)
+      throw badRequest('通知を送れませんでした。Webhook URLが正しいか、削除されていないか確認してください')
+    }
     return c.json({ ok: true })
   })

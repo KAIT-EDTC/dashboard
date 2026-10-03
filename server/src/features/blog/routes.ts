@@ -229,6 +229,7 @@ export const blogRoute = new Hono<AppEnv>()
         c,
         notifySubmitted(
           c.env,
+          db,
           { id: post.id, title: content.title, authorId: post.authorId, authorLabel, prUrl: result.prUrl },
           !result.created,
           await listReviewerIds(db),

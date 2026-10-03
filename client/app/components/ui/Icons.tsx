@@ -59,6 +59,13 @@ export const LogOutIcon = icon(
     <path d="m16 17 5-5-5-5M21 12H9" />
   </>,
 )
+export const BellIcon = icon(
+  <>
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+  </>,
+)
+
 export const TagIcon = icon(
   <>
     <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z" />

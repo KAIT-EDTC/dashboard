@@ -1,4 +1,5 @@
 import { EVENT_CATEGORY_LABELS, type EventCategory } from '@edtc/shared'
+import type { Db } from '../../db'
 import type { Bindings } from '../../env'
 import { EMBED_COLORS, mention, notify } from '../../lib/discord'
 
@@ -16,11 +17,12 @@ const formatDateTime = (value: string) => value.replace('T', ' ')
 /** target.label が null なら全員向け（メンションしない） */
 export function notifyEventCreated(
   env: Bindings,
+  db: Db,
   event: EventSummary,
   organizerName: string,
   target: { label: string | null; mentionIds: string[] },
 ) {
-  return notify(env, {
+  return notify(env, db, 'eventCreated', {
     content: [
       target.mentionIds.map(mention).join(' '),
       target.label ? `📅 ${target.label}向けのイベントが登録されました。出欠の回答をお願いします！` : '📅 新しいイベントが登録されました。出欠の回答をお願いします！',

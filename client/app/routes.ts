@@ -22,6 +22,7 @@ export default [
       route(':memberId', 'routes/members/detail.tsx'),
     ]),
     route('admin/users', 'routes/admin/users.tsx'),
+    route('admin/notifications', 'routes/admin/notifications.tsx'),
     route('admin/blog-tags', 'routes/admin/blog-tags.tsx'),
     route('profile', 'routes/profile.tsx'),
     route('*', 'routes/not-found.tsx'),

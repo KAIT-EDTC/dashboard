@@ -76,7 +76,7 @@ export const githubWebhookRoute = new Hono<AppEnv>().post('/', async (c) => {
         .update(blogPosts)
         .set({ status: 'published', publishedAt: new Date().toISOString() })
         .where(eq(blogPosts.id, post.id))
-      runInBackground(c, notifyPublished(c.env, summary, post.articleId))
+      runInBackground(c, notifyPublished(c.env, db, summary, post.articleId))
       if (post.branch) {
         const branch = post.branch
         runInBackground(c, BlogPublisher.create(c.env, db).then((publisher) => publisher.deleteBranch(branch)))
@@ -87,7 +87,7 @@ export const githubWebhookRoute = new Hono<AppEnv>().post('/', async (c) => {
         .update(blogPosts)
         .set({ status: post.publishedAt ? 'published' : 'draft' })
         .where(eq(blogPosts.id, post.id))
-      runInBackground(c, notifyClosed(c.env, summary))
+      runInBackground(c, notifyClosed(c.env, db, summary))
     }
     return c.json({ ok: true })
   }
@@ -104,7 +104,7 @@ export const githubWebhookRoute = new Hono<AppEnv>().post('/', async (c) => {
     if (post) {
       runInBackground(
         c,
-        notifyFeedback(c.env, await summaryOf(db, post), {
+        notifyFeedback(c.env, db, await summaryOf(db, post), {
           kind,
           reviewer: review.user.login,
           body: review.body ?? '',
@@ -122,7 +122,7 @@ export const githubWebhookRoute = new Hono<AppEnv>().post('/', async (c) => {
     if (post) {
       runInBackground(
         c,
-        notifyFeedback(c.env, await summaryOf(db, post), {
+        notifyFeedback(c.env, db, await summaryOf(db, post), {
           kind: 'commented',
           reviewer: comment.user.login,
           body: comment.body,
