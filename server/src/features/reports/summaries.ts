@@ -1,14 +1,14 @@
 import { and, eq, isNull } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { isLeader, nowInJst, summaryCreateSchema, summaryDraftSchema, summarySubmitSchema, type SummaryDraftInput } from '@edtc/shared'
+import { EDITABLE_REPORT_STATUSES, isLeader, nowInJst, summaryCreateSchema, summaryDraftSchema, summarySubmitSchema, type SummaryDraftInput } from '@edtc/shared'
 import { createDb, memberSummaryColumns, type Db } from '../../db'
 import { activityReports, events, userDivisions, users } from '../../db/schema'
 import type { AppEnv, Session } from '../../env'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
 import { validate } from '../../lib/validator'
-import { isApprover } from '../../middleware/auth'
-import { assertApprover, assertEditable, assertOwnDivision, EDITABLE, findReport, submitReport, updateIfUnchanged, type ReportRow } from './common'
+import { isApprover } from './access'
+import { assertApprover, assertEditable, assertOwnDivision, findReport, submitReport, updateIfUnchanged, type ReportRow } from './common'
 import { findEventForSummary, submissionProgress, summaryMembersOf, summaryReportOf, summaryWriterIdOf, type SummaryMember } from './queries'
 
 /**
@@ -18,7 +18,7 @@ import { findEventForSummary, submissionProgress, summaryMembersOf, summaryRepor
  */
 export function visibleMembers(
   session: Session,
-  summary: Pick<ReportRow, 'authorId' | 'status' | 'division' | 'approverId' | 'approvalSteps'>,
+  summary: Pick<ReportRow, 'authorId' | 'status' | 'division' | 'approverId' | 'approvalSteps' | 'currentStep'>,
   members: SummaryMember[],
 ) {
   const isAuthor = summary.authorId === session.userId
@@ -70,7 +70,7 @@ export const summariesRoute = new Hono<AppEnv>()
       summaryMembersOf(db, eventId),
     ])
     if (!event || !author) throw notFound('イベントが見つかりません')
-    const notCreated = { authorId: session.userId, status: 'draft', division: null, approverId: null, approvalSteps: [] } as const
+    const notCreated = { authorId: session.userId, status: 'draft', division: null, approverId: null, currentStep: 0 } as const
     return c.json({
       existingId: null,
       draft: {
@@ -176,7 +176,7 @@ export const summariesRoute = new Hono<AppEnv>()
     await assertOwnDivision(db, session.userId, input.division)
     await assertApprover(db, session.userId, input.approverId)
     const members = await summaryMembersOf(db, report.eventId)
-    await updateIfUnchanged(db, report, EDITABLE, { ...input, analyses: analysesFor(members, analyses) })
+    await updateIfUnchanged(db, report, EDITABLE_REPORT_STATUSES, { ...input, analyses: analysesFor(members, analyses) })
     return c.json({ ok: true })
   })
 

@@ -1,22 +1,25 @@
 import { z } from 'zod'
 import { DIVISIONS } from '../divisions'
-import { COMMENTABLE_FIELDS, countChars, HOSTINGS, RATING_MAX, RATING_MIN, REPORT_LIMITS, SUMMARY_LIMITS } from '../reports'
+import { COMMENTABLE_FIELDS, countChars, HOSTINGS, RATING_MAX, RATING_MIN, REPORT_FIELD_LABELS, REPORT_LIMITS, SUMMARY_FIELD_LABELS, SUMMARY_LIMITS } from '../reports'
 
-const maxChars = (label: string, max: number) =>
+const maxText = (label: string, max: number) =>
   z
     .string()
     .trim()
     .refine((v) => countChars(v) <= max, `${label}は${max}文字以内にしてください`)
+
+/** 活動報告書の文章の項目 */
+const maxChars = (field: 'content' | 'reflection' | 'notes') => maxText(REPORT_FIELD_LABELS[field], REPORT_LIMITS[field].max)
 
 const rating = z.number().int().min(RATING_MIN).max(RATING_MAX)
 
 /** 下書き保存。上限だけ確認し、未入力でもよい */
 export const reportDraftSchema = z.object({
   division: z.enum(DIVISIONS).nullable(),
-  content: maxChars('活動内容', REPORT_LIMITS.content.max),
-  reflection: maxChars('事後報告', REPORT_LIMITS.reflection.max),
+  content: maxChars('content'),
+  reflection: maxChars('reflection'),
   rating: rating.nullable(),
-  notes: maxChars('伝言事項・特記事項', REPORT_LIMITS.notes.max),
+  notes: maxChars('notes'),
   /** 役職者が選ぶ承認者（部員は不要） */
   approverId: z.string().min(1).nullable(),
 })
@@ -24,10 +27,10 @@ export type ReportDraftInput = z.input<typeof reportDraftSchema>
 
 /** 提出。必須項目と事後報告の最低文字数も確認する */
 export const reportSubmitSchema = reportDraftSchema.extend({
-  division: z.enum(DIVISIONS, '所属部署を選んでください'),
-  content: reportDraftSchema.shape.content.refine((v) => v.length > 0, '活動内容を入力してください'),
-  reflection: reportDraftSchema.shape.reflection.refine((v) => v.length > 0, '事後報告を入力してください'),
-  rating: rating.nullable().refine((v) => v !== null, '活動評価を選んでください'),
+  division: z.enum(DIVISIONS, `${REPORT_FIELD_LABELS.division}を選んでください`),
+  content: reportDraftSchema.shape.content.refine((v) => v.length > 0, `${REPORT_FIELD_LABELS.content}を入力してください`),
+  reflection: reportDraftSchema.shape.reflection.refine((v) => v.length > 0, `${REPORT_FIELD_LABELS.reflection}を入力してください`),
+  rating: rating.nullable().refine((v) => v !== null, `${REPORT_FIELD_LABELS.rating}を選んでください`),
 })
 
 /** 新しく作るとき（イベント選択後の作成ページから） */
@@ -38,22 +41,22 @@ export const reportCreateSchema = reportDraftSchema.extend({ eventId: z.string()
 /** 参加者1人分の自己分析 */
 const analysis = z.object({
   userId: z.string().min(1),
-  text: maxChars('自己分析', SUMMARY_LIMITS.analysis.max),
+  text: maxText(SUMMARY_FIELD_LABELS.analyses, SUMMARY_LIMITS.analysis.max),
 })
 
 /** 下書き保存。上限だけ確認し、未入力でもよい */
 export const summaryDraftSchema = z.object({
   division: z.enum(DIVISIONS).nullable(),
-  content: maxChars('活動内容', SUMMARY_LIMITS.content.max).refine(
+  content: maxText(SUMMARY_FIELD_LABELS.content, SUMMARY_LIMITS.content.max).refine(
     (v) => v.split('\n').length <= SUMMARY_LIMITS.content.lines,
     `活動内容は${SUMMARY_LIMITS.content.lines}行以内にしてください`,
   ),
   hosting: z.enum(HOSTINGS).nullable(),
   analyses: z.array(analysis).max(200),
-  overview: maxChars('総評', SUMMARY_LIMITS.overview.max),
-  impressions: maxChars('所感', SUMMARY_LIMITS.impressions.max),
+  overview: maxText(SUMMARY_FIELD_LABELS.overview, SUMMARY_LIMITS.overview.max),
+  impressions: maxText(SUMMARY_FIELD_LABELS.impressions, SUMMARY_LIMITS.impressions.max),
   rating: rating.nullable(),
-  notes: maxChars('特記事項', SUMMARY_LIMITS.notes.max),
+  notes: maxText(SUMMARY_FIELD_LABELS.notes, SUMMARY_LIMITS.notes.max),
   approverId: z.string().min(1).nullable(),
 })
 export type SummaryDraftInput = z.input<typeof summaryDraftSchema>

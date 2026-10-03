@@ -1,4 +1,4 @@
-import { OFFICER_LABELS, type Division, type Officer } from '@edtc/shared'
+import { positionLabels, type Division, type Officer } from '@edtc/shared'
 import { css } from 'styled-system/css'
 import { Badge } from '~/components/ui/Badge'
 
@@ -13,10 +13,9 @@ export function MemberBadges({ member }: { member: BadgeMember }) {
           {division}
         </Badge>
       ))}
-      {member.officer && <Badge tone="warning">{OFFICER_LABELS[member.officer]}</Badge>}
-      {member.headOf?.map((division) => (
-        <Badge key={`head-${division}`} tone="warning">
-          {division}長
+      {positionLabels({ officer: member.officer ?? null, headOf: member.headOf ?? [] }).map((label) => (
+        <Badge key={label} tone="warning">
+          {label}
         </Badge>
       ))}
       {member.role === 'admin' && <Badge tone="discord">管理者</Badge>}

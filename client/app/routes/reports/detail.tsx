@@ -12,18 +12,16 @@ import { redirect } from 'react-router'
 import { css } from 'styled-system/css'
 import { PageHeader } from '~/components/ui/PageHeader'
 import { useCurrentUser } from '~/features/auth/use-current-user'
-import { ApprovalProgress } from '~/features/reports/ApprovalProgress'
 import { ExportButton } from '~/features/reports/ExportButton'
 import { saveDraft, saveSummaryDraft } from '~/features/reports/autosave'
-import { contentOf, summaryContentOf } from '~/features/reports/content'
+import { contentOf, contextOf, latestRejection, summaryContentOf } from '~/features/reports/content'
 import { ReportForm, type ReportActionData, type ReportIntent } from '~/features/reports/ReportForm'
 import { ReportStatusBadge } from '~/features/reports/ReportStatusBadge'
 import { ReportView } from '~/features/reports/ReportView'
-import { ReviewHistory } from '~/features/reports/ReviewHistory'
+import { ReviewProgress } from '~/features/reports/ReviewHistory'
 import { ReviewStatus, ReviewWorkspace } from '~/features/reports/ReviewPanel'
 import { SummaryForm } from '~/features/reports/SummaryForm'
 import { SummaryView } from '~/features/reports/SummaryView'
-import { latestRejection } from '~/features/reports/types'
 import { api, unwrap } from '~/lib/api'
 import { catchApiError, zodErrors } from '~/lib/form'
 import { fullName } from '~/lib/format'
@@ -102,14 +100,9 @@ export default function ReportPage({ loaderData }: Route.ComponentProps) {
     rejection: latestRejection(report.reviews),
     isLeader: isLeader(me),
     approvers,
-    aside: (
-      <>
-        <ApprovalProgress report={report} />
-        <ReviewHistory reviews={report.reviews} />
-      </>
-    ),
+    aside: <ReviewProgress report={report} />,
   }
-  const context = { event: report.event, author: report.author, authorRole, submittedAt: report.submittedAt }
+  const context = contextOf(report, authorRole)
 
   return (
     <>
@@ -134,7 +127,7 @@ export default function ReportPage({ loaderData }: Route.ComponentProps) {
         isSummary ? (
           <SummaryForm
             key={report.updatedAt}
-            context={{ ...context, kind: 'summary' }}
+            context={context}
             initial={summaryContentOf(report)}
             members={members}
             autosave={autosaveSummary}

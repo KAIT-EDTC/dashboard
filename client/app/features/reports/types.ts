@@ -1,3 +1,4 @@
+import type { ParticipantRole } from '@edtc/shared'
 import type { InferResponseType } from 'hono/client'
 import type { api } from '~/lib/api'
 
@@ -21,16 +22,13 @@ export type NewSummaryDraft = NonNullable<NewSummaryResponse['draft']>
 export type SummaryExport = InferResponseType<typeof api.reports.summaries.export.$get, 200>['summaries'][number]
 
 /** 自動で入る欄（イベント・本人・役割）。作成前と作成後で共通。学籍番号は見られる人にだけ届く */
-export type ReportContext = Pick<NewReportDraft, 'event' | 'authorRole'> & {
+export type ReportContext = Pick<NewReportDraft, 'event'> & {
   author: Omit<NewReportDraft['author'], 'studentId'> & { studentId: string | null }
+  /** 書いた人の役割（作成後に参加者から外れていれば null） */
+  authorRole: ParticipantRole | null
   /** 活動報告書かまとめ報告書か（まとめ報告書は「担当者」と出す） */
   kind?: 'activity' | 'summary'
   submittedAt: string | null
-}
-
-/** いちばん新しい差し戻し（本人が直すときに見る） */
-export function latestRejection(reviews: ReportReview[]): ReportReview | undefined {
-  return [...reviews].reverse().find((review) => review.decision === 'reject')
 }
 
 /** 活動報告書が提出済み（承認待ち・承認済み）か */

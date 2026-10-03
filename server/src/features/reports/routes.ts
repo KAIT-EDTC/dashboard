@@ -3,6 +3,8 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import {
   COMMENTABLE_FIELDS_OF,
+  EDITABLE_REPORT_STATUSES,
+  isEditableStatus,
   isLeader,
   nowInJst,
   reportCreateSchema,
@@ -24,10 +26,11 @@ import type { AppEnv } from '../../env'
 import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
 import { validate } from '../../lib/validator'
-import { canReviewStep, isApprover, requireAuth } from '../../middleware/auth'
-import { assertEditable, assertOwnDivision, canView, EDITABLE, findReport, submitReport, summaryOf, updateIfUnchanged, assertApprover } from './common'
+import { requireAuth } from '../../middleware/auth'
+import { canReviewNow, canView, isApprover } from './access'
+import { assertApprover, assertEditable, assertOwnDivision, findReport, nameOf, submitReport, summaryOf, updateIfUnchanged } from './common'
 import { notifyApproved, notifyAwaitingReview, notifyRejected } from './notifications'
-import { approverCandidatesFor, isTargetParticipant, submissionProgress, summaryMembersOf } from './queries'
+import { approverCandidatesFor, isTargetParticipant, myReportOf, submissionProgress, summaryMembersOf } from './queries'
 import { summariesRoute, visibleMembers } from './summaries'
 
 /** 報告書の一覧に出すイベントの情報 */
@@ -38,27 +41,20 @@ const eventColumns = {
   endsAt: events.endsAt,
 }
 
-const isActivity = eq(activityReports.kind, 'activity')
-
-function findOwnReport(db: Db, eventId: string, userId: string) {
-  return db
-    .select({ id: activityReports.id })
-    .from(activityReports)
-    .where(and(eq(activityReports.eventId, eventId), eq(activityReports.authorId, userId), isActivity))
-    .get()
-}
-
-/** 報告書を書けるのは、参加したイベントが始まってから */
+/** 報告書を書けるのは、参加したイベントが始まってから。書く人のそのイベントでの役割を返す */
 async function assertCanWrite(db: Db, eventId: string, userId: string) {
   const participation = await db
-    .select({ startsAt: events.startsAt })
+    .select({ startsAt: events.startsAt, role: eventParticipants.role })
     .from(eventParticipants)
     .innerJoin(events, eq(events.id, eventParticipants.eventId))
     .where(and(eq(eventParticipants.eventId, eventId), eq(eventParticipants.userId, userId), isTargetParticipant))
     .get()
   if (!participation) throw forbidden('このイベントに参加した人だけが報告書を書けます')
   if (participation.startsAt > nowInJst()) throw badRequest('報告書はイベントが始まってから書けます')
+  return participation.role
 }
+
+const isActivity = eq(activityReports.kind, 'activity')
 
 /** 自分が担当するまとめ報告書（始まったイベントで、指名された・講師として担当する・すでに書いている） */
 async function summaryTargetsOf(db: Db, userId: string) {
@@ -146,7 +142,7 @@ export const reportsRoute = new Hono<AppEnv>()
   // 承認待ちのうち、いまの段階を自分が担当しているもの
   .get('/review', async (c) => {
     const session = c.get('session')
-    if (!session.officer && session.headOf.length === 0) return c.json({ reports: [] })
+    if (!isLeader(session)) return c.json({ reports: [] })
 
     const submitted = await createDb(c.env).query.activityReports.findMany({
       columns: { id: true, kind: true, authorId: true, status: true, division: true, approverId: true, submittedAt: true, approvalSteps: true, currentStep: true },
@@ -157,7 +153,7 @@ export const reportsRoute = new Hono<AppEnv>()
       where: eq(activityReports.status, 'submitted'),
       orderBy: asc(activityReports.submittedAt),
     })
-    const reports = submitted.filter((r) => canReviewStep(session, r, r.approvalSteps[r.currentStep]))
+    const reports = submitted.filter((r) => canReviewNow(session, r))
     return c.json({ reports })
   })
 
@@ -276,13 +272,12 @@ export const reportsRoute = new Hono<AppEnv>()
     const { userId } = c.get('session')
     const db = createDb(c.env)
 
-    const existing = await findOwnReport(db, eventId, userId)
+    const existing = await myReportOf(db, eventId, userId)
     if (existing) return c.json({ existingId: existing.id, draft: null })
 
-    await assertCanWrite(db, eventId, userId)
-    const [event, participant, author, divisions] = await Promise.all([
+    const authorRole = await assertCanWrite(db, eventId, userId)
+    const [event, author, divisions] = await Promise.all([
       db.select({ id: events.id, title: events.title, startsAt: events.startsAt, endsAt: events.endsAt, location: events.location }).from(events).where(eq(events.id, eventId)).get(),
-      db.select({ role: eventParticipants.role }).from(eventParticipants).where(and(eq(eventParticipants.eventId, eventId), eq(eventParticipants.userId, userId))).get(),
       db.query.users.findFirst({ columns: { ...memberSummaryColumns, studentId: true }, where: eq(users.id, userId) }),
       db.select({ division: userDivisions.division }).from(userDivisions).where(eq(userDivisions.userId, userId)),
     ])
@@ -292,7 +287,7 @@ export const reportsRoute = new Hono<AppEnv>()
       draft: {
         event,
         author,
-        authorRole: participant?.role ?? null,
+        authorRole,
         // 所属部署が1つなら最初から選んでおく
         division: divisions.length === 1 ? divisions[0].division : null,
       },
@@ -305,7 +300,7 @@ export const reportsRoute = new Hono<AppEnv>()
     const { userId } = c.get('session')
     const db = createDb(c.env)
 
-    const existing = await findOwnReport(db, eventId, userId)
+    const existing = await myReportOf(db, eventId, userId)
     if (existing) throw conflict('このイベントの報告書はすでにあります。ページを再読み込みしてください。')
     await assertCanWrite(db, eventId, userId)
     await assertOwnDivision(db, userId, content.division)
@@ -351,10 +346,10 @@ export const reportsRoute = new Hono<AppEnv>()
       report: { ...row, author: { ...author, studentId: isAuthor || isApprover(session, row) ? studentId : null } },
       authorRole: participant?.role ?? null,
       members,
-      canEdit: isAuthor && EDITABLE.includes(row.status),
+      canEdit: isAuthor && isEditableStatus(row.status),
       canDelete: isAuthor && row.status === 'draft',
       canWithdraw: isAuthor && row.status === 'submitted',
-      canReview: row.status === 'submitted' && canReviewStep(session, row, row.approvalSteps[row.currentStep]),
+      canReview: canReviewNow(session, row),
     })
   })
 
@@ -367,7 +362,7 @@ export const reportsRoute = new Hono<AppEnv>()
     assertEditable(session, report)
     await assertOwnDivision(db, session.userId, input.division)
     await assertApprover(db, session.userId, input.approverId)
-    await updateIfUnchanged(db, report, EDITABLE, input)
+    await updateIfUnchanged(db, report, EDITABLE_REPORT_STATUSES, input)
     return c.json({ ok: true })
   })
 
@@ -399,8 +394,8 @@ export const reportsRoute = new Hono<AppEnv>()
     const db = createDb(c.env)
     const report = await findReport(db, c.req.param('id'))
     if (report.status !== 'submitted') throw conflict('承認待ちの報告書ではありません')
+    if (!canReviewNow(session, report)) throw forbidden()
     const step = report.approvalSteps[report.currentStep]
-    if (!canReviewStep(session, report, step)) throw forbidden()
 
     // 範囲コメントは、確認している本文のその位置を指していること
     const comments = input.decision === 'reject' ? input.comments : []
@@ -439,15 +434,10 @@ export const reportsRoute = new Hono<AppEnv>()
 
     const summary = await summaryOf(db, report)
     if (input.decision === 'reject') {
-      const reviewer = await db
-        .select({ lastName: users.lastName, firstName: users.firstName })
-        .from(users)
-        .where(eq(users.id, session.userId))
-        .get()
       runInBackground(
         c,
         notifyRejected(c.env, db, summary, {
-          reviewerName: reviewer ? `${reviewer.lastName} ${reviewer.firstName}` : '',
+          reviewerName: await nameOf(db, session.userId),
           step,
           comment: input.comment,
           inlineCount: comments.length,

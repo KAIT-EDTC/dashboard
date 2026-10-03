@@ -4,8 +4,19 @@ import { Avatar } from '~/components/ui/Avatar'
 import { Badge } from '~/components/ui/Badge'
 import { Card } from '~/components/ui/Card'
 import { formatTimestamp, fullName } from '~/lib/format'
+import { ApprovalProgress } from './ApprovalProgress'
 import { RequestCard } from './InlineComment'
-import type { ReportReview } from './types'
+import type { ReportDetail, ReportReview } from './types'
+
+/** 右側の列に並べる、承認の流れと確認の履歴 */
+export function ReviewProgress({ report }: { report: ReportDetail }) {
+  return (
+    <>
+      <ApprovalProgress report={report} />
+      <ReviewHistory reviews={report.reviews} />
+    </>
+  )
+}
 
 /** 承認・差し戻しの履歴（新しい順） */
 export function ReviewHistory({ reviews }: { reviews: ReportReview[] }) {

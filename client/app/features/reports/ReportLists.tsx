@@ -1,3 +1,4 @@
+import { isEditableStatus, type ReportStatus } from '@edtc/shared'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { css, cx } from 'styled-system/css'
@@ -60,7 +61,7 @@ function RowAction({ exists, editable }: { exists: boolean; editable: boolean })
   )
 }
 
-const isEditable = (status: string | null) => status === 'draft' || status === 'rejected'
+const isEditable = (status: ReportStatus | null) => !!status && isEditableStatus(status)
 
 /** 自分が担当するまとめ報告書。参加者全員の活動報告書の提出状況も出す */
 export function SummaryTargetList({ summaries }: { summaries: SummaryTarget[] }) {

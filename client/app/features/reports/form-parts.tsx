@@ -1,4 +1,4 @@
-import { COMMENTABLE_FIELDS, type CommentableField, type Division, type ReportStatus } from '@edtc/shared'
+import type { CommentableField, Division, ReportStatus } from '@edtc/shared'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useBlocker } from 'react-router'
 import { css } from 'styled-system/css'
@@ -10,6 +10,7 @@ import { SelectField } from '~/components/ui/Field'
 import { CheckIcon, SaveIcon, SendIcon, TrashIcon } from '~/components/ui/Icons'
 import { formatTimestamp, fullName } from '~/lib/format'
 import type { Autosave } from './autosave'
+import { byPosition } from './content'
 import { RequestCard } from './InlineComment'
 import { MarkedTextarea } from './MarkedTextarea'
 import { ReportStatusBadge } from './ReportStatusBadge'
@@ -72,9 +73,7 @@ export function useRevisionRequests<F extends CommentableField>({
   value: (field: F) => string
   update: (field: F, value: string) => void
 }) {
-  const requests = rejection
-    ? [...rejection.comments].sort((a, b) => COMMENTABLE_FIELDS.indexOf(a.field) - COMMENTABLE_FIELDS.indexOf(b.field) || a.start - b.start)
-    : []
+  const requests = rejection ? [...rejection.comments].sort(byPosition) : []
   const [applied, setApplied] = useState<ReadonlySet<string>>(new Set())
   const textareas = useRef<Partial<Record<F, HTMLTextAreaElement | null>>>({})
   const requestsFor = (field: F) => requests.filter((r) => r.field === field)

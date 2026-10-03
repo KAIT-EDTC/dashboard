@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { css } from 'styled-system/css'
 import { Card } from '~/components/ui/Card'
 import { CommentableText } from './CommentableText'
+import { contextOf } from './content'
 import { RatingMeter } from './Rating'
 import { ReportInfo } from './ReportInfo'
 import type { ReportDetail } from './types'
@@ -60,7 +61,7 @@ export function ReportView({ report, authorRole, aside, renderText, renderAfter,
       </Card>
       <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
         {aside}
-        <ReportInfo context={{ event: report.event, author: report.author, authorRole, submittedAt: report.submittedAt }} />
+        <ReportInfo context={contextOf(report, authorRole)} />
       </div>
     </div>
   )

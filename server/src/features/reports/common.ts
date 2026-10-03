@@ -1,36 +1,32 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import type { Context } from 'hono'
-import { approvalStepsFor, isLeader, type Division, type ReportKind, type ReportStatus } from '@edtc/shared'
+import { approvalStepsFor, EDITABLE_REPORT_STATUSES, isEditableStatus, isLeader, type Division, type ReportKind, type ReportStatus } from '@edtc/shared'
 import type { Db } from '../../db'
 import { activityReports, events, userDivisions, users } from '../../db/schema'
 import type { AppEnv, Session } from '../../env'
 import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
-import { isApprover } from '../../middleware/auth'
 import { notifyAwaitingReview } from './notifications'
 
-/** 活動報告書・まとめ報告書で共通の、提出と承認まわりの処理 */
+/** 活動報告書・まとめ報告書で共通の、保存・提出まわりの処理 */
 
 export type ReportRow = typeof activityReports.$inferSelect
 
-/** 本人が編集できる状態 */
-export const EDITABLE: ReportStatus[] = ['draft', 'rejected']
-
+/** kind を指定すると、その種類でなければ見つからない扱いにする */
 export async function findReport(db: Db, id: string, kind?: ReportKind): Promise<ReportRow> {
   const report = await db.select().from(activityReports).where(eq(activityReports.id, id)).get()
   if (!report || (kind && report.kind !== kind)) throw notFound('報告書が見つかりません')
   return report
 }
 
-/** 承認済みはメンバー全員、それ以外は本人と承認の流れにいる人（部署長・本部長・代表）だけが見られる */
-export function canView(session: Session, report: ReportRow): boolean {
-  if (report.status === 'approved' || report.authorId === session.userId) return true
-  return report.status !== 'draft' && isApprover(session, report)
-}
-
 export function assertEditable(session: Session, report: ReportRow) {
   if (report.authorId !== session.userId) throw forbidden()
-  if (!EDITABLE.includes(report.status)) throw conflict('提出済みの報告書は編集できません')
+  if (!isEditableStatus(report.status)) throw conflict('提出済みの報告書は編集できません')
+}
+
+export async function nameOf(db: Db, userId: string): Promise<string> {
+  const user = await db.select({ lastName: users.lastName, firstName: users.firstName }).from(users).where(eq(users.id, userId)).get()
+  return user ? `${user.lastName} ${user.firstName}` : ''
 }
 
 /** 所属部署は本人が所属している部署から選ぶ */
@@ -54,7 +50,7 @@ export async function assertApprover(db: Db, userId: string, approverId: string 
 }
 
 /** 状態が変わっていないことを条件に更新する（同時に承認・再提出された場合に上書きしない） */
-export async function updateIfUnchanged(db: Db, report: ReportRow, from: ReportStatus[], values: Partial<ReportRow>) {
+export async function updateIfUnchanged(db: Db, report: ReportRow, from: readonly ReportStatus[], values: Partial<ReportRow>) {
   const updated = await db
     .update(activityReports)
     .set(values)
@@ -71,16 +67,16 @@ export async function updateIfUnchanged(db: Db, report: ReportRow, from: ReportS
 
 /** 通知に載せる報告書の要約 */
 export async function summaryOf(db: Db, report: ReportRow) {
-  const [event, author] = await Promise.all([
+  const [event, authorName] = await Promise.all([
     db.select({ title: events.title }).from(events).where(eq(events.id, report.eventId)).get(),
-    db.select({ lastName: users.lastName, firstName: users.firstName }).from(users).where(eq(users.id, report.authorId)).get(),
+    nameOf(db, report.authorId),
   ])
   return {
     id: report.id,
     kind: report.kind,
     authorId: report.authorId,
     eventTitle: event?.title ?? '',
-    authorName: author ? `${author.lastName} ${author.firstName}` : '',
+    authorName,
     division: report.division,
     approverId: report.approverId,
   }
@@ -102,7 +98,7 @@ export async function submitReport(
   if (designated && !input.approverId) throw badRequest('承認者を選んでください')
   const approverId = designated ? input.approverId : null
   await assertApprover(db, session.userId, approverId)
-  await updateIfUnchanged(db, report, EDITABLE, {
+  await updateIfUnchanged(db, report, EDITABLE_REPORT_STATUSES, {
     ...input,
     approverId,
     status: 'submitted',

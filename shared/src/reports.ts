@@ -24,6 +24,9 @@ export const REPORT_KIND_LABELS: Record<ReportKind, string> = {
   activity: '活動報告書',
   summary: 'まとめ報告書',
 }
+/** 本人が書き直せる状態（下書き・修正依頼） */
+export const EDITABLE_REPORT_STATUSES: readonly ReportStatus[] = ['draft', 'rejected']
+export const isEditableStatus = (status: ReportStatus) => EDITABLE_REPORT_STATUSES.includes(status)
 
 /** 本人が書く項目 */
 export const REPORT_FIELDS = ['division', 'content', 'reflection', 'rating', 'notes'] as const
@@ -111,9 +114,12 @@ export const OFFICER_LABELS: Record<Officer, string> = {
 export type Position = { officer: Officer | null; headOf: Division[] }
 export const isLeader = (user: Position) => !!user.officer || user.headOf.length > 0
 
+/** 部署長の表示（営業部長 など） */
+export const divisionHeadLabel = (division: Division) => `${division}長`
+
 /** 役職の表示（代表・本部長・営業部長 など） */
 export function positionLabels(user: Position): string[] {
-  return [...(user.officer ? [OFFICER_LABELS[user.officer]] : []), ...user.headOf.map((division) => `${division}長`)]
+  return [...(user.officer ? [OFFICER_LABELS[user.officer]] : []), ...user.headOf.map(divisionHeadLabel)]
 }
 
 /**
