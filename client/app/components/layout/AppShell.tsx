@@ -142,7 +142,7 @@ function MobileTabBar({ isAdmin }: { isAdmin: boolean }) {
 /** ログイン後の画面の枠（ヘッダー・ナビゲーション・本文） */
 export function AppShell({ user, onLogout, children }: { user: ShellUser; onLogout: () => void; children: ReactNode }) {
   return (
-    <div className={css({ h: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' })}>
+    <div className={css({ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' })}>
       <header
         className={css({
           h: '56px',
