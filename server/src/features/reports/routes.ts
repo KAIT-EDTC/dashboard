@@ -196,17 +196,19 @@ export const reportsRoute = new Hono<AppEnv>()
     // 開けるのは承認済みと自分の報告書だけ
     const visibleId = (report: (typeof reports)[number]) => (report.status === 'approved' || report.authorId === userId ? report.id : null)
     const shownStatus = (report: (typeof reports)[number] | undefined) => (report && report.status !== 'draft' ? report.status : null)
+    const reportOf = new Map(reports.filter((r) => r.kind === 'activity').map((r) => [`${r.eventId}:${r.authorId}`, r]))
+    const summaryByEvent = new Map(reports.filter((r) => r.kind === 'summary').map((r) => [r.eventId, r]))
 
     return c.json({
       events: recent.map(({ summaryWriterId, ...event }) => {
         const members = participants.filter((p) => p.eventId === event.id)
-        const summary = reports.find((r) => r.eventId === event.id && r.kind === 'summary')
+        const summary = summaryByEvent.get(event.id)
         // 担当者: 書き始めた人、指名された人、講師の順
         const writerId = summary?.authorId ?? summaryWriterId ?? members.find((m) => m.role === 'lecturer')?.userId
         return {
           ...event,
           members: members.map((p) => {
-            const report = reports.find((r) => r.eventId === event.id && r.kind === 'activity' && r.authorId === p.userId)
+            const report = reportOf.get(`${event.id}:${p.userId}`)
             return {
               user: p.user,
               role: p.role,
