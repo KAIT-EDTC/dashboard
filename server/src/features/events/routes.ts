@@ -182,7 +182,7 @@ export const eventsRoute = new Hono<AppEnv>()
     const mentionIds = label ? (await findTargetMembers(db, id)).map((m) => m.id).filter((memberId) => memberId !== userId) : []
     runInBackground(
       c,
-      notifyEventCreated(c.env, { id, ...input }, organizer ? `${organizer.lastName} ${organizer.firstName}` : '', {
+      notifyEventCreated(c.env, db, { id, ...input }, organizer ? `${organizer.lastName} ${organizer.firstName}` : '', {
         label,
         mentionIds,
       }),

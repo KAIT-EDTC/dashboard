@@ -63,7 +63,6 @@ theme/ (client直下)     # Panda のトークン・グローバルCSS
 
 - 最初に登録した人（管理者が1人もいない状態で登録した人）は自動で管理者になる
 - 自分自身の権限は変更できないので、管理者が0人になることはない。全員がログインできなくなった場合などは `wrangler d1 execute edtc-dashboard --remote --env production --command "UPDATE users SET role='admin' WHERE id='<DiscordのユーザーID>'"` で復旧する
-- 「ユーザー管理」では、ブログ提出時のDiscord通知でメンションする **レビュー担当** もメンバーのドロップダウンから選ぶ
 
 ### イベントの対象者
 
@@ -149,7 +148,9 @@ npm run dev                        # client: http://localhost:5173 / server: htt
 1. [Developer Portal](https://discord.com/developers/applications) でアプリを作り、OAuth2 の Redirects に `<APIのURL>/api/auth/callback` を登録
 2. `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` / `DISCORD_REDIRECT_URI` / `DISCORD_GUILD_ID` を設定
 3. スコープは `identify` と `guilds.members.read`（サーバー内のニックネームを本人のトークンで読むため、Botは不要）
-4. 通知したいチャンネルでWebhookを作り `DISCORD_WEBHOOK_URL` に設定。ブログ提出時にメンションする人は、ダッシュボードの「ユーザー管理」で選ぶ
+4. 通知したいチャンネルでWebhookを作り、ダッシュボードの「通知設定」に登録する（管理者のみ）。通知の種類ごとのオン/オフ、テスト送信、ブログ提出時にメンションする **レビュー担当**（メンバーのドロップダウンから選ぶ）も同じ画面で設定する
+   - Webhook URLは保存すると画面には末尾しか表示されない。Discordのウェブフック以外のURLは登録できない
+   - 環境変数 `DISCORD_WEBHOOK_URL` は、画面で設定するまでの代わりとして使われる（画面の設定が優先）
 
 ### GitHub App（ブログ）
 
@@ -183,7 +184,7 @@ npx wrangler secret put DISCORD_CLIENT_ID --env production
 npx wrangler secret put DISCORD_CLIENT_SECRET --env production
 npx wrangler secret put DISCORD_REDIRECT_URI --env production        # https://<公開URL>/api/auth/callback
 npx wrangler secret put DISCORD_GUILD_ID --env production
-npx wrangler secret put DISCORD_WEBHOOK_URL --env production
+npx wrangler secret put DISCORD_WEBHOOK_URL --env production   # 任意（「通知設定」で登録するなら不要）
 npx wrangler secret put GITHUB_APP_ID --env production
 npx wrangler secret put GITHUB_APP_PRIVATE_KEY --env production < your-app.pem
 npx wrangler secret put GITHUB_WEBHOOK_SECRET --env production

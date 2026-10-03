@@ -122,6 +122,21 @@ export const blogReviewers = sqliteTable('blog_reviewers', {
 })
 
 /**
+ * Discord通知の設定（1行だけ。id は常に 1）。行が無ければ「通知先なし・すべてオン」として扱う。
+ * webhook_url は管理者が「通知設定」で入力する。画面には返さず、末尾だけ見せる
+ */
+export const notificationSettings = sqliteTable('notification_settings', {
+  id: integer('id').primaryKey(),
+  webhookUrl: text('webhook_url'),
+  onEventCreated: integer('on_event_created', { mode: 'boolean' }).notNull().default(true),
+  onBlogSubmitted: integer('on_blog_submitted', { mode: 'boolean' }).notNull().default(true),
+  onBlogPublished: integer('on_blog_published', { mode: 'boolean' }).notNull().default(true),
+  onBlogClosed: integer('on_blog_closed', { mode: 'boolean' }).notNull().default(true),
+  onBlogFeedback: integer('on_blog_feedback', { mode: 'boolean' }).notNull().default(true),
+  updatedAt: timestamps.updatedAt,
+})
+
+/**
  * 記事の画像（WebP）。本文からは ./<fileName> で参照し、PRでは記事フォルダに同じ名前で置かれる。
  * D1の行サイズ上限(2MB)に収まるようクライアント側で縮小してから base64 で保存する。
  */

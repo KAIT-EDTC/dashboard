@@ -1,4 +1,7 @@
+import type { NotificationKind } from '@edtc/shared'
+import type { Db } from '../db'
 import type { Bindings } from '../env'
+import { getNotificationSettings, resolveWebhook } from '../features/admin/notification-settings'
 
 const API = 'https://discord.com/api/v10'
 
@@ -90,14 +93,16 @@ export const EMBED_COLORS = {
 /** Discordのユーザーメンション */
 export const mention = (userId: string) => `<@${userId}>`
 
-/** 通知の失敗で本来の処理を失敗させないよう、例外は握りつぶしてログだけ残す */
-export async function notify(
-  env: Bindings,
-  message: { content?: string; embeds?: DiscordEmbed[]; mentionUserIds?: string[] },
-): Promise<void> {
-  if (!env.DISCORD_WEBHOOK_URL) return
+export type NotificationMessage = {
+  content?: string
+  embeds?: DiscordEmbed[]
+  mentionUserIds?: string[]
+}
+
+/** Webhookに1件送る。失敗したら理由を返す（例外は投げない） */
+export async function sendWebhook(url: string, message: NotificationMessage): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const res = await fetch(env.DISCORD_WEBHOOK_URL, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -106,8 +111,25 @@ export async function notify(
         allowed_mentions: { users: message.mentionUserIds ?? [] },
       }),
     })
-    if (!res.ok) console.error('Discord通知に失敗しました', res.status, await res.text())
+    if (!res.ok) return { ok: false, error: `Discordが ${res.status} を返しました: ${await res.text()}` }
+    return { ok: true }
   } catch (error) {
-    console.error('Discord通知に失敗しました', error)
+    return { ok: false, error: String(error) }
+  }
+}
+
+/**
+ * 設定で有効な通知だけを、設定された通知先に送る。
+ * 通知の失敗で本来の処理を失敗させないよう、例外は握りつぶしてログだけ残す
+ */
+export async function notify(env: Bindings, db: Db, kind: NotificationKind, message: NotificationMessage): Promise<void> {
+  try {
+    const settings = await getNotificationSettings(db)
+    const { url } = resolveWebhook(env, settings)
+    if (!url || !settings.enabled[kind]) return
+    const result = await sendWebhook(url, message)
+    if (!result.ok) console.error('Discord通知に失敗しました', kind, result.error)
+  } catch (error) {
+    console.error('Discord通知に失敗しました', kind, error)
   }
 }
