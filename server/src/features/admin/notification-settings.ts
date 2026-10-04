@@ -41,11 +41,12 @@ export const webhookHint = (url: string) => `…${url.slice(-6)}`
 
 export async function saveNotificationSettings(
   db: Db,
-  input: { webhookUrl?: string | null; enabled: Record<NotificationKind, boolean> },
+  input: { webhookUrl?: string | null; enabled?: Record<NotificationKind, boolean> },
 ) {
-  const enabledColumns = Object.fromEntries(
-    Object.entries(ENABLED_COLUMNS).map(([kind, column]) => [column, input.enabled[kind as NotificationKind]]),
-  )
+  const { enabled } = input
+  const enabledColumns = enabled
+    ? Object.fromEntries(Object.entries(ENABLED_COLUMNS).map(([kind, column]) => [column, enabled[kind as NotificationKind]]))
+    : {}
   const values = { ...enabledColumns, ...(input.webhookUrl !== undefined && { webhookUrl: input.webhookUrl }) }
   await db
     .insert(notificationSettings)

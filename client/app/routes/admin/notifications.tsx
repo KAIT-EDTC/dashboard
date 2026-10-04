@@ -16,7 +16,7 @@ import type { Route } from './+types/notifications'
 export const meta: Route.MetaFunction = () => [{ title: '通知設定 | EDTC ダッシュボード' }]
 
 type Change =
-  | { intent: 'save'; webhookUrl?: string | null; enabled: Record<NotificationKind, boolean> }
+  | { intent: 'save'; webhookUrl?: string | null; enabled?: Record<NotificationKind, boolean> }
   | { intent: 'test' }
   | { intent: 'reviewers'; userIds: string[] }
 
@@ -55,13 +55,14 @@ export default function NotificationsPage({ loaderData }: Route.ComponentProps) 
   const me = useCurrentUser()
   if (me.role !== 'admin') return <Navigate to="/" replace />
 
-  // 保存して設定が変わったら、編集中の状態を作り直す
   const { webhook, enabled, members, reviewerIds } = loaderData
   return (
     <>
-      <PageHeader title="通知設定" description="Discordに送る通知の送り先と、通知の種類、ブログのレビュー担当を管理します。" />
+      <PageHeader title="通知設定" description="Discordに送る通知の送り先と、通知の種類、ブログのレビュー担当を管理します。各項目は個別に保存されます。" />
       <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg', maxW: '720px' })}>
-        <SettingsForm key={JSON.stringify([webhook, enabled])} webhook={webhook} enabled={enabled} />
+        {/* 通知先を保存したら、入力欄を空に戻す */}
+        <WebhookCard key={JSON.stringify(webhook)} webhook={webhook} />
+        <KindsCard enabled={enabled} />
         <ReviewersCard members={members} reviewerIds={reviewerIds} />
       </div>
     </>
@@ -70,14 +71,13 @@ export default function NotificationsPage({ loaderData }: Route.ComponentProps) 
 
 type Webhook = { source: 'db' | 'env' | null; hint: string | null }
 
-function SettingsForm({ webhook, enabled: saved }: { webhook: Webhook; enabled: Record<NotificationKind, boolean> }) {
+function WebhookCard({ webhook }: { webhook: Webhook }) {
   const saveFetcher = useFetcher<ActionResult>()
   const testFetcher = useFetcher<ActionResult>()
   const [url, setUrl] = useState('')
-  const [enabled, setEnabled] = useState(saved)
 
   const saving = saveFetcher.state !== 'idle'
-  const dirty = url.trim() !== '' || NOTIFICATION_KINDS.some((kind) => enabled[kind.id] !== saved[kind.id])
+  const dirty = url.trim() !== ''
   const submit = (change: Change) => saveFetcher.submit(change, { method: 'post', encType: 'application/json' })
   const saveError = saveFetcher.state === 'idle' ? errorOf(saveFetcher.data) : undefined
   const testResult = testFetcher.state === 'idle' ? testFetcher.data : undefined
@@ -91,51 +91,62 @@ function SettingsForm({ webhook, enabled: saved }: { webhook: Webhook; enabled: 
         : '未設定（通知は送られません）'
 
   return (
-    <>
-      <Card title="通知先">
-        <div className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
-          {saveError && <Alert>{saveError}</Alert>}
-          <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
-            通知を送るチャンネルのWebhook URLを設定します。Discordのチャンネル設定 →
-            連携サービス → ウェブフックで作成できます。URLは保存すると画面には表示されません。
-          </p>
-          <p className={css({ fontSize: 'sm' })}>
-            <span className={css({ fontWeight: '600', mr: 'sm' })}>現在</span>
-            {status}
-          </p>
-          <TextField
-            label="新しいWebhook URL"
-            type="url"
-            autoComplete="off"
-            value={url}
-            onChange={(e) => setUrl(e.currentTarget.value)}
-            placeholder="https://discord.com/api/webhooks/…"
-            hint="入力して保存すると、通知先が置き換わります"
-          />
-          <div className={css({ display: 'flex', flexWrap: 'wrap', gap: 'sm' })}>
-            <Button variant="primary" loading={saving} disabled={!dirty} onClick={() => submit({ intent: 'save', ...(url.trim() && { webhookUrl: url.trim() }), enabled })}>
-              保存
+    <Card title="通知先">
+      <div className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
+        {saveError && <Alert>{saveError}</Alert>}
+        <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
+          通知を送るチャンネルのWebhook URLを設定します。Discordのチャンネル設定 →
+          連携サービス → ウェブフックで作成できます。URLは保存すると画面には表示されません。
+        </p>
+        <p className={css({ fontSize: 'sm' })}>
+          <span className={css({ fontWeight: '600', mr: 'sm' })}>現在</span>
+          {status}
+        </p>
+        <TextField
+          label="新しいWebhook URL"
+          type="url"
+          autoComplete="off"
+          value={url}
+          onChange={(e) => setUrl(e.currentTarget.value)}
+          placeholder="https://discord.com/api/webhooks/…"
+          hint="入力して保存すると、通知先が置き換わります"
+        />
+        <div className={css({ display: 'flex', flexWrap: 'wrap', gap: 'sm' })}>
+          <Button variant="primary" loading={saving} disabled={!dirty} onClick={() => submit({ intent: 'save', webhookUrl: url.trim() })}>
+            保存
+          </Button>
+          <Button
+            loading={testFetcher.state !== 'idle'}
+            disabled={!webhook.source || dirty}
+            onClick={() => testFetcher.submit({ intent: 'test' }, { method: 'post', encType: 'application/json' })}
+          >
+            テスト送信
+          </Button>
+          {webhook.source === 'db' && (
+            <Button variant="danger" disabled={saving} onClick={() => confirm('通知先を削除しますか？環境変数に値がなければ通知は送られなくなります。') && submit({ intent: 'save', webhookUrl: null })}>
+              通知先を削除
             </Button>
-            <Button
-              loading={testFetcher.state !== 'idle'}
-              disabled={!webhook.source || dirty}
-              onClick={() => testFetcher.submit({ intent: 'test' }, { method: 'post', encType: 'application/json' })}
-            >
-              テスト送信
-            </Button>
-            {webhook.source === 'db' && (
-              <Button variant="danger" disabled={saving} onClick={() => confirm('通知先を削除しますか？環境変数に値がなければ通知は送られなくなります。') && submit({ intent: 'save', webhookUrl: null, enabled })}>
-                通知先を削除
-              </Button>
-            )}
-          </div>
-          {testError && <Alert>{testError}</Alert>}
-          {testResult && !testError && <Alert tone="success">テスト通知を送りました。Discordで確認してください。</Alert>}
-          {!webhook.source && <Alert tone="warning">通知先が未設定のため、イベントやブログの通知は送られません。</Alert>}
+          )}
         </div>
-      </Card>
+        {testError && <Alert>{testError}</Alert>}
+        {testResult && !testError && <Alert tone="success">テスト通知を送りました。Discordで確認してください。</Alert>}
+        {!webhook.source && <Alert tone="warning">通知先が未設定のため、イベントやブログの通知は送られません。</Alert>}
+      </div>
+    </Card>
+  )
+}
 
-      <Card title="通知の種類">
+function KindsCard({ enabled: saved }: { enabled: Record<NotificationKind, boolean> }) {
+  const fetcher = useFetcher<ActionResult>()
+  const error = fetcher.state === 'idle' ? errorOf(fetcher.data) : undefined
+  // 保存中は送信した値を見せる（反映を待つ間にチェックが元に戻って見えないように）
+  const sent = fetcher.json as Extract<Change, { intent: 'save' }> | undefined
+  const enabled = (fetcher.state !== 'idle' && sent?.enabled) || saved
+  return (
+    <Card title="通知の種類">
+      <div className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
+        {error && <Alert>{error}</Alert>}
+        <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>送る通知を選びます。変更はその場で保存されます。</p>
         <ul className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
           {NOTIFICATION_KINDS.map((kind) => (
             <li key={kind.id}>
@@ -147,14 +158,18 @@ function SettingsForm({ webhook, enabled: saved }: { webhook: Webhook; enabled: 
                   </span>
                 }
                 checked={enabled[kind.id]}
-                onChange={(e) => setEnabled({ ...enabled, [kind.id]: e.currentTarget.checked })}
+                onChange={(e) =>
+                  fetcher.submit(
+                    { intent: 'save', enabled: { ...enabled, [kind.id]: e.currentTarget.checked } } satisfies Change,
+                    { method: 'post', encType: 'application/json' },
+                  )
+                }
               />
             </li>
           ))}
         </ul>
-        <p className={css({ fontSize: 'xs', color: 'fg.subtle', mt: 'md' })}>変更は上の「保存」で反映されます。</p>
-      </Card>
-    </>
+      </div>
+    </Card>
   )
 }
 

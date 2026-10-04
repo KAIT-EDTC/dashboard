@@ -9,7 +9,8 @@ export const blogReviewersSchema = z.object({
 })
 
 /**
- * 通知設定の保存。webhookUrl は、文字列なら更新、null なら削除（環境変数の値に戻る）、未指定なら変更しない
+ * 通知設定の保存。webhookUrl は、文字列なら更新、null なら削除（環境変数の値に戻る）、未指定なら変更しない。
+ * enabled（通知の種類）も未指定なら変更しない。通知先と種類はそれぞれ単独で保存できる
  */
 export const notificationSettingsSchema = z.object({
   webhookUrl: z
@@ -18,5 +19,5 @@ export const notificationSettingsSchema = z.object({
     .regex(DISCORD_WEBHOOK_URL_PATTERN, 'DiscordのWebhook URL（https://discord.com/api/webhooks/…）を入力してください')
     .nullable()
     .optional(),
-  enabled: z.record(z.enum(NOTIFICATION_KIND_IDS), z.boolean()),
+  enabled: z.record(z.enum(NOTIFICATION_KIND_IDS), z.boolean()).optional(),
 })
