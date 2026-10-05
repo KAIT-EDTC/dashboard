@@ -24,7 +24,6 @@ export default [
     route('admin/users', 'routes/admin/users.tsx'),
     route('admin/notifications', 'routes/admin/notifications.tsx'),
     route('admin/event-settings', 'routes/admin/event-settings.tsx'),
-    route('admin/blog-settings', 'routes/admin/blog-settings.tsx'),
     route('profile', 'routes/profile.tsx'),
     route('*', 'routes/not-found.tsx'),
   ]),

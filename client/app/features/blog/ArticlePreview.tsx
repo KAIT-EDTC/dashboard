@@ -1,4 +1,4 @@
-import { articleIdBase, type BlogPostContent } from '@edtc/shared'
+import { articleIdBase, seriesLabel, type BlogPostContent } from '@edtc/shared'
 import { useMemo } from 'react'
 import { css } from 'styled-system/css'
 import { Badge } from '~/components/ui/Badge'
@@ -51,7 +51,6 @@ export function ListCardPreview({ postId, content }: { postId: string; content: 
         <p className={css({ fontSize: 'xs', color: 'fg.subtle' })}>{content.eventDate || '日付未入力'}</p>
         <p className={css({ fontWeight: '700' })}>{content.title || '（タイトル未入力）'}</p>
         <p className={css({ fontSize: 'sm', color: 'fg.muted', lineClamp: 2 })}>{content.description}</p>
-        <p className={css({ fontSize: 'xs', color: 'accent.fg' })}>{content.tags.map((tag) => `#${tag}`).join(' ')}</p>
       </div>
     </div>
   )
@@ -64,11 +63,8 @@ export function ArticlePreview({ postId, content, articleId: fixedId }: { postId
     <article className={css({ display: 'flex', flexDirection: 'column', gap: 'md', maxW: '760px' })}>
       <header className={css({ display: 'flex', flexDirection: 'column', gap: 'xs' })}>
         <div className={css({ display: 'flex', flexWrap: 'wrap', gap: 'xs' })}>
-          {content.tags.map((tag) => (
-            <Badge key={tag} tone="accent">
-              {tag}
-            </Badge>
-          ))}
+          {content.series && <Badge tone="accent">{seriesLabel(content.series)}</Badge>}
+          {content.pickup && <Badge tone="warning">ピックアップ</Badge>}
         </div>
         <h2 className={css({ fontSize: '2xl', fontWeight: '700' })}>{content.title || '（タイトル未入力）'}</h2>
         <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>

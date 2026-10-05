@@ -5,6 +5,7 @@ import {
   ITEM_KINDS,
   RSVP_STATUSES,
   type BlogPostContent,
+  type BlogSeriesId,
   type CategoryTone,
   type Division,
   type ProfileLinks,
@@ -80,11 +81,12 @@ export const blogPosts = sqliteTable(
     eventDate: text('event_date').notNull().default(''),
     /** 旧ルールの記事ID末尾（廃止。新しい記事では使わない） */
     slug: text('slug').notNull().default(''),
-    /** イベント種別ID（BLOG_SERIES）。記事IDの末尾になる */
-    series: text('series').notNull().default(''),
+    /** イベント種別ID（BLOG_SERIES）。記事IDの末尾になる。未選択は '' */
+    series: text('series').$type<BlogSeriesId | ''>().notNull().default(''),
     description: text('description').notNull().default(''),
     authorName: text('author_name').notNull().default(''),
-    tags: text('tags', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+    /** サイトの「ピックアップ」に載せるか */
+    pickup: integer('pickup', { mode: 'boolean' }).notNull().default(false),
     thumbnail: text('thumbnail'),
     body: text('body').notNull().default(''),
 
@@ -105,13 +107,6 @@ export const blogPosts = sqliteTable(
   (t) => [index('blog_posts_author_idx').on(t.authorId), index('blog_posts_pr_idx').on(t.prNumber)],
 )
 
-/** ブログ記事のイベント種別。id は記事IDの末尾（管理者が作成時に決め、後から変えられない） */
-export const blogSeries = sqliteTable('blog_series', {
-  id: text('id').primaryKey(),
-  label: text('label').notNull().unique(),
-  sortOrder: integer('sort_order').notNull().default(0),
-  createdAt: timestamps.createdAt,
-})
 
 /** イベントの種類（活動・ミーティングなど）。名前を変えても id は変わらない */
 export const eventCategories = sqliteTable('event_categories', {
@@ -123,13 +118,6 @@ export const eventCategories = sqliteTable('event_categories', {
   createdAt: timestamps.createdAt,
 })
 
-/** 記事に付けられるタグ。管理者がダッシュボードで管理し、記事には表示名で保存する */
-export const blogTags = sqliteTable('blog_tags', {
-  id: text('id').primaryKey(),
-  label: text('label').notNull().unique(),
-  sortOrder: integer('sort_order').notNull().default(0),
-  createdAt: timestamps.createdAt,
-})
 
 /** ブログ提出時にDiscordでメンションするレビュー担当。管理者が「ユーザー管理」で選ぶ */
 export const blogReviewers = sqliteTable('blog_reviewers', {

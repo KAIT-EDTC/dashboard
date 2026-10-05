@@ -4,7 +4,7 @@ import { css, cx } from 'styled-system/css'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
-import { BellIcon, CalendarIcon, HomeIcon, ListIcon, LogOutIcon, PenIcon, SlidersIcon, TagIcon, UserIcon, UsersIcon } from '../ui/Icons'
+import { BellIcon, CalendarIcon, HomeIcon, ListIcon, LogOutIcon, PenIcon, SlidersIcon, UserIcon, UsersIcon } from '../ui/Icons'
 import { Logo } from './Logo'
 
 const NAV_ITEMS = [
@@ -17,7 +17,6 @@ const ADMIN_NAV_ITEMS = [
   { to: '/admin/users', label: 'ユーザー管理', icon: UserIcon, end: false },
   { to: '/admin/notifications', label: '通知設定', icon: BellIcon, end: false },
   { to: '/admin/event-settings', label: 'イベント設定', icon: ListIcon, end: false },
-  { to: '/admin/blog-settings', label: 'ブログ設定', icon: TagIcon, end: false },
 ]
 
 type ShellUser = {

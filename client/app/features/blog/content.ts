@@ -8,7 +8,7 @@ export function contentOf(post: BlogPostContent): BlogPostContent {
     series: post.series,
     description: post.description,
     authorName: post.authorName,
-    tags: post.tags,
+    pickup: post.pickup,
     thumbnail: post.thumbnail,
     body: post.body,
   }

@@ -10,7 +10,7 @@ import {
   validateForSubmit,
 } from '@edtc/shared'
 import { createDb, memberSummaryColumns } from '../../db'
-import { blogImages, blogPosts, blogTags, events, users } from '../../db/schema'
+import { blogImages, blogPosts, events, users } from '../../db/schema'
 import type { AppEnv } from '../../env'
 import { runInBackground } from '../../lib/background'
 import { base64ToBytes, bytesToBase64 } from '../../lib/base64'
@@ -22,9 +22,7 @@ import { resolveArticleId } from './article-id'
 import { contentOf, hasUnsubmittedChanges, imagesOf } from './content'
 import { notifySubmitted } from './notifications'
 import { BlogPublisher } from './publisher'
-import { assertCanView, authorLabelOf, findPost, listReviewerIds, listSeries } from './queries'
-import { blogSeriesRoute } from './series'
-import { blogTagsRoute } from './tags'
+import { assertCanView, authorLabelOf, findPost, listReviewerIds } from './queries'
 
 const WEBP_MAGIC = { riff: 'RIFF', webp: 'WEBP' }
 const isWebp = (bytes: Uint8Array) =>
@@ -39,8 +37,6 @@ function newImageFileName(): string {
 
 export const blogRoute = new Hono<AppEnv>()
   .use(requireAuth)
-  .route('/tags', blogTagsRoute)
-  .route('/series', blogSeriesRoute)
 
   .get('/posts', validate('query', z.object({ scope: z.enum(['mine', 'all']).default('all') })), async (c) => {
     const { scope } = c.req.valid('query')
@@ -92,12 +88,8 @@ export const blogRoute = new Hono<AppEnv>()
     if (!post) throw notFound('記事が見つかりません')
     assertCanView(session, post)
     const { submittedContent: _snapshot, ...rest } = post
-    const availableTags = await db.select({ id: blogTags.id, label: blogTags.label }).from(blogTags).orderBy(blogTags.sortOrder, blogTags.createdAt)
-    const availableSeries = await listSeries(db)
     return c.json({
       post: rest,
-      availableTags,
-      availableSeries,
       canEdit: canManage(session, post.authorId),
       hasUnsubmittedChanges: hasUnsubmittedChanges(post),
       githubConfigured: isGitHubConfigured(c.env),
@@ -109,16 +101,8 @@ export const blogRoute = new Hono<AppEnv>()
     const db = createDb(c.env)
     const post = await findPost(db, c.req.param('id'))
     assertCanManage(c.get('session'), post.authorId)
-    if (post.publishedAt && (input.eventDate !== post.eventDate || input.series !== post.series)) {
-      throw badRequest('公開済みの記事は日付とイベント種別を変更できません')
-    }
-    if (input.series && !(await listSeries(db)).some((series) => series.id === input.series)) {
-      throw badRequest('イベント種別が正しくありません。画面を読み込み直してください')
-    }
-    // 管理者が削除したタグが付いたままの記事も保存できるよう、すでに付いているタグは許可する
-    const knownTags = new Set((await db.select({ label: blogTags.label }).from(blogTags)).map((tag) => tag.label))
-    const unknownTags = input.tags.filter((tag) => !knownTags.has(tag) && !post.tags.includes(tag))
-    if (unknownTags.length > 0) throw badRequest(`存在しないタグです: ${unknownTags.join(', ')}`)
+    // 公開済みの記事IDは変わらないので、種別は付け直してよい（サイトでの分類だけが変わる）
+    if (post.publishedAt && input.eventDate !== post.eventDate) throw badRequest('公開済みの記事は日付を変更できません')
 
     // 使われなくなった画像を消す。提出済みの内容が参照している画像と、
     // 保存と入れ違いでアップロードされたばかりの画像（1時間以内）は残す
@@ -191,18 +175,11 @@ export const blogRoute = new Hono<AppEnv>()
     assertCanManage(c.get('session'), post.authorId)
 
     const content = contentOf(post)
-    const seriesIds = (await listSeries(db)).map((series) => series.id)
-    const errors = validateForSubmit(content, { seriesOptional: !!post.articleId, seriesIds })
+    const errors = validateForSubmit(content)
     if (errors.length > 0) throw badRequest(errors.join('\n'))
-    if (post.publishedAt) {
-      const submitted = post.submittedContent
-      if (submitted && (content.eventDate !== submitted.eventDate || content.series !== (submitted.series ?? ''))) {
-        throw badRequest('公開済みの記事は日付とイベント種別を変更できません')
-      }
+    if (post.publishedAt && post.submittedContent && content.eventDate !== post.submittedContent.eventDate) {
+      throw badRequest('公開済みの記事は日付を変更できません')
     }
-    const knownTags = new Set((await db.select({ label: blogTags.label }).from(blogTags)).map((tag) => tag.label))
-    const unknownTags = content.tags.filter((tag) => !knownTags.has(tag))
-    if (unknownTags.length > 0) throw badRequest(`削除されたタグが付いています。外してから提出してください: ${unknownTags.join(', ')}`)
 
     const images = referencedImages(content)
     const uploaded = images.length
