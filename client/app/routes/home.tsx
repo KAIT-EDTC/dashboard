@@ -7,18 +7,22 @@ import { useCurrentUser } from '~/features/auth/use-current-user'
 import { MyPostsCard } from '~/features/blog/MyPostsCard'
 import { MyItemsCard, UpcomingEventsCard } from '~/features/events/HomeCards'
 import { MemberBadges } from '~/features/members/MemberBadges'
+import { HomeReportsCard } from '~/features/reports/HomeReportsCard'
 import { api, unwrap } from '~/lib/api'
 import type { Route } from './+types/home'
 
 export const meta: Route.MetaFunction = () => [{ title: 'ホーム | EDTC ダッシュボード' }]
 
 export async function clientLoader() {
-  const [{ events }, { items }, { posts }] = await Promise.all([
+  // 承認待ちは承認する立場でなければ空
+  const [{ events }, { items }, { posts }, { targets, summaries }, { reports: review }] = await Promise.all([
     unwrap(api.events.$get({ query: { scope: 'upcoming' } })),
     unwrap(api.events['my-items'].$get()),
     unwrap(api.blog.posts.$get({ query: { scope: 'mine' } })),
+    unwrap(api.reports.targets.$get()),
+    unwrap(api.reports.review.$get()),
   ])
-  return { events, items, posts }
+  return { events, items, posts, targets, summaries, reviewCount: review.length }
 }
 
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
@@ -52,6 +56,7 @@ export default function HomePage({ loaderData }: Route.ComponentProps) {
       <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', lg: '3fr 2fr' }, gap: 'lg', alignItems: 'start' })}>
         <UpcomingEventsCard events={loaderData.events} />
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
+          <HomeReportsCard targets={loaderData.targets} summaries={loaderData.summaries} reviewCount={loaderData.reviewCount} />
           <MyItemsCard items={loaderData.items} />
           <MyPostsCard posts={loaderData.posts} />
         </div>

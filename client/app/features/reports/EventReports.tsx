@@ -13,7 +13,8 @@ import { RatingMeter } from './Rating'
 
 /** イベント詳細: 承認済みの活動報告書 */
 export function EventReports({ event, reports }: { event: EventDetail; reports: EventReport[] }) {
-  const roleOf = (userId: string) => event.participants.find((p) => p.userId === userId)?.role
+  // 講師を置かないイベントには役割がない
+  const roleOf = (userId: string) => (event.hasLecturer ? event.participants.find((p) => p.userId === userId)?.role : undefined)
   return (
     <Card
       title={`活動報告書（${reports.length}）`}

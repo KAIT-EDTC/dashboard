@@ -77,7 +77,7 @@ export function SummaryView({ report, members, aside, renderText, renderAfter }:
                     ) : (
                       <span className={css({ fontSize: 'sm', fontWeight: '600' })}>{fullName(member.user)}</span>
                     )}
-                    <RoleBadge role={member.role} />
+                    {member.role && <RoleBadge role={member.role} />}
                     {member.isWriter && !member.report ? (
                       <Badge tone="accent">担当者</Badge>
                     ) : (

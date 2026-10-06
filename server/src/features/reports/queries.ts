@@ -62,7 +62,8 @@ export function summaryReportOf(db: Db, eventId: string) {
  * 並びは講師を先頭に、参加を回答した順
  */
 export async function summaryMembersOf(db: Db, eventId: string) {
-  const [participants, reports] = await Promise.all([
+  const [event, participants, reports] = await Promise.all([
+    db.select({ hasLecturer: events.hasLecturer }).from(events).where(eq(events.id, eventId)).get(),
     db.query.eventParticipants.findMany({
       columns: { userId: true, role: true },
       with: { user: { columns: { ...memberSummaryColumns, lastNameKana: true, firstNameKana: true, studentId: true } } },
@@ -84,7 +85,8 @@ export async function summaryMembersOf(db: Db, eventId: string) {
     .sort((a, b) => Number(b.role === 'lecturer') - Number(a.role === 'lecturer'))
     .map((p) => {
       const report = reports.find((r) => r.authorId === p.userId && r.status !== 'draft')
-      return { user: p.user, role: p.role, report: report ?? null }
+      // 講師を置かないイベントには役割がない
+      return { user: p.user, role: event?.hasLecturer ? p.role : null, report: report ?? null }
     })
 }
 export type SummaryMember = Awaited<ReturnType<typeof summaryMembersOf>>[number]

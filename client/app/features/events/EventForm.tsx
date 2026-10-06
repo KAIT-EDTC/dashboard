@@ -5,7 +5,7 @@ import { css } from 'styled-system/css'
 import { Alert } from '~/components/ui/Alert'
 import { Button } from '~/components/ui/Button'
 import { Card } from '~/components/ui/Card'
-import { SelectField, TextareaField, TextField } from '~/components/ui/Field'
+import { Checkbox, SelectField, TextareaField, TextField } from '~/components/ui/Field'
 import { DivisionPicker } from '~/features/members/DivisionPicker'
 import { MemberPicker } from '~/features/members/MemberPicker'
 import type { MemberListItem } from '~/features/members/types'
@@ -58,6 +58,13 @@ export function EventForm({ defaultValue = {}, categories, members, errors, subm
           <TextField label="出欠の回答期限" name="rsvpDeadline" type="datetime-local" defaultValue={defaultValue.rsvpDeadline ?? ''} error={e.rsvpDeadline} hint="期限後は主催者のみ出欠を変更できます" />
           <TextField label="定員" name="capacity" type="number" min={1} defaultValue={defaultValue.capacity ?? ''} placeholder="なし" error={e.capacity} />
           <TextField label="参加費（円）" name="fee" type="number" min={0} step={1} defaultValue={defaultValue.fee ?? ''} placeholder="なし" error={e.fee} hint="設定すると参加者ごとに集金状況を記録できます" />
+        </div>
+      </Card>
+
+      <Card title="講師">
+        <div className={css({ display: 'flex', flexDirection: 'column', gap: 'xs' })}>
+          <Checkbox label="講師を置く" name="hasLecturer" defaultChecked={defaultValue.hasLecturer ?? true} />
+          <p className={css({ fontSize: 'xs', color: 'fg.subtle' })}>展示などの講師がいないイベントは外してください。まとめ報告書の担当者を参加者から指名します</p>
         </div>
       </Card>
 

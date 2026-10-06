@@ -139,7 +139,7 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
         </div>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
           <RsvpPanel event={event} userId={me.id} canManage={canManage} isTarget={isTarget} />
-          <ParticipantList event={event} pending={pending} canManage={canManage} />
+          <ParticipantList event={event} pending={pending} canManage={canManage} summary={summary} />
         </div>
       </div>
     </>

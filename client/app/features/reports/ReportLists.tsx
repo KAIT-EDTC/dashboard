@@ -106,7 +106,7 @@ export function TargetList({ targets }: { targets: ReportTarget[] }) {
           >
             <span className={dateStyle}>{formatDateTime(target.startsAt)}</span>
             <span className={titleStyle}>{target.eventTitle}</span>
-            <RoleBadge role={target.role} />
+            {target.role && <RoleBadge role={target.role} />}
             <ReportStatusBadge status={target.reportStatus} />
             <RowAction exists={!!target.reportId} editable={isEditable(target.reportStatus)} />
           </Link>

@@ -47,7 +47,7 @@ export function EventSummary({ event, summary, canManage, started }: { event: Ev
   const error = fetcher.state === 'idle' && fetcher.data && 'error' in fetcher.data ? fetcher.data.error : undefined
   const { writer, report } = summary
   const locked = report?.status === 'submitted' || report?.status === 'approved'
-  const writerRole = event.participants.find((p) => p.userId === writer?.id)?.role
+  const writerRole = event.hasLecturer ? event.participants.find((p) => p.userId === writer?.id)?.role : undefined
   // 担当者に選べるのは参加者（参加と回答した人・出席した人）
   const candidates = event.participants.filter((p) => p.status === 'going' || p.attended)
 
@@ -82,7 +82,7 @@ export function EventSummary({ event, summary, canManage, started }: { event: Ev
             }
             className={css({ maxW: '280px' })}
           >
-            <option value="">講師</option>
+            <option value="">{event.hasLecturer ? '講師' : '未定'}</option>
             {candidates.map((p) => (
               <option key={p.userId} value={p.userId}>
                 {fullName(p.user)}

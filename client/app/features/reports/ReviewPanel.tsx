@@ -12,6 +12,7 @@ import { CommentableText, type Mark, type RequestMode, type TextRange } from './
 import { byPosition } from './content'
 import { RequestCard, RequestComposer } from './InlineComment'
 import type { ReportActionData } from './ReportForm'
+import { choiceStyle } from './Rating'
 import { ReportStatusBadge } from './ReportStatusBadge'
 import { ReportView } from './ReportView'
 import { ReviewProgress } from './ReviewHistory'
@@ -19,6 +20,7 @@ import { SummaryView } from './SummaryView'
 import type { ReportDetail, ReportDetailResponse } from './types'
 
 type PendingRequest = Required<InlineCommentInput> & { key: string }
+type Decision = ReportReviewInput['decision']
 type Draft = TextRange & { field: CommentableField; mode: RequestMode }
 
 /** 確認する人の画面。本文を選ぶとその場でコメント・書き直し案を付けられ、まとめて承認・差し戻しする */
@@ -27,9 +29,13 @@ export function ReviewWorkspace({ report, authorRole, members }: Pick<ReportDeta
   const [requests, setRequests] = useState<PendingRequest[]>([])
   const [draft, setDraft] = useState<Draft | null>(null)
   const [comment, setComment] = useState('')
-  const pending = fetcher.state !== 'idle' ? (fetcher.json as { review?: ReportReviewInput } | undefined)?.review?.decision : undefined
+  const [chosen, setChosen] = useState<Decision | null>(null)
+  const sending = fetcher.state !== 'idle'
   const data = fetcher.state === 'idle' ? fetcher.data : undefined
-  const canReject = comment.trim().length > 0 || requests.length > 0
+  // 修正依頼を書いている間（範囲コメントがある・書きかけがある）は承認を選べない
+  const writingRequests = requests.length > 0 || draft !== null
+  const decision: Decision | null = writingRequests ? 'reject' : chosen
+  const canSubmit = decision === 'approve' || (decision === 'reject' && (comment.trim().length > 0 || requests.length > 0))
 
   // 番号は項目の順・本文の位置の順。書いている途中のものも並びに入れる
   const ordered = [...requests, ...(draft ? [{ ...draft, key: 'draft' }] : [])].sort(byPosition)
@@ -90,37 +96,64 @@ export function ReviewWorkspace({ report, authorRole, members }: Pick<ReportDeta
         <Card title="確認">
           <div className={css({ display: 'flex', flexDirection: 'column', gap: 'md', fontSize: 'sm' })}>
             {data && 'error' in data && data.error && <Alert>{data.error}</Alert>}
+            {/* 先にどちらにするかを選んでから送る（修正依頼を書いたまま承認してしまわないように） */}
+            <fieldset className={css({ display: 'flex', flexDirection: 'column', gap: 'xs' })}>
+              <legend className={css({ srOnly: true })}>確認の結果</legend>
+              <div className={css({ display: 'flex', gap: 'sm' })}>
+                {(
+                  [
+                    { value: 'reject', label: '修正を依頼', icon: <XIcon size={16} />, disabled: false },
+                    { value: 'approve', label: '承認', icon: <CheckIcon size={16} />, disabled: writingRequests },
+                  ] as const
+                ).map((option) => (
+                  <label key={option.value} className={choiceStyle}>
+                    <input
+                      type="radio"
+                      name="decision"
+                      value={option.value}
+                      checked={decision === option.value}
+                      disabled={option.disabled || sending}
+                      onChange={() => setChosen(option.value)}
+                      className={css({ srOnly: true })}
+                    />
+                    <span className={css({ display: 'inline-flex', alignItems: 'center', gap: 'xs', fontSize: 'sm' })}>
+                      {option.icon}
+                      {option.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              {writingRequests && <p className={css({ fontSize: 'xs', color: 'fg.subtle' })}>修正依頼を付けている間は承認できません</p>}
+            </fieldset>
             <TextareaField
-              label="全体へのコメント"
+              label={decision === 'approve' ? 'コメント（任意）' : '全体へのコメント'}
               value={comment}
               onChange={(e) => setComment(e.currentTarget.value)}
               rows={3}
               error={data && 'fieldErrors' in data ? data.fieldErrors?.comment : undefined}
               hint={<CharCount value={comment} max={REPORT_LIMITS.reviewComment.max} />}
             />
-            <div className={css({ display: 'flex', gap: 'sm' })}>
-              <Button
-                variant="danger"
-                loading={pending === 'reject'}
-                disabled={!canReject || (!!pending && pending !== 'reject')}
-                onClick={() => send({ decision: 'reject', comment, comments: strip(requests) })}
-              >
-                <XIcon size={16} />
-                修正を依頼{requests.length > 0 && `（${requests.length}）`}
-              </Button>
-              <Button
-                variant="primary"
-                block
-                loading={pending === 'approve'}
-                disabled={!!pending && pending !== 'approve'}
-                onClick={() => {
-                  if (requests.length === 0 || confirm('修正依頼が付いています。依頼せずに承認しますか？')) send({ decision: 'approve', comment })
-                }}
-              >
-                <CheckIcon size={16} />
-                承認
-              </Button>
-            </div>
+            <Button
+              variant={decision === 'approve' ? 'primary' : 'danger'}
+              block
+              loading={sending}
+              disabled={!canSubmit}
+              onClick={() => send(decision === 'approve' ? { decision: 'approve', comment } : { decision: 'reject', comment, comments: strip(requests) })}
+            >
+              {decision === 'approve' ? (
+                <>
+                  <CheckIcon size={16} />
+                  承認する
+                </>
+              ) : decision === 'reject' ? (
+                <>
+                  <XIcon size={16} />
+                  修正を依頼する{requests.length > 0 && `（${requests.length}件）`}
+                </>
+              ) : (
+                '送信'
+              )}
+            </Button>
           </div>
         </Card>
         <ReviewProgress report={report} />

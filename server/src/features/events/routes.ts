@@ -310,8 +310,16 @@ export const eventsRoute = new Hono<AppEnv>()
     const targetUserIds = [...new Set(rawUserIds)]
     await findCategory(db, input.category)
     await assertUsersExist(db, targetUserIds)
+
+    // 講師を置かない設定にしたら、講師の役割を外す。まとめ報告書の担当が講師だった場合はその人を指名したことにする
+    const lecturers = and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.role, 'lecturer'))
+    const lecturer = event.hasLecturer && !input.hasLecturer ? await db.select({ userId: eventParticipants.userId }).from(eventParticipants).where(lecturers).get() : undefined
     await db.batch([
-      db.update(events).set(input).where(eq(events.id, event.id)),
+      db
+        .update(events)
+        .set({ ...input, ...(lecturer && !event.summaryWriterId && { summaryWriterId: lecturer.userId }) })
+        .where(eq(events.id, event.id)),
+      ...(input.hasLecturer ? [] : [db.update(eventParticipants).set({ role: 'assistant' }).where(lecturers)]),
       ...replaceTargets(db, event.id, targetDivisions, targetUserIds),
     ])
     return c.json({ id: event.id })
@@ -387,6 +395,7 @@ export const eventsRoute = new Hono<AppEnv>()
     const participant = await db.select({ userId: eventParticipants.userId }).from(eventParticipants).where(target).get()
     if (!participant) throw notFound('参加者が見つかりません')
 
+    if (input.role === 'lecturer' && !event.hasLecturer) throw badRequest('このイベントは講師を置かない設定です')
     const update = db.update(eventParticipants).set(input).where(target)
     if (input.role === 'lecturer') {
       // 講師は1人だけ。新しく講師にしたら、それまでの講師は講師補助に戻す

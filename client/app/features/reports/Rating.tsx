@@ -21,6 +21,7 @@ export const choiceStyle = css({
   color: 'fg.muted',
   '&:has(input:checked)': { borderColor: 'accent', bg: 'accent.subtle', color: 'accent.fg' },
   '&:has(input:focus-visible)': { shadow: 'focus' },
+  '&:has(input:disabled)': { opacity: 0.4, cursor: 'not-allowed' },
 })
 
 /** 両端の「悪」「良」 */

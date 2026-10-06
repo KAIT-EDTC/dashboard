@@ -87,7 +87,7 @@ function EventStatus({ event }: { event: SubmissionStatusEvent }) {
               <>
                 <Avatar user={member.user} size={24} />
                 <span className={css({ flex: 1, minW: 0, truncate: true })}>{fullName(member.user)}</span>
-                <RoleBadge role={member.role} />
+                {member.role && <RoleBadge role={member.role} />}
                 {member.isSummaryWriter && !member.status ? <Badge tone="accent">まとめ担当</Badge> : <ReportStatusBadge status={member.status} emptyLabel="未提出" />}
               </>
             )

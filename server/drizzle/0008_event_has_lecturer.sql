@@ -1,0 +1,1 @@
+ALTER TABLE `events` ADD `has_lecturer` integer DEFAULT true NOT NULL;

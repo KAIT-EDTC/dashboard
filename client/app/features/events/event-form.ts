@@ -12,6 +12,7 @@ export function parseEventForm(form: FormData) {
     rsvpDeadline: optionalText(form, 'rsvpDeadline'),
     capacity: optionalInt(form, 'capacity'),
     fee: optionalInt(form, 'fee'),
+    hasLecturer: form.has('hasLecturer'),
     targetDivisions: texts(form, 'targetDivisions'),
     targetUserIds: texts(form, 'targetUserIds'),
   })

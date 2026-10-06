@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, lte, or } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import {
@@ -11,6 +11,7 @@ import {
   reportDraftSchema,
   reportReviewSchema,
   reportSubmitSchema,
+  type ParticipantRole,
 } from '@edtc/shared'
 import { createDb, memberSummaryColumns, type Db } from '../../db'
 import {
@@ -44,17 +45,21 @@ const eventColumns = {
 /** 報告書を書けるのは、参加したイベントが始まってから。書く人のそのイベントでの役割を返す */
 async function assertCanWrite(db: Db, eventId: string, userId: string) {
   const participation = await db
-    .select({ startsAt: events.startsAt, role: eventParticipants.role })
+    .select({ startsAt: events.startsAt, role: eventParticipants.role, hasLecturer: events.hasLecturer })
     .from(eventParticipants)
     .innerJoin(events, eq(events.id, eventParticipants.eventId))
     .where(and(eq(eventParticipants.eventId, eventId), eq(eventParticipants.userId, userId), isTargetParticipant))
     .get()
   if (!participation) throw forbidden('このイベントに参加した人だけが報告書を書けます')
   if (participation.startsAt > nowInJst()) throw badRequest('報告書はイベントが始まってから書けます')
-  return participation.role
+  // 講師を置かないイベントには役割がない
+  return participation.hasLecturer ? participation.role : null
 }
 
 const isActivity = eq(activityReports.kind, 'activity')
+
+/** 参加者の役割。講師を置かないイベントには役割がないので null */
+const roleOrNull = sql<ParticipantRole | null>`case when ${events.hasLecturer} then ${eventParticipants.role} end`
 
 /** 自分が担当するまとめ報告書（始まったイベントで、指名された・講師として担当する・すでに書いている） */
 async function summaryTargetsOf(db: Db, userId: string) {
@@ -104,7 +109,7 @@ export const reportsRoute = new Hono<AppEnv>()
       .select({
         ...eventColumns,
         location: events.location,
-        role: eventParticipants.role,
+        role: roleOrNull,
         reportId: activityReports.id,
         reportStatus: activityReports.status,
       })
@@ -167,7 +172,14 @@ export const reportsRoute = new Hono<AppEnv>()
     const { userId } = c.get('session')
     const db = createDb(c.env)
     const recent = await db
-      .select({ id: events.id, title: events.title, startsAt: events.startsAt, endsAt: events.endsAt, summaryWriterId: events.summaryWriterId })
+      .select({
+        id: events.id,
+        title: events.title,
+        startsAt: events.startsAt,
+        endsAt: events.endsAt,
+        summaryWriterId: events.summaryWriterId,
+        hasLecturer: events.hasLecturer,
+      })
       .from(events)
       .where(lte(events.startsAt, nowInJst()))
       .orderBy(desc(events.startsAt))
@@ -200,7 +212,7 @@ export const reportsRoute = new Hono<AppEnv>()
     const summaryByEvent = new Map(reports.filter((r) => r.kind === 'summary').map((r) => [r.eventId, r]))
 
     return c.json({
-      events: recent.map(({ summaryWriterId, ...event }) => {
+      events: recent.map(({ summaryWriterId, hasLecturer, ...event }) => {
         const members = participants.filter((p) => p.eventId === event.id)
         const summary = summaryByEvent.get(event.id)
         // 担当者: 書き始めた人、指名された人、講師の順
@@ -211,7 +223,7 @@ export const reportsRoute = new Hono<AppEnv>()
             const report = reportOf.get(`${event.id}:${p.userId}`)
             return {
               user: p.user,
-              role: p.role,
+              role: hasLecturer ? p.role : null,
               status: shownStatus(report),
               reportId: report ? visibleId(report) : null,
               /** まとめ報告書の担当者（活動報告書は書かなくてよい） */
@@ -240,7 +252,7 @@ export const reportsRoute = new Hono<AppEnv>()
         columns: { id: true, eventId: true, authorId: true, division: true, content: true, reflection: true, rating: true, notes: true, submittedAt: true },
         with: {
           author: { columns: { lastName: true, firstName: true, lastNameKana: true, firstNameKana: true, studentId: true } },
-          event: { columns: { title: true, startsAt: true, endsAt: true, location: true } },
+          event: { columns: { title: true, startsAt: true, endsAt: true, location: true, hasLecturer: true } },
         },
         where: and(
           isActivity,
@@ -261,7 +273,7 @@ export const reportsRoute = new Hono<AppEnv>()
         .map(({ author: { studentId, ...author }, ...report }) => ({
           ...report,
           author: { ...author, studentId: privileged || report.authorId === session.userId ? studentId : null },
-          role: roles.find((r) => r.eventId === report.eventId && r.userId === report.authorId)?.role ?? null,
+          role: report.event.hasLecturer ? (roles.find((r) => r.eventId === report.eventId && r.userId === report.authorId)?.role ?? null) : null,
         }))
         .sort((a, b) => b.event.startsAt.localeCompare(a.event.startsAt) || a.author.lastNameKana.localeCompare(b.author.lastNameKana, 'ja'))
       return c.json({ reports })
@@ -321,7 +333,7 @@ export const reportsRoute = new Hono<AppEnv>()
       with: {
         author: { columns: { ...memberSummaryColumns, studentId: true } },
         approver: { columns: memberSummaryColumns },
-        event: { columns: { id: true, title: true, startsAt: true, endsAt: true, location: true } },
+        event: { columns: { id: true, title: true, startsAt: true, endsAt: true, location: true, hasLecturer: true } },
         reviews: {
           with: {
             reviewer: { columns: memberSummaryColumns },
@@ -346,7 +358,7 @@ export const reportsRoute = new Hono<AppEnv>()
     const members = row.kind === 'summary' ? visibleMembers(session, row, await summaryMembersOf(db, row.eventId)) : []
     return c.json({
       report: { ...row, author: { ...author, studentId: isAuthor || isApprover(session, row) ? studentId : null } },
-      authorRole: participant?.role ?? null,
+      authorRole: row.event.hasLecturer ? (participant?.role ?? null) : null,
       members,
       canEdit: isAuthor && isEditableStatus(row.status),
       canDelete: isAuthor && row.status === 'draft',

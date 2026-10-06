@@ -66,7 +66,7 @@ function AnalysisInput({
       <div className={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'sm' })}>
         <Avatar user={member.user} size={24} />
         <span className={css({ fontSize: 'sm', fontWeight: '600' })}>{fullName(member.user)}</span>
-        <RoleBadge role={member.role} />
+        {member.role && <RoleBadge role={member.role} />}
         {member.isWriter && !member.report ? <Badge tone="accent">担当者</Badge> : <ReportStatusBadge status={member.report?.status ?? null} emptyLabel="未提出" />}
         <span className={css({ ml: 'auto' })}>
           <RatingMeter value={rating} />

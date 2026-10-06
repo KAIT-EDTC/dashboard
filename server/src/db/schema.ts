@@ -212,6 +212,8 @@ export const events = sqliteTable(
     createdBy: text('created_by')
       .notNull()
       .references(() => users.id),
+    /** 講師を置くか。置かないイベント（展示など）は講師・講師補助の役割がなく、まとめ報告書の担当者を指名する */
+    hasLecturer: integer('has_lecturer', { mode: 'boolean' }).notNull().default(true),
     /** まとめ報告書の担当者（主催者が指名する）。未指名なら講師が担当 */
     summaryWriterId: text('summary_writer_id').references(() => users.id, { onDelete: 'set null' }),
     ...timestamps,
