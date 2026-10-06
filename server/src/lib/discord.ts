@@ -138,6 +138,9 @@ export async function notify(env: Bindings, db: Db, kind: NotificationKind, mess
 // DM（Bot）。常駐はせず、送るときにREST APIを呼ぶだけ
 // ---------------------------------------------------------------------------
 
+/** DiscordのID（数字だけの17〜20桁） */
+const isSnowflake = (id: string) => /^\d{17,20}$/.test(id)
+
 /**
  * 1人にDMを送る。Botと同じサーバーにいて、サーバーメンバーからのDMを許可している人にだけ届く。
  * notify と同じく、失敗しても本来の処理は止めずログだけ残す
@@ -147,7 +150,8 @@ export async function sendDirectMessage(
   userId: string,
   message: { content: string; embeds?: DiscordEmbed[] },
 ): Promise<void> {
-  if (!env.DISCORD_BOT_TOKEN) return
+  // DiscordのユーザーIDでない相手（開発用シードのダミーユーザーなど）には送らない
+  if (!env.DISCORD_BOT_TOKEN || !isSnowflake(userId)) return
   const headers = { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`, 'Content-Type': 'application/json' }
   try {
     const channelRes = await fetch(`${API}/users/@me/channels`, {
