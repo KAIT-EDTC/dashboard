@@ -126,7 +126,7 @@ export default function UsersPage({ loaderData }: Route.ComponentProps) {
 
         <Card title={`メンバーの権限（管理者 ${adminCount}人 / 全${members.length}人）`}>
           <p className={css({ fontSize: 'sm', color: 'fg.muted', mb: 'md' })}>
-            管理者は、すべてのイベント・記事の編集、ブログのタグ管理、通知設定、このページの操作ができます。自分自身の権限は変更できません。
+            管理者は、すべてのイベント・記事の編集、イベント設定、通知設定、このページの操作ができます。自分自身の権限は変更できません。
           </p>
           <ul className={css({ display: 'flex', flexDirection: 'column', gap: 'xs' })}>
             {members.map((member) => (

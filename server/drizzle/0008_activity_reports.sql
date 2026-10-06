@@ -29,11 +29,16 @@ CREATE TABLE `activity_reports` (
 	`id` text PRIMARY KEY NOT NULL,
 	`event_id` text NOT NULL,
 	`author_id` text NOT NULL,
+	`kind` text DEFAULT 'activity' NOT NULL,
 	`division` text,
 	`content` text DEFAULT '' NOT NULL,
 	`reflection` text DEFAULT '' NOT NULL,
 	`rating` integer,
 	`notes` text DEFAULT '' NOT NULL,
+	`hosting` text,
+	`analyses` text DEFAULT '[]' NOT NULL,
+	`overview` text DEFAULT '' NOT NULL,
+	`impressions` text DEFAULT '' NOT NULL,
 	`status` text DEFAULT 'draft' NOT NULL,
 	`submitted_at` text,
 	`approval_steps` text DEFAULT '[]' NOT NULL,
@@ -47,10 +52,13 @@ CREATE TABLE `activity_reports` (
 	FOREIGN KEY (`approver_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `activity_reports_event_author_idx` ON `activity_reports` (`event_id`,`author_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `activity_reports_event_author_idx` ON `activity_reports` (`event_id`,`author_id`,`kind`);--> statement-breakpoint
+CREATE UNIQUE INDEX `activity_reports_event_summary_idx` ON `activity_reports` (`event_id`) WHERE kind = 'summary';--> statement-breakpoint
 CREATE INDEX `activity_reports_author_idx` ON `activity_reports` (`author_id`);--> statement-breakpoint
 CREATE INDEX `activity_reports_status_division_idx` ON `activity_reports` (`status`,`division`);--> statement-breakpoint
 ALTER TABLE `event_participants` ADD `role` text DEFAULT 'assistant' NOT NULL;--> statement-breakpoint
+ALTER TABLE `events` ADD `has_lecturer` integer DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE `events` ADD `summary_writer_id` text REFERENCES users(id) ON DELETE set null;--> statement-breakpoint
 ALTER TABLE `notification_settings` ADD `on_report_review_requested` integer DEFAULT true NOT NULL;--> statement-breakpoint
 ALTER TABLE `notification_settings` ADD `on_report_reviewed` integer DEFAULT true NOT NULL;--> statement-breakpoint
 ALTER TABLE `users` ADD `head_of` text DEFAULT '[]' NOT NULL;--> statement-breakpoint

@@ -1,4 +1,4 @@
-import { useEffect, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useEffectEvent, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { useBlocker, useFetcher, type Blocker, type SubmitTarget } from 'react-router'
 import { css } from 'styled-system/css'
 import { Alert } from '~/components/ui/Alert'
@@ -94,7 +94,9 @@ export function ListEditor<E extends object = object>({
   const invalid = labels.some((label) => !label) || !!duplicated || rowErrors.some(Boolean)
   const error = fetcher.state === 'idle' && fetcher.data && 'error' in fetcher.data ? fetcher.data.error : undefined
 
-  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange])
+  // 呼び出し側が毎回新しい関数を渡しても、dirty が変わったときだけ知らせる（依存に入れると無限ループになる）
+  const notifyDirty = useEffectEvent((value: boolean) => onDirtyChange?.(value))
+  useEffect(() => notifyDirty(dirty), [dirty])
 
   const move = (key: string, to: number) =>
     setRows((prev) => {
