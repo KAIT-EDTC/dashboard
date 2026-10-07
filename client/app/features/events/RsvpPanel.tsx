@@ -9,6 +9,7 @@ import type { FormErrors } from '~/lib/form'
 import type { EventDetail } from './types'
 
 const optionStyle = css({
+  position: 'relative',
   flex: 1,
   display: 'flex',
   alignItems: 'center',
