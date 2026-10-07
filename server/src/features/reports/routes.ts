@@ -28,6 +28,7 @@ import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
 import { validate } from '../../lib/validator'
 import { requireAuth } from '../../middleware/auth'
+import { eventHasLecturer, lecturerByCategory } from '../events/lecturer'
 import { canReviewNow, canView, isApprover } from './access'
 import { assertApprover, assertEditable, assertOwnDivision, findReport, nameOf, submitReport, summaryOf, updateIfUnchanged } from './common'
 import { notifyApproved, notifyAwaitingReview, notifyRejected } from './notifications'
@@ -45,7 +46,7 @@ const eventColumns = {
 /** 報告書を書けるのは、参加したイベントが始まってから。書く人のそのイベントでの役割を返す */
 async function assertCanWrite(db: Db, eventId: string, userId: string) {
   const participation = await db
-    .select({ startsAt: events.startsAt, role: eventParticipants.role, hasLecturer: events.hasLecturer })
+    .select({ startsAt: events.startsAt, role: eventParticipants.role, hasLecturer: eventHasLecturer })
     .from(eventParticipants)
     .innerJoin(events, eq(events.id, eventParticipants.eventId))
     .where(and(eq(eventParticipants.eventId, eventId), eq(eventParticipants.userId, userId), isTargetParticipant))
@@ -59,7 +60,7 @@ async function assertCanWrite(db: Db, eventId: string, userId: string) {
 const isActivity = eq(activityReports.kind, 'activity')
 
 /** 参加者の役割。講師を置かないイベントには役割がないので null */
-const roleOrNull = sql<ParticipantRole | null>`case when ${events.hasLecturer} then ${eventParticipants.role} end`
+const roleOrNull = sql<ParticipantRole | null>`case when ${eventHasLecturer} then ${eventParticipants.role} end`
 
 /** 自分が担当するまとめ報告書（始まったイベントで、指名された・講師として担当する・すでに書いている） */
 async function summaryTargetsOf(db: Db, userId: string) {
@@ -178,7 +179,7 @@ export const reportsRoute = new Hono<AppEnv>()
         startsAt: events.startsAt,
         endsAt: events.endsAt,
         summaryWriterId: events.summaryWriterId,
-        hasLecturer: events.hasLecturer,
+        hasLecturer: eventHasLecturer,
       })
       .from(events)
       .where(lte(events.startsAt, nowInJst()))
@@ -252,7 +253,7 @@ export const reportsRoute = new Hono<AppEnv>()
         columns: { id: true, eventId: true, authorId: true, division: true, content: true, reflection: true, rating: true, notes: true, submittedAt: true },
         with: {
           author: { columns: { lastName: true, firstName: true, lastNameKana: true, firstNameKana: true, studentId: true } },
-          event: { columns: { title: true, startsAt: true, endsAt: true, location: true, hasLecturer: true } },
+          event: { columns: { title: true, startsAt: true, endsAt: true, location: true, category: true } },
         },
         where: and(
           isActivity,
@@ -268,12 +269,13 @@ export const reportsRoute = new Hono<AppEnv>()
             .where(inArray(eventParticipants.eventId, [...new Set(rows.map((r) => r.eventId))]))
         : []
       const privileged = session.role === 'admin' || isLeader(session)
+      const hasLecturer = await lecturerByCategory(db)
 
       const reports = rows
         .map(({ author: { studentId, ...author }, ...report }) => ({
           ...report,
           author: { ...author, studentId: privileged || report.authorId === session.userId ? studentId : null },
-          role: report.event.hasLecturer ? (roles.find((r) => r.eventId === report.eventId && r.userId === report.authorId)?.role ?? null) : null,
+          role: hasLecturer(report.event.category) ? (roles.find((r) => r.eventId === report.eventId && r.userId === report.authorId)?.role ?? null) : null,
         }))
         .sort((a, b) => b.event.startsAt.localeCompare(a.event.startsAt) || a.author.lastNameKana.localeCompare(b.author.lastNameKana, 'ja'))
       return c.json({ reports })
@@ -333,7 +335,7 @@ export const reportsRoute = new Hono<AppEnv>()
       with: {
         author: { columns: { ...memberSummaryColumns, studentId: true } },
         approver: { columns: memberSummaryColumns },
-        event: { columns: { id: true, title: true, startsAt: true, endsAt: true, location: true, hasLecturer: true } },
+        event: { columns: { id: true, title: true, startsAt: true, endsAt: true, location: true, category: true } },
         reviews: {
           with: {
             reviewer: { columns: memberSummaryColumns },
@@ -358,7 +360,7 @@ export const reportsRoute = new Hono<AppEnv>()
     const members = row.kind === 'summary' ? visibleMembers(session, row, await summaryMembersOf(db, row.eventId)) : []
     return c.json({
       report: { ...row, author: { ...author, studentId: isAuthor || isApprover(session, row) ? studentId : null } },
-      authorRole: row.event.hasLecturer ? (participant?.role ?? null) : null,
+      authorRole: (await lecturerByCategory(db))(row.event.category) ? (participant?.role ?? null) : null,
       members,
       canEdit: isAuthor && isEditableStatus(row.status),
       canDelete: isAuthor && row.status === 'draft',

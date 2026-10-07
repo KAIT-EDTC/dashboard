@@ -17,8 +17,6 @@ export const eventInputSchema = z
     rsvpDeadline: dateTime.nullable(),
     capacity: z.number().int().min(1, '定員は1以上にしてください').max(1000).nullable(),
     fee: z.number().int().min(0, '参加費は0以上にしてください').max(1_000_000).nullable(),
-    /** 講師を置くか。置かなければ、まとめ報告書の担当者を参加者から指名する */
-    hasLecturer: z.boolean().default(true),
     /** 対象の部署と個人。どちらも空なら全員向け */
     targetDivisions: z.array(z.enum(DIVISIONS)).max(DIVISIONS.length).default([]),
     targetUserIds: z.array(z.string().min(1)).max(100, '対象者は100人までにしてください').default([]),
@@ -67,6 +65,8 @@ export const eventCategoriesSaveSchema = z.object({
         id: z.string().optional(),
         label: z.string().trim().min(1, '種類の名前を入力してください').max(CATEGORY_LABEL_MAX, '種類の名前が長すぎます'),
         tone: z.enum(CATEGORY_TONES),
+        /** 講師を置くか。置かない種類のイベントは役割がなく、まとめ報告書の担当者を参加者から指名する */
+        hasLecturer: z.boolean().default(true),
       }),
     )
     .min(1, '種類は1つ以上必要です')

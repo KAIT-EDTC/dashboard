@@ -231,8 +231,7 @@ UPDATE event_participants SET role = 'lecturer' WHERE user_id = 'seed-03' AND ev
 UPDATE event_participants SET role = 'lecturer' WHERE user_id = 'seed-07' AND event_id = 'seed-ev-09';
 -- 第3回 遊行塾のまとめ報告書は、講師ではなく山田さんを担当に指名
 UPDATE events SET summary_writer_id = 'seed-12' WHERE id = 'seed-ev-09';
--- 遊行塾・プログラミング教室以外は講師を置かない。前期おつかれさま会は主催の渡辺さんがまとめ担当
-UPDATE events SET has_lecturer = 0 WHERE id IN ('seed-ev-02', 'seed-ev-03', 'seed-ev-04', 'seed-ev-06', 'seed-ev-08');
+-- 親睦・ミーティングは講師を置かない種類（マイグレーションの初期値）。前期おつかれさま会は主催の渡辺さんがまとめ担当
 UPDATE events SET summary_writer_id = 'seed-06' WHERE id = 'seed-ev-02';
 
 -- ---------------------------------------------------------------------------

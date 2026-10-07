@@ -42,6 +42,7 @@ import {
   summaryWriterIdOf,
 } from '../reports/queries'
 import { eventCategoriesRoute } from './categories'
+import { dropLecturers } from './lecturer'
 import { notifyEventCreated } from './notifications'
 
 /** 終了日時が無いイベントは開始日の終わりまでを開催中とみなす */
@@ -273,6 +274,8 @@ export const eventsRoute = new Hono<AppEnv>()
         ...event,
         categoryLabel: category?.label ?? event.category,
         categoryTone: category?.tone ?? ('neutral' as CategoryTone),
+        /** 講師を置くか（種類の設定） */
+        hasLecturer: category?.hasLecturer ?? true,
         targetDivisions: sortDivisions(targetDivisions.map((t) => t.division)),
         targetUsers: targetUsers.map((t) => t.user),
       },
@@ -308,18 +311,12 @@ export const eventsRoute = new Hono<AppEnv>()
     assertCanManage(c.get('session'), event.createdBy)
     const { targetDivisions, targetUserIds: rawUserIds, ...input } = c.req.valid('json')
     const targetUserIds = [...new Set(rawUserIds)]
-    await findCategory(db, input.category)
+    const category = await findCategory(db, input.category)
     await assertUsersExist(db, targetUserIds)
-
-    // 講師を置かない設定にしたら、講師の役割を外す。まとめ報告書の担当が講師だった場合はその人を指名したことにする
-    const lecturers = and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.role, 'lecturer'))
-    const lecturer = event.hasLecturer && !input.hasLecturer ? await db.select({ userId: eventParticipants.userId }).from(eventParticipants).where(lecturers).get() : undefined
     await db.batch([
-      db
-        .update(events)
-        .set({ ...input, ...(lecturer && !event.summaryWriterId && { summaryWriterId: lecturer.userId }) })
-        .where(eq(events.id, event.id)),
-      ...(input.hasLecturer ? [] : [db.update(eventParticipants).set({ role: 'assistant' }).where(lecturers)]),
+      db.update(events).set(input).where(eq(events.id, event.id)),
+      // 講師を置かない種類に変えたら、講師の役割を外す
+      ...(category.hasLecturer ? [] : dropLecturers(db, eq(events.id, event.id))),
       ...replaceTargets(db, event.id, targetDivisions, targetUserIds),
     ])
     return c.json({ id: event.id })
@@ -395,7 +392,7 @@ export const eventsRoute = new Hono<AppEnv>()
     const participant = await db.select({ userId: eventParticipants.userId }).from(eventParticipants).where(target).get()
     if (!participant) throw notFound('参加者が見つかりません')
 
-    if (input.role === 'lecturer' && !event.hasLecturer) throw badRequest('このイベントは講師を置かない設定です')
+    if (input.role === 'lecturer' && !(await findCategory(db, event.category)).hasLecturer) throw badRequest('この種類のイベントには講師を置きません')
     const update = db.update(eventParticipants).set(input).where(target)
     if (input.role === 'lecturer') {
       // 講師は1人だけ。新しく講師にしたら、それまでの講師は講師補助に戻す

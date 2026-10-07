@@ -2,6 +2,7 @@ import { and, asc, eq, isNotNull, ne, or } from 'drizzle-orm'
 import { canApproveStep, isLeader, positionLabels, type ApprovalStep, type Division } from '@edtc/shared'
 import { memberSummaryColumns, type Db } from '../../db'
 import { activityReports, eventParticipants, events, users } from '../../db/schema'
+import { eventHasLecturer } from '../events/lecturer'
 
 /** 報告書の対象: 参加と回答した人か、当日出席した人 */
 export const isTargetParticipant = or(eq(eventParticipants.status, 'going'), eq(eventParticipants.attended, true))
@@ -63,7 +64,7 @@ export function summaryReportOf(db: Db, eventId: string) {
  */
 export async function summaryMembersOf(db: Db, eventId: string) {
   const [event, participants, reports] = await Promise.all([
-    db.select({ hasLecturer: events.hasLecturer }).from(events).where(eq(events.id, eventId)).get(),
+    db.select({ hasLecturer: eventHasLecturer }).from(events).where(eq(events.id, eventId)).get(),
     db.query.eventParticipants.findMany({
       columns: { userId: true, role: true },
       with: { user: { columns: { ...memberSummaryColumns, lastNameKana: true, firstNameKana: true, studentId: true } } },

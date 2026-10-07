@@ -5,7 +5,7 @@ import { css } from 'styled-system/css'
 import { Alert } from '~/components/ui/Alert'
 import { Button } from '~/components/ui/Button'
 import { Card } from '~/components/ui/Card'
-import { Checkbox, SelectField, TextareaField, TextField } from '~/components/ui/Field'
+import { SelectField, TextareaField, TextField } from '~/components/ui/Field'
 import { DivisionPicker } from '~/features/members/DivisionPicker'
 import { MemberPicker } from '~/features/members/MemberPicker'
 import type { MemberListItem } from '~/features/members/types'
@@ -61,12 +61,6 @@ export function EventForm({ defaultValue = {}, categories, members, errors, subm
         </div>
       </Card>
 
-      <Card title="講師">
-        <div className={css({ display: 'flex', flexDirection: 'column', gap: 'xs' })}>
-          <Checkbox label="講師を置く" name="hasLecturer" defaultChecked={defaultValue.hasLecturer ?? true} />
-          <p className={css({ fontSize: 'xs', color: 'fg.subtle' })}>展示などの講師がいないイベントは外してください。まとめ報告書の担当者を参加者から指名します</p>
-        </div>
-      </Card>
 
       <Card
         title="対象"

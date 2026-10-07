@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "3288fe14-96e8-43e9-a3a0-294712238e9e",
+  "id": "8a00461f-69be-4a13-8929-942f458a9f8b",
   "prevId": "a0f85167-7d02-4155-9998-d378b008d598",
   "tables": {
     "activity_report_comments": {
@@ -774,6 +774,14 @@
           "autoincrement": false,
           "default": "'neutral'"
         },
+        "has_lecturer": {
+          "name": "has_lecturer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
         "sort_order": {
           "name": "sort_order",
           "type": "integer",
@@ -1240,14 +1248,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "has_lecturer": {
-          "name": "has_lecturer",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": true
         },
         "summary_writer_id": {
           "name": "summary_writer_id",
