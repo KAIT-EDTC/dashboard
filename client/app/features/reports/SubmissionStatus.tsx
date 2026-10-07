@@ -7,6 +7,7 @@ import { EmptyState } from '~/components/ui/EmptyState'
 import { CalendarIcon } from '~/components/ui/Icons'
 import { RoleBadge } from '~/features/events/EventBadges'
 import { formatDateTime, fullName } from '~/lib/format'
+import { ExportButton } from './ExportButton'
 import { ReportStatusBadge } from './ReportStatusBadge'
 import type { SubmissionStatusEvent } from './types'
 
@@ -74,6 +75,9 @@ function EventStatus({ event }: { event: SubmissionStatusEvent }) {
           {count('submitted') > 0 && <Badge tone="warning">承認待ち {count('submitted')}</Badge>}
           {count('rejected') > 0 && <Badge tone="danger">修正依頼 {count('rejected')}</Badge>}
           {count(null) > 0 && <Badge>未提出 {count(null)}</Badge>}
+          {(approved > 0 || event.summary.status === 'approved') && (
+            <ExportButton size="sm" eventId={event.id} zipName={`活動報告書_${event.title.replace(/[\\/:*?"<>|]/g, '_')}.zip`} />
+          )}
         </span>
       }
     >

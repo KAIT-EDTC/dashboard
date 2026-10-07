@@ -4,8 +4,7 @@ import { css } from 'styled-system/css'
 import { Avatar } from '~/components/ui/Avatar'
 import { Badge } from '~/components/ui/Badge'
 import { Card } from '~/components/ui/Card'
-import { Button } from '~/components/ui/Button'
-import { Checkbox } from '~/components/ui/Field'
+import { Checkbox, SelectField } from '~/components/ui/Field'
 import { formatYen, fullName } from '~/lib/format'
 import { RoleBadge } from './EventBadges'
 import type { EventDetail, EventDetailResponse, EventParticipant, PendingMember } from './types'
@@ -27,39 +26,31 @@ function ParticipantToggles({ participant, showPaid }: { participant: EventParti
   )
 }
 
-/** 講師にする／外す（主催者・管理者のみ）。講師は1人だけで、ほかの参加者は講師補助 */
-function LecturerToggle({ participant }: { participant: EventParticipant }) {
+/** 講師を選ぶ（主催者・管理者のみ）。講師は1人だけで、ほかの参加者は講師補助 */
+function LecturerSelect({ participants }: { participants: EventParticipant[] }) {
   const fetcher = useFetcher()
-  const isLecturer = participant.role === 'lecturer'
+  const current = participants.find((p) => p.role === 'lecturer')
+  const pendingId = fetcher.formData ? String(fetcher.formData.get('role') === 'lecturer' ? fetcher.formData.get('userId') : '') : undefined
   return (
-    <Button
-      size="sm"
-      variant="ghost"
-      loading={fetcher.state !== 'idle'}
-      onClick={() =>
-        fetcher.submit(
-          { intent: 'update-participant', userId: participant.userId, role: isLecturer ? 'assistant' : 'lecturer' },
-          { method: 'post' },
-        )
-      }
+    <SelectField
+      label="講師"
+      value={pendingId ?? current?.userId ?? ''}
+      disabled={fetcher.state !== 'idle'}
+      onChange={(e) => {
+        const userId = e.currentTarget.value
+        // 「なし」は今の講師を講師補助に戻す。ほかの人を選ぶと、それまでの講師はサーバーで講師補助に戻る
+        if (userId) fetcher.submit({ intent: 'update-participant', userId, role: 'lecturer' }, { method: 'post' })
+        else if (current) fetcher.submit({ intent: 'update-participant', userId: current.userId, role: 'assistant' }, { method: 'post' })
+      }}
+      className={css({ maxW: '280px' })}
     >
-      {isLecturer ? '講師を外す' : '講師にする'}
-    </Button>
-  )
-}
-
-/** まとめ報告書の担当にする／外す（講師を置かないイベントで、主催者・管理者のみ） */
-function SummaryWriterToggle({ participant, isWriter }: { participant: EventParticipant; isWriter: boolean }) {
-  const fetcher = useFetcher()
-  return (
-    <Button
-      size="sm"
-      variant="ghost"
-      loading={fetcher.state !== 'idle'}
-      onClick={() => fetcher.submit({ intent: 'summary-writer', userId: isWriter ? '' : participant.userId }, { method: 'post' })}
-    >
-      {isWriter ? 'まとめ担当を外す' : 'まとめ担当にする'}
-    </Button>
+      <option value="">なし</option>
+      {participants.map((p) => (
+        <option key={p.userId} value={p.userId}>
+          {fullName(p.user)}
+        </option>
+      ))}
+    </SelectField>
   )
 }
 
@@ -72,13 +63,16 @@ type Props = {
 
 export function ParticipantList({ event, pending, canManage, summary }: Props) {
   const writerId = summary.writer?.id
-  // 提出後はまとめ報告書の担当者を替えられない
-  const writerLocked = summary.report?.status === 'submitted' || summary.report?.status === 'approved'
   const going = event.participants.filter((p) => p.status === 'going')
   const paidCount = going.filter((p) => p.paid).length
 
   return (
     <Card title="参加者" padded={false}>
+      {canManage && event.hasLecturer && going.length > 0 && (
+        <div className={css({ px: 'lg', py: 'md', borderBottomWidth: '1px' })}>
+          <LecturerSelect participants={going} />
+        </div>
+      )}
       {event.fee && going.length > 0 ? (
         <p className={css({ px: 'lg', py: 'sm', fontSize: 'sm', bg: 'surface.subtle', borderBottomWidth: '1px' })}>
           集金: {paidCount} / {going.length}人（{formatYen(paidCount * event.fee)} / {formatYen(going.length * event.fee)}）
@@ -103,14 +97,7 @@ export function ParticipantList({ event, pending, canManage, summary }: Props) {
                     {p.comment && <span className={css({ fontSize: 'xs', color: 'fg.muted', truncate: true })}>「{p.comment}」</span>}
                   </Link>
                   {canManage && status === 'going' && (
-                    <>
-                      {event.hasLecturer ? (
-                        <LecturerToggle participant={p} />
-                      ) : (
-                        !writerLocked && <SummaryWriterToggle participant={p} isWriter={p.userId === writerId} />
-                      )}
-                      <ParticipantToggles participant={p} showPaid={!!event.fee} />
-                    </>
+                    <ParticipantToggles participant={p} showPaid={!!event.fee} />
                   )}
                 </li>
               ))}

@@ -1,3 +1,4 @@
+import { isLeader } from '@edtc/shared'
 import { Link } from 'react-router'
 import { css } from 'styled-system/css'
 import { Avatar } from '~/components/ui/Avatar'
@@ -7,7 +8,7 @@ import { useCurrentUser } from '~/features/auth/use-current-user'
 import { MyPostsCard } from '~/features/blog/MyPostsCard'
 import { MyItemsCard, UpcomingEventsCard } from '~/features/events/HomeCards'
 import { MemberBadges } from '~/features/members/MemberBadges'
-import { HomeReportsCard } from '~/features/reports/HomeReportsCard'
+import { HomeReportsCard, HomeReviewCard } from '~/features/reports/HomeReportsCard'
 import { api, unwrap } from '~/lib/api'
 import type { Route } from './+types/home'
 
@@ -22,7 +23,7 @@ export async function clientLoader() {
     unwrap(api.reports.targets.$get()),
     unwrap(api.reports.review.$get()),
   ])
-  return { events, items, posts, targets, summaries, reviewCount: review.length }
+  return { events, items, posts, targets, summaries, review }
 }
 
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
@@ -56,7 +57,8 @@ export default function HomePage({ loaderData }: Route.ComponentProps) {
       <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', lg: '3fr 2fr' }, gap: 'lg', alignItems: 'start' })}>
         <UpcomingEventsCard events={loaderData.events} />
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
-          <HomeReportsCard targets={loaderData.targets} summaries={loaderData.summaries} reviewCount={loaderData.reviewCount} />
+          <HomeReportsCard targets={loaderData.targets} summaries={loaderData.summaries} />
+          {isLeader(me) && <HomeReviewCard reports={loaderData.review} />}
           <MyItemsCard items={loaderData.items} />
           <MyPostsCard posts={loaderData.posts} />
         </div>
