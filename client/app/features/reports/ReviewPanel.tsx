@@ -24,7 +24,7 @@ type Decision = ReportReviewInput['decision']
 type Draft = TextRange & { field: CommentableField; mode: RequestMode }
 
 /** 確認する人の画面。本文を選ぶとその場でコメント・書き直し案を付けられ、まとめて承認・差し戻しする */
-export function ReviewWorkspace({ report, authorRole, members }: Pick<ReportDetailResponse, 'report' | 'authorRole' | 'members'>) {
+export function ReviewWorkspace({ report, authorRole, members, photos }: Pick<ReportDetailResponse, 'report' | 'authorRole' | 'members' | 'photos'>) {
   const fetcher = useFetcher<ReportActionData>()
   const [requests, setRequests] = useState<PendingRequest[]>([])
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -162,7 +162,7 @@ export function ReviewWorkspace({ report, authorRole, members }: Pick<ReportDeta
   }
 
   return report.kind === 'summary' ? (
-    <SummaryView report={report} members={members} {...viewProps} />
+    <SummaryView report={report} members={members} photos={photos} {...viewProps} />
   ) : (
     <ReportView report={report} authorRole={authorRole} {...viewProps} />
   )

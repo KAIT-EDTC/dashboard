@@ -1,14 +1,14 @@
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { EDITABLE_REPORT_STATUSES, isLeader, nowInJst, summaryCreateSchema, summaryDraftSchema, summarySubmitSchema, type SummaryDraftInput } from '@edtc/shared'
+import { EDITABLE_REPORT_STATUSES, isLeader, SUMMARY_LIMITS, nowInJst, summaryCreateSchema, summaryDraftSchema, summarySubmitSchema, type SummaryDraftInput } from '@edtc/shared'
 import { createDb, memberSummaryColumns, type Db } from '../../db'
-import { activityReports, events, userDivisions, users } from '../../db/schema'
+import { activityReports, events, reportPhotos, userDivisions, users } from '../../db/schema'
 import type { AppEnv, Session } from '../../env'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
 import { validate } from '../../lib/validator'
 import { rulesOf } from '../events/category-rules'
-import { isApprover } from './access'
+import { canView, isApprover } from './access'
 import { assertApprover, assertEditable, assertOwnDivision, findReport, submitReport, updateIfUnchanged, type ReportRow } from './common'
 import { findEventForSummary, submissionProgress, summaryMembersOf, summaryReportOf, summaryWriterIdOf, type SummaryMember } from './queries'
 
@@ -47,6 +47,29 @@ async function assertSummaryWriter(db: Db, eventId: string, userId: string) {
   if ((await summaryWriterIdOf(db, event)) !== userId) throw forbidden('まとめ報告書は担当者だけが書けます')
   if (event.startsAt > nowInJst()) throw badRequest('まとめ報告書はイベントが始まってから書けます')
   return event
+}
+
+/** JPEG（FF D8 FF で始まる） */
+const isJpeg = (bytes: Uint8Array) => bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+const PHOTO_FILE_PATTERN = /^photo-[a-z0-9]{8}\.jpg$/
+
+/** photo-xxxxxxxx.jpg */
+function newPhotoFileName(): string {
+  const random = crypto.getRandomValues(new Uint8Array(8))
+  return `photo-${[...random].map((b) => (b % 36).toString(36)).join('')}.jpg`
+}
+
+/** R2 での写真の置き場所 */
+export const photoKey = (reportId: string, fileName: string) => `reports/${reportId}/${fileName}`
+
+/** まとめ報告書の写真のファイル名（追加した順） */
+export async function photosOf(db: Db, reportId: string): Promise<string[]> {
+  const rows = await db
+    .select({ fileName: reportPhotos.fileName })
+    .from(reportPhotos)
+    .where(eq(reportPhotos.reportId, reportId))
+    .orderBy(asc(reportPhotos.createdAt))
+  return rows.map((row) => row.fileName)
 }
 
 /** 自己分析は参加者の分だけ残し、参加者の並びにそろえる */
@@ -151,6 +174,7 @@ export const summariesRoute = new Hono<AppEnv>()
           return {
             ...summary,
             author: { ...author, studentId: canSeeIds ? studentId : null },
+            photos: await photosOf(db, summary.id),
             // 様式の参加者欄・自己分析欄の並び（講師が先頭）。評価は各自の活動報告書から
             members: members.map((m) => ({
               lastName: m.user.lastName,
@@ -199,4 +223,49 @@ export const summariesRoute = new Hono<AppEnv>()
 
     await submitReport(c, db, report, { ...input, analyses: sorted })
     return c.json({ ok: true })
+  })
+
+  // --- 活動写真 -------------------------------------------------------------
+  // 写真はバイナリをそのまま送る（JPEG）。書いている間（下書き・修正依頼）だけ追加・削除できる
+
+  .post('/:id/photos', async (c) => {
+    const db = createDb(c.env)
+    const report = await findReport(db, c.req.param('id'), 'summary')
+    assertEditable(c.get('session'), report)
+    const bytes = new Uint8Array(await c.req.arrayBuffer())
+    if (bytes.length === 0 || !isJpeg(bytes)) throw badRequest('JPEG画像を送信してください')
+    if (bytes.length > SUMMARY_LIMITS.photos.maxBytes) throw badRequest('画像サイズが大きすぎます')
+    if ((await photosOf(db, report.id)).length >= SUMMARY_LIMITS.photos.max) {
+      throw badRequest(`写真は${SUMMARY_LIMITS.photos.max}枚までです`)
+    }
+    const fileName = newPhotoFileName()
+    await c.env.REPORT_PHOTOS.put(photoKey(report.id, fileName), bytes, { httpMetadata: { contentType: 'image/jpeg' } })
+    await db.insert(reportPhotos).values({ reportId: report.id, fileName, size: bytes.length })
+    return c.json({ fileName }, 201)
+  })
+
+  .delete('/:id/photos/:fileName', async (c) => {
+    const db = createDb(c.env)
+    const report = await findReport(db, c.req.param('id'), 'summary')
+    assertEditable(c.get('session'), report)
+    const fileName = c.req.param('fileName')
+    await db.delete(reportPhotos).where(and(eq(reportPhotos.reportId, report.id), eq(reportPhotos.fileName, fileName)))
+    await c.env.REPORT_PHOTOS.delete(photoKey(report.id, fileName))
+    return c.json({ ok: true })
+  })
+
+  // まとめ報告書を見られる人だけが写真も見られる
+  .get('/:id/photos/:fileName', async (c) => {
+    const { id, fileName } = c.req.param()
+    if (!PHOTO_FILE_PATTERN.test(fileName)) throw notFound('写真が見つかりません')
+    const db = createDb(c.env)
+    const report = await findReport(db, id, 'summary')
+    if (!canView(c.get('session'), report)) throw notFound('写真が見つかりません')
+    const photo = await c.env.REPORT_PHOTOS.get(photoKey(id, fileName))
+    if (!photo) throw notFound('写真が見つかりません')
+    return c.body(await photo.arrayBuffer(), 200, {
+      'Content-Type': 'image/jpeg',
+      // ファイル名ごとに中身は不変
+      'Cache-Control': 'private, max-age=31536000, immutable',
+    })
   })
