@@ -1,4 +1,4 @@
-import { ITEM_KINDS, RSVP_STATUSES } from '@edtc/shared'
+import { RSVP_STATUSES } from '@edtc/shared'
 import { Form } from 'react-router'
 import { css } from 'styled-system/css'
 import { Button, ButtonLink } from '~/components/ui/Button'
@@ -7,7 +7,7 @@ import { PageHeader } from '~/components/ui/PageHeader'
 import { useCurrentUser } from '~/features/auth/use-current-user'
 import { CategoryBadge } from '~/features/events/EventBadges'
 import { EventInfo } from '~/features/events/EventInfo'
-import { ItemList } from '~/features/events/ItemList'
+import { bringerToFields, ItemList } from '~/features/events/ItemList'
 import { ParticipantList } from '~/features/events/ParticipantList'
 import { RsvpPanel } from '~/features/events/RsvpPanel'
 import { api, unwrap } from '~/lib/api'
@@ -43,7 +43,7 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
             param: { id },
             json: {
               name: text(form, 'name'),
-              kind: oneOf(ITEM_KINDS, text(form, 'kind'), 'shared'),
+              ...bringerToFields(text(form, 'bringer')),
               quantity: Number(text(form, 'quantity') || 1),
               note: text(form, 'note'),
             },
@@ -54,6 +54,7 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
           api.events[':id'].items[':itemId'].$patch({
             param: { id, itemId: text(form, 'itemId') },
             json: {
+              ...(form.has('bringer') && bringerToFields(text(form, 'bringer'))),
               ...(form.has('assigneeId') && { assigneeId: text(form, 'assigneeId') || null }),
               ...(form.has('prepared') && { prepared: bool(text(form, 'prepared')) }),
             },
