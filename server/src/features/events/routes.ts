@@ -1,8 +1,9 @@
-import { and, asc, count, desc, eq, getTableColumns, gte, inArray, lte, ne, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, getTableColumns, gte, inArray, lte, ne, or, sql, sum, type SQL } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import {
   ATTACHMENT_MAX_COUNT,
+  ATTACHMENT_TOTAL_MAX_BYTES,
   attachmentUploadSchema,
   DIVISIONS,
   eventInputSchema,
@@ -269,6 +270,9 @@ export const eventsRoute = new Hono<AppEnv>()
 
     const existing = await db.select({ n: count() }).from(eventAttachments).where(eq(eventAttachments.eventId, event.id)).get()
     if ((existing?.n ?? 0) >= ATTACHMENT_MAX_COUNT) throw badRequest(`添付ファイルは1イベントにつき${ATTACHMENT_MAX_COUNT}個までです`)
+
+    const total = await db.select({ n: sum(eventAttachments.size) }).from(eventAttachments).get()
+    if (Number(total?.n ?? 0) + file.size > ATTACHMENT_TOTAL_MAX_BYTES) throw badRequest('ストレージの上限に達しているため、これ以上ファイルを追加できません')
 
     const id = crypto.randomUUID()
     const r2Key = `events/${event.id}/${id}`
