@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { DIVISIONS } from '../divisions'
-import { CATEGORY_TONES, ITEM_KINDS, RSVP_STATUSES } from '../events'
+import { CATEGORY_TONES, ITEM_KINDS, PARTICIPANT_ROLES, RSVP_STATUSES } from '../events'
 
 /** 日本時間の YYYY-MM-DDTHH:mm */
 const dateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, '日時の形式が正しくありません')
@@ -35,6 +35,7 @@ export const rsvpSchema = z.object({
 export const participantUpdateSchema = z.object({
   attended: z.boolean().optional(),
   paid: z.boolean().optional(),
+  role: z.enum(PARTICIPANT_ROLES).optional(),
 })
 
 const itemFields = {
@@ -64,6 +65,10 @@ export const eventCategoriesSaveSchema = z.object({
         id: z.string().optional(),
         label: z.string().trim().min(1, '種類の名前を入力してください').max(CATEGORY_LABEL_MAX, '種類の名前が長すぎます'),
         tone: z.enum(CATEGORY_TONES),
+        /** 講師を置くか。置かない種類のイベントは役割がなく、まとめ報告書の担当者を参加者から指名する */
+        hasLecturer: z.boolean().default(true),
+        /** 報告書を書くか。書かない種類のイベントは活動報告書・まとめ報告書の対象にならない */
+        hasReport: z.boolean().default(true),
       }),
     )
     .min(1, '種類は1つ以上必要です')

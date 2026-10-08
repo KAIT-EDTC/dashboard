@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DIVISIONS } from '../divisions'
 import { DISCORD_WEBHOOK_URL_PATTERN, NOTIFICATION_KIND_IDS } from '../notifications'
 
 export const userRoleSchema = z.object({ role: z.enum(['member', 'admin']) })
@@ -21,3 +22,21 @@ export const notificationSettingsSchema = z.object({
     .optional(),
   enabled: z.record(z.enum(NOTIFICATION_KIND_IDS), z.boolean()).optional(),
 })
+
+const userIds = z.array(z.string().min(1)).max(50)
+
+/**
+ * 役職（活動報告書の承認者）。送られた内容で全員分を置き換える。
+ * 代表・本部長はどちらか一方だけ（同じ人を両方には指定できない）
+ */
+export const positionsSchema = z
+  .object({
+    representatives: userIds,
+    generalManagers: userIds,
+    divisionHeads: z.partialRecord(z.enum(DIVISIONS), userIds),
+  })
+  .refine((v) => !v.representatives.some((id) => v.generalManagers.includes(id)), {
+    path: ['generalManagers'],
+    message: '同じ人を代表と本部長の両方には指定できません',
+  })
+export type PositionsInput = z.input<typeof positionsSchema>

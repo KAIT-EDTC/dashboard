@@ -5,6 +5,8 @@ export const NOTIFICATION_KINDS = [
   { id: 'blogPublished', label: 'ブログの公開', description: '記事のPRがマージされたとき（執筆者をメンション）' },
   { id: 'blogClosed', label: 'ブログのPRクローズ', description: '記事のPRが閉じられたとき（執筆者をメンション）' },
   { id: 'blogFeedback', label: 'ブログのレビュー', description: '承認・修正依頼・コメントが届いたとき（執筆者をメンション）' },
+  { id: 'reportReviewRequested', label: '活動報告書の確認依頼', description: '報告書が提出・再提出されたとき（承認する人にDM）' },
+  { id: 'reportReviewed', label: '活動報告書の承認・修正依頼', description: '承認・修正依頼されたとき（書いた本人にDM）' },
 ] as const
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number]['id']
 export const NOTIFICATION_KIND_IDS = NOTIFICATION_KINDS.map((kind) => kind.id) as [NotificationKind, ...NotificationKind[]]
