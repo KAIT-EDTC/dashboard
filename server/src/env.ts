@@ -1,8 +1,10 @@
-import type { D1Database } from '@cloudflare/workers-types'
+import type { D1Database, R2Bucket } from '@cloudflare/workers-types'
 
 // クライアントが AppType を型importする際にも解決できるよう、グローバル型に頼らず明示的にimportする
 export type Bindings = {
   DB: D1Database
+  /** イベントの添付ファイルの置き場所 */
+  ATTACHMENTS: R2Bucket
 
   FRONTEND_URL: string
   COOKIE_DOMAIN?: string

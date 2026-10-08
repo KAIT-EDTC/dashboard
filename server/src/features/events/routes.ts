@@ -1,7 +1,10 @@
-import { and, asc, count, desc, eq, getTableColumns, gte, inArray, lte, ne, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, getTableColumns, gte, inArray, lte, ne, or, sql, sum, type SQL } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import {
+  ATTACHMENT_MAX_COUNT,
+  ATTACHMENT_TOTAL_MAX_BYTES,
+  attachmentUploadSchema,
   DIVISIONS,
   eventInputSchema,
   itemInputSchema,
@@ -14,7 +17,7 @@ import {
   type RsvpStatus,
 } from '@edtc/shared'
 import { createDb, memberSummaryColumns, type Db } from '../../db'
-import { eventCategories, eventItems, eventParticipants, events, eventTargetDivisions, eventTargetUsers, userDivisions, users } from '../../db/schema'
+import { eventAttachments, eventCategories, eventItems, eventParticipants, events, eventTargetDivisions, eventTargetUsers, userDivisions, users } from '../../db/schema'
 import type { AppEnv } from '../../env'
 import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
@@ -227,6 +230,10 @@ export const eventsRoute = new Hono<AppEnv>()
           with: { assignee: { columns: memberSummaryColumns } },
           orderBy: [asc(eventItems.kind), asc(eventItems.createdAt)],
         },
+        attachments: {
+          columns: { id: true, name: true, size: true, contentType: true, createdAt: true },
+          orderBy: asc(eventAttachments.createdAt),
+        },
       },
     })
     if (!found) throw notFound('イベントが見つかりません')
@@ -271,7 +278,85 @@ export const eventsRoute = new Hono<AppEnv>()
     const db = createDb(c.env)
     const event = await findEvent(db, c.req.param('id'))
     assertCanManage(c.get('session'), event.createdBy)
+    const files = await db.select({ r2Key: eventAttachments.r2Key }).from(eventAttachments).where(eq(eventAttachments.eventId, event.id))
     await db.delete(events).where(eq(events.id, event.id))
+    // 行は先に消えているので、R2の削除に失敗しても画面上は残らない（実体だけが残る）
+    if (files.length > 0) await c.env.ATTACHMENTS.delete(files.map((f) => f.r2Key))
+    return c.json({ ok: true })
+  })
+
+  // --- 添付ファイル -----------------------------------------------------------
+
+  .post('/:id/attachments', validate('form', attachmentUploadSchema), async (c) => {
+    const db = createDb(c.env)
+    const event = await findEvent(db, c.req.param('id'))
+    const session = c.get('session')
+    assertCanManage(session, event.createdBy)
+    // zod の File 型は Workers の型と合わないため、実行時の実体（Workers の File）として扱う
+    const file = c.req.valid('form').file as unknown as File
+
+    const existing = await db.select({ n: count() }).from(eventAttachments).where(eq(eventAttachments.eventId, event.id)).get()
+    if ((existing?.n ?? 0) >= ATTACHMENT_MAX_COUNT) throw badRequest(`添付ファイルは1イベントにつき${ATTACHMENT_MAX_COUNT}個までです`)
+
+    const total = await db.select({ n: sum(eventAttachments.size) }).from(eventAttachments).get()
+    if (Number(total?.n ?? 0) + file.size > ATTACHMENT_TOTAL_MAX_BYTES) throw badRequest('ストレージの上限に達しているため、これ以上ファイルを追加できません')
+
+    const id = crypto.randomUUID()
+    const r2Key = `events/${event.id}/${id}`
+    const contentType = file.type || 'application/octet-stream'
+    await c.env.ATTACHMENTS.put(r2Key, await file.arrayBuffer(), { httpMetadata: { contentType } })
+    try {
+      await db.insert(eventAttachments).values({
+        id,
+        eventId: event.id,
+        name: file.name.trim().slice(0, 200) || 'ファイル',
+        size: file.size,
+        contentType,
+        r2Key,
+        uploadedBy: session.userId,
+      })
+    } catch (error) {
+      await c.env.ATTACHMENTS.delete(r2Key)
+      throw error
+    }
+    return c.json({ id }, 201)
+  })
+
+  .get('/:id/attachments/:attachmentId', async (c) => {
+    const db = createDb(c.env)
+    const attachment = await db
+      .select()
+      .from(eventAttachments)
+      .where(and(eq(eventAttachments.id, c.req.param('attachmentId')), eq(eventAttachments.eventId, c.req.param('id'))))
+      .get()
+    const object = attachment && (await c.env.ATTACHMENTS.get(attachment.r2Key))
+    if (!attachment || !object) throw notFound('ファイルが見つかりません')
+
+    // アプリと同じオリジンで配信するため、HTMLなどがその場で開かれないよう常にダウンロードとして返す
+    return new Response(object.body as unknown as ReadableStream, {
+      headers: {
+        'Content-Type': attachment.contentType,
+        'Content-Length': String(attachment.size),
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(attachment.name)}`,
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'; sandbox",
+        'Cache-Control': 'private, max-age=0, must-revalidate',
+      },
+    })
+  })
+
+  .delete('/:id/attachments/:attachmentId', async (c) => {
+    const db = createDb(c.env)
+    const event = await findEvent(db, c.req.param('id'))
+    assertCanManage(c.get('session'), event.createdBy)
+    const attachment = await db
+      .select()
+      .from(eventAttachments)
+      .where(and(eq(eventAttachments.id, c.req.param('attachmentId')), eq(eventAttachments.eventId, event.id)))
+      .get()
+    if (!attachment) throw notFound('ファイルが見つかりません')
+    await db.delete(eventAttachments).where(eq(eventAttachments.id, attachment.id))
+    await c.env.ATTACHMENTS.delete(attachment.r2Key)
     return c.json({ ok: true })
   })
 

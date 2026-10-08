@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { DIVISIONS } from '../divisions'
-import { CATEGORY_TONES, ITEM_KINDS, RSVP_STATUSES } from '../events'
+import { ATTACHMENT_MAX_BYTES, CATEGORY_TONES, ITEM_KINDS, RSVP_STATUSES } from '../events'
 
 /** 日本時間の YYYY-MM-DDTHH:mm */
 const dateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, '日時の形式が正しくありません')
@@ -53,6 +53,13 @@ export const itemUpdateSchema = z
     prepared: z.boolean(),
   })
   .partial()
+
+export const attachmentUploadSchema = z.object({
+  file: z
+    .file('ファイルを選択してください')
+    .min(1, 'ファイルが空です')
+    .max(ATTACHMENT_MAX_BYTES, `ファイルは${ATTACHMENT_MAX_BYTES / 1024 / 1024}MBまでです`),
+})
 
 export const CATEGORY_LABEL_MAX = 20
 

@@ -23,13 +23,13 @@ npm workspaces のモノレポ。client は server の `AppType` を型として
 ```
 app.ts                 # ルーティングの組み立て・CORS/CSRF・エラーハンドリング。AppType を export
 env.ts                 # Bindings（環境変数）とセッションの型
-db/schema.ts           # テーブル定義（users, user_divisions, events, event_participants, event_items, blog_posts, blog_images）
+db/schema.ts           # テーブル定義（users, user_divisions, events, event_participants, event_items, event_attachments, blog_posts, blog_images）
 middleware/auth.ts     # requireAuth（ロールは毎回DBから読む）と権限チェック
 lib/                   # discord（OAuth・Webhook通知）、github（App認証・Webhook署名検証）など外部サービス
 features/
   auth/                # OAuth・新規登録・セッションCookie
   members/             # 名簿・プロフィール
-  events/              # イベント・出欠・持ち物
+  events/              # イベント・出欠・持ち物・添付ファイル（実体はR2、メタデータはD1）
   blog/                # 下書き・画像・提出（publisher.ts）・GitHub Webhook
 ```
 
@@ -183,6 +183,8 @@ npx wrangler d1 create edtc-dashboard
 #   → 出力された database_id を wrangler.jsonc の env.production.d1_databases に貼る
 #   （wrangler の d1 create が認証エラーになる場合は、ダッシュボードのD1画面から作ってもよい）
 npm run db:migrate:remote                                # テーブルを作る
+# イベントの添付ファイルの置き場所（無いとデプロイが失敗する）。アカウントが複数あると選べないので、団体のアカウントIDを渡す
+CLOUDFLARE_ACCOUNT_ID=f63f9ebc5db7b049a6e98a155a3d219d npx wrangler r2 bucket create edtc-dashboard-attachments
 
 # 秘密情報（値を聞かれる）。GitHub App の鍵は  < your-app.pem  でファイルから渡す
 npx wrangler secret put JWT_SECRET --env production                  # openssl rand -hex 32

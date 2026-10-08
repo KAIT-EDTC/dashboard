@@ -27,3 +27,9 @@ export const ITEM_KIND_LABELS: Record<ItemKind, string> = {
   personal: '各自持参',
   shared: '共有（担当者が用意）',
 }
+
+/** イベントに添付できるファイルの上限（1ファイルあたりのバイト数と、1イベントあたりの個数） */
+export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
+export const ATTACHMENT_MAX_COUNT = 10
+// R2の無料枠(10GB)を超えないよう、添付の合計がこれを超えたらアップロードを止める
+export const ATTACHMENT_TOTAL_MAX_BYTES = 8 * 1024 * 1024 * 1024
