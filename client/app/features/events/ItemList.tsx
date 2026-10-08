@@ -1,14 +1,15 @@
 import type { ItemKind } from '@edtc/shared'
-import { useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useFetcher } from 'react-router'
-import { css, cx } from 'styled-system/css'
+import { css } from 'styled-system/css'
 import { Alert } from '~/components/ui/Alert'
 import { Avatar } from '~/components/ui/Avatar'
 import { Badge } from '~/components/ui/Badge'
 import { Button } from '~/components/ui/Button'
 import { Card } from '~/components/ui/Card'
-import { Checkbox, inputStyle, SelectField, TextField } from '~/components/ui/Field'
-import { PackageIcon, TrashIcon } from '~/components/ui/Icons'
+import { Dialog } from '~/components/ui/Dialog'
+import { Checkbox, SelectField, TextField } from '~/components/ui/Field'
+import { EditIcon, PackageIcon, PlusIcon, TrashIcon } from '~/components/ui/Icons'
 import { EmptyState } from '~/components/ui/EmptyState'
 import type { FormErrors } from '~/lib/form'
 import { fullName } from '~/lib/format'
@@ -82,6 +83,7 @@ function MyItemRow({ item }: { item: EventItem }) {
 
 function ItemRow({ item, userId, canManage, candidates }: { item: EventItem; userId: string; canManage: boolean; candidates: Participants }) {
   const fetcher = useFetcher<FormErrors>()
+  const [editing, setEditing] = useState(false)
   const busy = fetcher.state !== 'idle'
   const submit = (fields: Record<string, string>) => fetcher.submit({ intent: 'update-item', itemId: item.id, ...fields }, { method: 'post' })
   const mine = item.assigneeId === userId
@@ -100,74 +102,77 @@ function ItemRow({ item, userId, canManage, candidates }: { item: EventItem; use
         {fetcher.data?.error && <p className={css({ fontSize: 'xs', color: 'danger.fg' })}>{fetcher.data.error}</p>}
       </div>
 
-      {canManage ? (
-        <>
-          <select
-            aria-label={`${item.name}を持ってくる人`}
-            value={bringerOf(item)}
-            onChange={(e) => submit({ bringer: e.currentTarget.value })}
-            disabled={busy}
-            className={cx(inputStyle, css({ w: '220px', maxW: 'full' }))}
-          >
-            <BringerOptions candidates={options} />
-          </select>
-          {item.assigneeId && <Checkbox label="準備OK" checked={item.prepared} disabled={busy} onChange={(e) => submit({ prepared: String(e.currentTarget.checked) })} />}
-          <Button size="sm" variant="ghost" aria-label={`${item.name}を削除`} loading={busy} onClick={() => fetcher.submit({ intent: 'delete-item', itemId: item.id }, { method: 'post' })}>
-            <TrashIcon size={14} />
-          </Button>
-        </>
+      {item.kind === 'personal' ? (
+        <span className={css({ fontSize: 'sm' })}>参加者全員</span>
+      ) : item.assignee ? (
+        <span className={css({ display: 'inline-flex', alignItems: 'center', gap: 'xs', fontSize: 'sm' })}>
+          <Avatar user={item.assignee} size={22} />
+          {fullName(item.assignee)}
+          {mine && '（あなた）'}
+        </span>
       ) : (
+        <Badge tone="warning">未定</Badge>
+      )}
+      {open && (
+        <Button variant="primary" loading={busy} onClick={() => submit({ assigneeId: userId })}>
+          自分が持っていく
+        </Button>
+      )}
+      {mine && (
+        <Button variant="ghost" loading={busy} onClick={() => submit({ assigneeId: '' })}>
+          担当をやめる
+        </Button>
+      )}
+      {canManage && (
         <>
-          {item.kind === 'personal' ? (
-            <span className={css({ fontSize: 'sm' })}>参加者全員</span>
-          ) : item.assignee ? (
-            <span className={css({ display: 'inline-flex', alignItems: 'center', gap: 'xs', fontSize: 'sm' })}>
-              <Avatar user={item.assignee} size={22} />
-              {fullName(item.assignee)}
-              {mine && '（あなた）'}
-            </span>
-          ) : (
-            <Badge tone="warning">未定</Badge>
-          )}
-          {open && (
-            <Button variant="primary" loading={busy} onClick={() => submit({ assigneeId: userId })}>
-              自分が持っていく
-            </Button>
-          )}
-          {mine && (
-            <Button variant="ghost" loading={busy} onClick={() => submit({ assigneeId: '' })}>
-              担当をやめる
-            </Button>
-          )}
+          {item.assigneeId && <Checkbox label="準備OK" checked={item.prepared} disabled={busy} onChange={(e) => submit({ prepared: String(e.currentTarget.checked) })} />}
+          <Button aria-label={`${item.name}を編集`} onClick={() => setEditing(true)}>
+            <EditIcon size={16} />
+            編集
+          </Button>
+          <Dialog open={editing} onClose={() => setEditing(false)} title="持ち物を編集">
+            <ItemForm item={item} candidates={options} onDone={() => setEditing(false)} />
+          </Dialog>
         </>
       )}
     </li>
   )
 }
 
-function AddItemForm({ candidates }: { candidates: Participants }) {
+/** 追加と編集で共通のフォーム。item があれば編集（削除もここから） */
+function ItemForm({ item, candidates, onDone }: { item?: EventItem; candidates: Participants; onDone: () => void }) {
   const fetcher = useFetcher<FormErrors | { ok: true }>()
-  const formRef = useRef<HTMLFormElement>(null)
+  const busy = fetcher.state !== 'idle'
+  const deleting = busy && fetcher.formData?.get('intent') === 'delete-item'
   useEffect(() => {
-    if (fetcher.state === 'idle' && fetcher.data && 'ok' in fetcher.data) formRef.current?.reset()
-  }, [fetcher.state, fetcher.data])
+    if (fetcher.state === 'idle' && fetcher.data && 'ok' in fetcher.data) onDone()
+  }, [fetcher.state, fetcher.data, onDone])
   const error = fetcher.data && 'error' in fetcher.data ? fetcher.data.error : undefined
 
   return (
-    <fetcher.Form ref={formRef} method="post" className={css({ display: 'flex', flexDirection: 'column', gap: 'md', pt: 'md', mt: 'md', borderTopWidth: '1px', borderTopStyle: 'dashed' })}>
-      <input type="hidden" name="intent" value="add-item" />
+    <fetcher.Form method="post" className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
+      <input type="hidden" name="intent" value={item ? 'update-item' : 'add-item'} />
+      {item && <input type="hidden" name="itemId" value={item.id} />}
       {error && <Alert>{error}</Alert>}
-      <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: '2fr 1fr' }, gap: 'md' })}>
-        <TextField label="持ち物" name="name" required placeholder="例: はんだごて" />
-        <TextField label="数量" name="quantity" type="number" min={1} defaultValue={1} />
+      <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', sm: '2fr 1fr' }, gap: 'md' })}>
+        <TextField label="持ち物" name="name" required placeholder="例: はんだごて" defaultValue={item?.name} />
+        <TextField label="数量" name="quantity" type="number" min={1} defaultValue={item?.quantity ?? 1} />
       </div>
-      <SelectField label="持ってくる人" name="bringer" defaultValue="" hint="あとから変更できます。未定にすると参加者が名乗り出られます">
+      <SelectField label="持ってくる人" name="bringer" defaultValue={item ? bringerOf(item) : ''} hint="あとから変更できます。未定にすると参加者が名乗り出られます">
         <BringerOptions candidates={candidates} />
       </SelectField>
-      <TextField label="メモ（任意）" name="note" />
-      <div>
-        <Button type="submit" loading={fetcher.state !== 'idle'}>
-          持ち物を追加
+      <TextField label="メモ（任意）" name="note" defaultValue={item?.note ?? ''} />
+      <div className={css({ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 'sm' })}>
+        {item ? (
+          <Button variant="danger" loading={deleting} disabled={busy} onClick={() => fetcher.submit({ intent: 'delete-item', itemId: item.id }, { method: 'post' })}>
+            <TrashIcon size={16} />
+            削除
+          </Button>
+        ) : (
+          <span />
+        )}
+        <Button type="submit" variant="primary" loading={busy && !deleting} disabled={busy}>
+          {item ? '保存' : '追加'}
         </Button>
       </div>
     </fetcher.Form>
@@ -179,9 +184,20 @@ export function ItemList({ event, userId, canManage }: Props) {
   const mine = event.items.filter((item) => item.kind === 'personal' || item.assigneeId === userId)
   const sorted = [...event.items].sort((a, b) => rank(a) - rank(b)) // Array#sort は安定
   const openCount = event.items.filter((item) => rank(item) === 0).length
+  const [adding, setAdding] = useState(false)
 
   return (
-    <Card title="持ち物">
+    <Card
+      title="持ち物"
+      action={
+        canManage && (
+          <Button size="sm" onClick={() => setAdding(true)}>
+            <PlusIcon size={14} />
+            持ち物を追加
+          </Button>
+        )
+      }
+    >
       {mine.length > 0 && (
         <section className={css({ mb: 'lg' })}>
           <h3 className={css({ fontSize: 'sm', fontWeight: '700', mb: 'xs' })}>あなたが持っていくもの</h3>
@@ -209,7 +225,11 @@ export function ItemList({ event, userId, canManage }: Props) {
         </section>
       )}
 
-      {canManage && <AddItemForm candidates={candidates} />}
+      {canManage && (
+        <Dialog open={adding} onClose={() => setAdding(false)} title="持ち物を追加">
+          <ItemForm candidates={candidates} onDone={() => setAdding(false)} />
+        </Dialog>
+      )}
     </Card>
   )
 }

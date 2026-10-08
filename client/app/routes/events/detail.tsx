@@ -54,6 +54,8 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
           api.events[':id'].items[':itemId'].$patch({
             param: { id, itemId: text(form, 'itemId') },
             json: {
+              // 編集モーダルは持ち物・数量・メモをまとめて送る
+              ...(form.has('name') && { name: text(form, 'name'), quantity: Number(text(form, 'quantity') || 1), note: text(form, 'note') }),
               ...(form.has('bringer') && bringerToFields(text(form, 'bringer'))),
               ...(form.has('assigneeId') && { assigneeId: text(form, 'assigneeId') || null }),
               ...(form.has('prepared') && { prepared: bool(text(form, 'prepared')) }),
