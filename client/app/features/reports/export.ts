@@ -2,6 +2,7 @@ import { PARTICIPANT_ROLE_LABELS, romanizedName } from '@edtc/shared'
 import { unzipSync, zipSync } from 'fflate'
 import type { InferResponseType } from 'hono/client'
 import { api, unwrap } from '~/lib/api'
+import { loadSummaryPhoto } from './photo'
 import { fillSummaryTemplate, summaryFileName } from './summary-export'
 import activityTemplateUrl from './template/activity-report.xlsx?url'
 import summaryTemplateUrl from './template/summary-report.xlsx?url'
@@ -85,8 +86,10 @@ export async function exportReports(target: { eventId?: string; reportId?: strin
     reports.length > 0 ? loadTemplate(activityTemplateUrl) : null,
     summaries.length > 0 ? loadTemplate(summaryTemplateUrl) : null,
   ])
+  // まとめ報告書の活動写真（Excelの枠に貼る）
+  const summaryPhotos = await Promise.all(summaries.map((summary) => Promise.all(summary.photos.map((fileName) => loadSummaryPhoto(summary.id, fileName)))))
   const files = [
-    ...(summaryTemplate ? summaries.map((summary) => ({ name: summaryFileName(summary), build: () => fillSummaryTemplate(summaryTemplate, summary) })) : []),
+    ...(summaryTemplate ? summaries.map((summary, index) => ({ name: summaryFileName(summary), build: () => fillSummaryTemplate(summaryTemplate, summary, summaryPhotos[index]) })) : []),
     ...(activityTemplate ? reports.map((report) => ({ name: reportFileName(report), build: () => fillTemplate(activityTemplate, report) })) : []),
   ]
   if (files.length === 0) return 0

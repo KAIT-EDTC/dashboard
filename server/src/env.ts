@@ -1,9 +1,11 @@
-import type { D1Database } from '@cloudflare/workers-types'
+import type { D1Database, R2Bucket } from '@cloudflare/workers-types'
 import type { Division, Officer } from '@edtc/shared'
 
 // クライアントが AppType を型importする際にも解決できるよう、グローバル型に頼らず明示的にimportする
 export type Bindings = {
   DB: D1Database
+  /** まとめ報告書の活動写真（JPEG） */
+  REPORT_PHOTOS: R2Bucket
 
   FRONTEND_URL: string
   COOKIE_DOMAIN?: string

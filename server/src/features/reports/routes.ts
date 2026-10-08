@@ -33,7 +33,7 @@ import { canReviewNow, canView, isApprover } from './access'
 import { assertApprover, assertEditable, assertOwnDivision, findReport, nameOf, submitReport, summaryOf, updateIfUnchanged } from './common'
 import { notifyApproved, notifyAwaitingReview, notifyRejected } from './notifications'
 import { approverCandidatesFor, isTargetParticipant, myReportOf, submissionProgress, summaryMembersOf } from './queries'
-import { summariesRoute, visibleMembers } from './summaries'
+import { photoKey, photosOf, summariesRoute, visibleMembers } from './summaries'
 
 /** 報告書の一覧に出すイベントの情報 */
 const eventColumns = {
@@ -362,10 +362,12 @@ export const reportsRoute = new Hono<AppEnv>()
     const { studentId, ...author } = row.author
     // まとめ報告書: 参加者と、それぞれの活動報告書の提出状況・評価
     const members = row.kind === 'summary' ? visibleMembers(session, row, await summaryMembersOf(db, row.eventId)) : []
+    const photos = row.kind === 'summary' ? await photosOf(db, row.id) : []
     return c.json({
       report: { ...row, author: { ...author, studentId: isAuthor || isApprover(session, row) ? studentId : null } },
       authorRole: (await lecturerByCategory(db))(row.event.category) ? (participant?.role ?? null) : null,
       members,
+      photos,
       canEdit: isAuthor && isEditableStatus(row.status),
       canDelete: isAuthor && row.status === 'draft',
       canWithdraw: isAuthor && row.status === 'submitted',
@@ -477,6 +479,9 @@ export const reportsRoute = new Hono<AppEnv>()
     const report = await findReport(db, c.req.param('id'))
     if (report.authorId !== session.userId) throw forbidden()
     if (report.status !== 'draft') throw conflict('削除できるのは下書きだけです')
+    // まとめ報告書の写真はR2から消す（D1の記録は報告書と一緒に消える）
+    const photos = report.kind === 'summary' ? await photosOf(db, report.id) : []
     await db.delete(activityReports).where(and(eq(activityReports.id, report.id), eq(activityReports.status, 'draft')))
+    if (photos.length > 0) await c.env.REPORT_PHOTOS.delete(photos.map((fileName) => photoKey(report.id, fileName)))
     return c.json({ ok: true })
   })

@@ -342,6 +342,23 @@ export const activityReports = sqliteTable(
   ],
 )
 
+/**
+ * まとめ報告書の活動写真（JPEG。Excelの様式の「図1. 活動写真」の枠に貼る）。
+ * 中身はR2（REPORT_PHOTOS）の reports/<報告書ID>/<ファイル名> に置き、ここには並び順のための記録だけ持つ
+ */
+export const reportPhotos = sqliteTable(
+  'report_photos',
+  {
+    reportId: text('report_id')
+      .notNull()
+      .references(() => activityReports.id, { onDelete: 'cascade' }),
+    fileName: text('file_name').notNull(),
+    size: integer('size').notNull(),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [primaryKey({ columns: [t.reportId, t.fileName] })],
+)
+
 /** 承認・差し戻しの履歴（段階ごとに1行） */
 export const activityReportReviews = sqliteTable(
   'activity_report_reviews',
