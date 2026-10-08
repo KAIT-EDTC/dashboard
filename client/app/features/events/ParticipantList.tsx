@@ -89,7 +89,7 @@ export function ParticipantList({ event, pending, canManage, summary }: Props) {
             <ul className={css({ display: 'flex', flexDirection: 'column', gap: 'sm' })}>
               {list.map((p) => (
                 <li key={p.userId} className={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'sm' })}>
-                  <Link to={`/members/${p.userId}`} className={css({ display: 'flex', alignItems: 'center', gap: 'sm', flex: 1, minW: '140px', color: 'fg', _hover: { color: 'accent' } })}>
+                  <Link to={`/members/${p.userId}`} className={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 'sm', rowGap: 'xs', flex: 1, minW: 0, color: 'fg', _hover: { color: 'accent' } })}>
                     <Avatar user={p.user} size={28} />
                     <span className={css({ fontSize: 'sm', fontWeight: '500', whiteSpace: 'nowrap' })}>{fullName(p.user)}</span>
                     {status === 'going' && event.hasLecturer && <RoleBadge role={p.role} />}
