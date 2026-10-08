@@ -8,11 +8,39 @@ import { Card } from '~/components/ui/Card'
 import { SelectField } from '~/components/ui/Field'
 import { ListIcon } from '~/components/ui/Icons'
 import { RoleBadge } from '~/features/events/EventBadges'
-import type { EventDetail, EventDetailResponse } from '~/features/events/types'
+import type { EventDetail, EventDetailResponse, EventParticipant } from '~/features/events/types'
 import type { FormErrors } from '~/lib/form'
 import { fullName } from '~/lib/format'
 import { ExportButton } from './ExportButton'
 import { ReportStatusBadge } from './ReportStatusBadge'
+
+/** 講師を選ぶ（講師を置く種類で、主催者・管理者のみ）。講師がまとめ報告書を書く。講師は1人だけで、ほかの参加者は講師補助 */
+function LecturerSelect({ participants }: { participants: EventParticipant[] }) {
+  const fetcher = useFetcher()
+  const current = participants.find((p) => p.role === 'lecturer')
+  const pendingId = fetcher.formData ? String(fetcher.formData.get('role') === 'lecturer' ? fetcher.formData.get('userId') : '') : undefined
+  return (
+    <SelectField
+      label="講師"
+      value={pendingId ?? current?.userId ?? ''}
+      disabled={fetcher.state !== 'idle'}
+      onChange={(e) => {
+        const userId = e.currentTarget.value
+        // 「なし」は今の講師を講師補助に戻す。ほかの人を選ぶと、それまでの講師はサーバーで講師補助に戻る
+        if (userId) fetcher.submit({ intent: 'update-participant', userId, role: 'lecturer' }, { method: 'post' })
+        else if (current) fetcher.submit({ intent: 'update-participant', userId: current.userId, role: 'assistant' }, { method: 'post' })
+      }}
+      className={css({ maxW: '280px' })}
+    >
+      <option value="">なし</option>
+      {participants.map((p) => (
+        <option key={p.userId} value={p.userId}>
+          {fullName(p.user)}
+        </option>
+      ))}
+    </SelectField>
+  )
+}
 
 type Summary = EventDetailResponse['summary']
 
@@ -72,7 +100,8 @@ export function EventSummary({ event, summary, canManage, started }: { event: Ev
             </Badge>
           )}
         </div>
-        {/* 講師を置く種類は講師が書くので、担当者を選ぶのは講師を置かない種類だけ */}
+        {/* 講師を置く種類は講師が書くので講師を選ぶ。置かない種類は担当者を選ぶ */}
+        {canManage && event.hasLecturer && candidates.length > 0 && <LecturerSelect participants={candidates} />}
         {canManage && !locked && !event.hasLecturer && (
           <SelectField
             label="担当者"

@@ -1,9 +1,8 @@
-import { isLeader, todayInJst } from '@edtc/shared'
+import { isLeader } from '@edtc/shared'
 import { css } from 'styled-system/css'
 import { PageHeader } from '~/components/ui/PageHeader'
 import { TabLinks } from '~/components/ui/Tabs'
 import { useCurrentUser } from '~/features/auth/use-current-user'
-import { ExportButton } from '~/features/reports/ExportButton'
 import { MyReportList, ReviewList, SummaryTargetList, TargetList } from '~/features/reports/ReportLists'
 import { SubmissionStatus } from '~/features/reports/SubmissionStatus'
 import { api, unwrap } from '~/lib/api'
@@ -37,7 +36,7 @@ export default function ReportsPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
-      <PageHeader title="活動報告書" actions={<ExportButton zipName={`活動報告書_${todayInJst()}.zip`} />} />
+      <PageHeader title="活動報告書" />
       <div className={css({ mb: 'lg' })}>
         <TabLinks
           items={[

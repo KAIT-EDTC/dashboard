@@ -4,7 +4,7 @@ import { css } from 'styled-system/css'
 import { Avatar } from '~/components/ui/Avatar'
 import { Badge } from '~/components/ui/Badge'
 import { Card } from '~/components/ui/Card'
-import { Checkbox, SelectField } from '~/components/ui/Field'
+import { Checkbox } from '~/components/ui/Field'
 import { formatYen, fullName } from '~/lib/format'
 import { RoleBadge } from './EventBadges'
 import type { EventDetail, EventDetailResponse, EventParticipant, PendingMember } from './types'
@@ -26,34 +26,6 @@ function ParticipantToggles({ participant, showPaid }: { participant: EventParti
   )
 }
 
-/** 講師を選ぶ（主催者・管理者のみ）。講師は1人だけで、ほかの参加者は講師補助 */
-function LecturerSelect({ participants }: { participants: EventParticipant[] }) {
-  const fetcher = useFetcher()
-  const current = participants.find((p) => p.role === 'lecturer')
-  const pendingId = fetcher.formData ? String(fetcher.formData.get('role') === 'lecturer' ? fetcher.formData.get('userId') : '') : undefined
-  return (
-    <SelectField
-      label="講師"
-      value={pendingId ?? current?.userId ?? ''}
-      disabled={fetcher.state !== 'idle'}
-      onChange={(e) => {
-        const userId = e.currentTarget.value
-        // 「なし」は今の講師を講師補助に戻す。ほかの人を選ぶと、それまでの講師はサーバーで講師補助に戻る
-        if (userId) fetcher.submit({ intent: 'update-participant', userId, role: 'lecturer' }, { method: 'post' })
-        else if (current) fetcher.submit({ intent: 'update-participant', userId: current.userId, role: 'assistant' }, { method: 'post' })
-      }}
-      className={css({ maxW: '280px' })}
-    >
-      <option value="">なし</option>
-      {participants.map((p) => (
-        <option key={p.userId} value={p.userId}>
-          {fullName(p.user)}
-        </option>
-      ))}
-    </SelectField>
-  )
-}
-
 type Props = {
   event: EventDetail
   pending: PendingMember[]
@@ -68,11 +40,6 @@ export function ParticipantList({ event, pending, canManage, summary }: Props) {
 
   return (
     <Card title="参加者" padded={false}>
-      {canManage && event.hasLecturer && going.length > 0 && (
-        <div className={css({ px: 'lg', py: 'md', borderBottomWidth: '1px' })}>
-          <LecturerSelect participants={going} />
-        </div>
-      )}
       {event.fee && going.length > 0 ? (
         <p className={css({ px: 'lg', py: 'sm', fontSize: 'sm', bg: 'surface.subtle', borderBottomWidth: '1px' })}>
           集金: {paidCount} / {going.length}人（{formatYen(paidCount * event.fee)} / {formatYen(going.length * event.fee)}）
