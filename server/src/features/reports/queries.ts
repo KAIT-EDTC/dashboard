@@ -2,7 +2,7 @@ import { and, asc, eq, isNotNull, ne, or } from 'drizzle-orm'
 import { canApproveStep, isLeader, positionLabels, type ApprovalStep, type Division } from '@edtc/shared'
 import { memberSummaryColumns, type Db } from '../../db'
 import { activityReports, eventParticipants, events, users } from '../../db/schema'
-import { eventHasLecturer } from '../events/lecturer'
+import { eventHasLecturer, rulesOf } from '../events/category-rules'
 
 /** 報告書の対象: 参加と回答した人か、当日出席した人 */
 export const isTargetParticipant = or(eq(eventParticipants.status, 'going'), eq(eventParticipants.attended, true))
@@ -32,9 +32,12 @@ export function myReportOf(db: Db, eventId: string, userId: string) {
 
 // --- まとめ報告書 -------------------------------------------------------------
 
-/** まとめ報告書の担当者。主催者が指名した人、いなければ講師。どちらもいなければ null */
-export async function summaryWriterIdOf(db: Db, event: { id: string; summaryWriterId: string | null }): Promise<string | null> {
-  if (event.summaryWriterId) return event.summaryWriterId
+/**
+ * まとめ報告書を書く人（まだ書き始めていないとき）。講師を置く種類なら講師、置かない種類なら主催者が指名した人。
+ * いなければ null。書き始めた後は、まとめ報告書を書いている人が担当者
+ */
+export async function summaryWriterIdOf(db: Db, event: { id: string; category: string; summaryWriterId: string | null }): Promise<string | null> {
+  if (!(await rulesOf(db, event.category)).hasLecturer) return event.summaryWriterId
   const lecturer = await db
     .select({ userId: eventParticipants.userId })
     .from(eventParticipants)
@@ -105,7 +108,7 @@ export function submissionProgress(members: SummaryMember[], writerId: string | 
 /** まとめ報告書の担当者を決めるときに使うイベントの情報 */
 export function findEventForSummary(db: Db, eventId: string) {
   return db
-    .select({ id: events.id, title: events.title, startsAt: events.startsAt, summaryWriterId: events.summaryWriterId, createdBy: events.createdBy })
+    .select({ id: events.id, title: events.title, startsAt: events.startsAt, category: events.category, summaryWriterId: events.summaryWriterId, createdBy: events.createdBy })
     .from(events)
     .where(eq(events.id, eventId))
     .get()

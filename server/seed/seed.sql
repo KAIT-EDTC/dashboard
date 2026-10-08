@@ -229,8 +229,6 @@ UPDATE users SET head_of = '["総務部"]' WHERE id = 'seed-09';
 
 UPDATE event_participants SET role = 'lecturer' WHERE user_id = 'seed-03' AND event_id IN ('seed-ev-01', 'seed-ev-05');
 UPDATE event_participants SET role = 'lecturer' WHERE user_id = 'seed-07' AND event_id = 'seed-ev-09';
--- 第3回 遊行塾のまとめ報告書は、講師ではなく山田さんを担当に指名
-UPDATE events SET summary_writer_id = 'seed-12' WHERE id = 'seed-ev-09';
 -- 親睦・ミーティングは講師を置かない種類（マイグレーションの初期値）。前期おつかれさま会は主催の渡辺さんがまとめ担当
 UPDATE events SET summary_writer_id = 'seed-06' WHERE id = 'seed-ev-02';
 
@@ -271,9 +269,9 @@ WITH
     ('seed-rp-09', 'seed-ev-02', 'seed-11', '人事部', '新入生への声かけを担当した。',
       '新入生と話せた。楽しかった。', 4,
       '', 'rejected', -8, '["division_head"]', NULL, NULL),
-    -- 第3回 遊行塾（全員承認済み。まとめ報告書の担当の山田さんは書いていない）
-    ('seed-rp-11', 'seed-ev-09', 'seed-07', '企画部', '講師としてArduinoの基本と、ブザーを鳴らすプログラムを説明した。',
-      '前半の説明が長くなり、実習の時間が足りなかった。次回は説明を半分にして、手を動かす時間を増やす。', 4,
+    -- 第3回 遊行塾（全員承認済み。まとめ報告書を書いた講師の山本さんは書いていない）
+    ('seed-rp-13', 'seed-ev-09', 'seed-12', '企画部', '受付と、参加者への資料配布をした。',
+      '資料の部数が足りず、途中で印刷し直した。次回は多めに用意する。', 3,
       '', 'approved', -33, '["division_head"]', NULL, -32),
     ('seed-rp-12', 'seed-ev-09', 'seed-03', '企画部', '各班を回って配線の確認をした。',
       '配線ミスが多かったので、ブレッドボードの使い方を先に説明したほうがよい。', 4,
@@ -312,7 +310,7 @@ FROM r;
 -- ---------------------------------------------------------------------------
 
 INSERT INTO activity_reports (id, event_id, author_id, kind, division, content, hosting, analyses, overview, impressions, rating, notes, status, submitted_at, approval_steps, approved_at) VALUES
-  ('seed-rp-20', 'seed-ev-09', 'seed-12', 'summary', '企画部',
+  ('seed-rp-20', 'seed-ev-09', 'seed-07', 'summary', '企画部',
     'Arduinoの基本とブザーを鳴らすプログラムの説明' || char(10) || '班ごとの実習と講師・補助による個別のサポート' || char(10) || '参加者アンケートの実施',
     'host', '[{"userId": "seed-07", "text": "前半の説明が長くなり、実習の時間が足りなかった。次回は説明を半分にして、手を動かす時間を増やす。"}, {"userId": "seed-03", "text": "配線ミスが多かったので、ブレッドボードの使い方を先に説明したほうがよい。"}, {"userId": "seed-12", "text": "資料の部数が足りず、途中で印刷し直した。次回は多めに用意する。"}, {"userId": "seed-13", "text": "音が鳴らない原因を一緒に探せた。自分でも説明できるよう復習したい。"}, {"userId": "seed-17", "text": "部品の数を事前に数えておいたので、回収がスムーズだった。"}, {"userId": "seed-15", "text": "作業中の写真を多く撮れた。SNSに使える写真を広報部に渡した。"}, {"userId": "seed-19", "text": "机の配置を班ごとに分けたことで、講師が回りやすかった。"}, {"userId": "seed-05", "text": "全員分を回収できた。釣り銭を多めに用意しておいてよかった。"}, {"userId": "seed-01", "text": "初心者が多かったが、全員が音を鳴らせた。次は応用編を企画したい。"}]',
     '初心者が多い回だったが、参加者全員がブザーを鳴らすところまで進められた。前半の説明が長く実習の時間が足りなかったため、説明を短くし手を動かす時間を増やすことが次回の課題である。資料の部数不足もあり、準備の段階で数を確認する必要がある。',

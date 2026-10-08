@@ -7,13 +7,13 @@ import type { AppEnv } from '../../env'
 import { badRequest, conflict } from '../../lib/errors'
 import { validate } from '../../lib/validator'
 import { assertAdmin } from '../../middleware/auth'
-import { dropLecturers } from './lecturer'
+import { dropLecturers } from './category-rules'
 
 /** イベントの種類。誰でも読めて、変更は管理者だけが一括で保存する */
 export const eventCategoriesRoute = new Hono<AppEnv>()
   .get('/', async (c) => {
     const categories = await createDb(c.env)
-      .select({ id: eventCategories.id, label: eventCategories.label, tone: eventCategories.tone, hasLecturer: eventCategories.hasLecturer })
+      .select({ id: eventCategories.id, label: eventCategories.label, tone: eventCategories.tone, hasLecturer: eventCategories.hasLecturer, hasReport: eventCategories.hasReport })
       .from(eventCategories)
       .orderBy(asc(eventCategories.sortOrder), asc(eventCategories.createdAt))
     return c.json({ categories })
@@ -63,9 +63,9 @@ export const eventCategoriesRoute = new Hono<AppEnv>()
         category.id
           ? db
               .update(eventCategories)
-              .set({ label: category.label, tone: category.tone, hasLecturer: category.hasLecturer, sortOrder: index })
+              .set({ label: category.label, tone: category.tone, hasLecturer: category.hasLecturer, hasReport: category.hasReport, sortOrder: index })
               .where(eq(eventCategories.id, category.id))
-          : db.insert(eventCategories).values({ id: crypto.randomUUID(), label: category.label, tone: category.tone, hasLecturer: category.hasLecturer, sortOrder: index }),
+          : db.insert(eventCategories).values({ id: crypto.randomUUID(), label: category.label, tone: category.tone, hasLecturer: category.hasLecturer, hasReport: category.hasReport, sortOrder: index }),
       ),
       ...(lecturerDropped.length > 0 ? dropLecturers(db, inArray(events.category, lecturerDropped)) : []),
     ]

@@ -17,9 +17,9 @@ export async function clientLoader() {
   return unwrap(api.events.categories.$get())
 }
 
-/** 編集画面から { categories: [{ id?, label, tone, hasLecturer }] } が JSON で送られてくる。上から順に並べて一括で保存する */
+/** 編集画面から { categories: [{ id?, label, tone, hasLecturer, hasReport }] } が JSON で送られてくる。上から順に並べて一括で保存する */
 export async function clientAction({ request }: Route.ClientActionArgs): Promise<FormErrors | { ok: true }> {
-  const { categories } = (await request.json()) as { categories: { id?: string; label: string; tone: CategoryTone; hasLecturer: boolean }[] }
+  const { categories } = (await request.json()) as { categories: { id?: string; label: string; tone: CategoryTone; hasLecturer: boolean; hasReport: boolean }[] }
   const result = await catchApiError(() => unwrap(api.events.categories.$put({ json: { categories } })))
   return result.errors ?? { ok: true }
 }
@@ -32,7 +32,7 @@ export default function EventSettingsPage({ loaderData }: Route.ComponentProps) 
   return <EventSettingsView categories={loaderData.categories} />
 }
 
-type Category = { id: string; label: string; tone: CategoryTone; hasLecturer: boolean }
+type Category = { id: string; label: string; tone: CategoryTone; hasLecturer: boolean; hasReport: boolean }
 
 function EventSettingsView({ categories }: { categories: Category[] }) {
   const [dirty, setDirty] = useState(false)
@@ -42,21 +42,21 @@ function EventSettingsView({ categories }: { categories: Category[] }) {
     <>
       <PageHeader
         title="イベント設定"
-        description="イベントを作るときに選ぶ種類を管理します。変更は「保存」を押すとまとめて反映されます。名前を変えても、そのイベントはそのままです。使われている種類は削除できません。色はバッジとカレンダーに使われます。講師を置かない種類のイベントは、講師・講師補助の役割がなく、まとめ報告書の担当者を参加者から指名します。"
+        description="イベントを作るときに選ぶ種類を管理します。変更は「保存」を押すとまとめて反映されます。名前を変えても、そのイベントはそのままです。使われている種類は削除できません。色はバッジとカレンダーに使われます。講師を置かない種類のイベントは、講師・講師補助の役割がなく、まとめ報告書の担当者を参加者から指名します。報告書なしの種類のイベントは、活動報告書・まとめ報告書を書きません。"
       />
       <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg', maxW: '720px' })}>
         <UnsavedAlert blocker={blocker} />
         {/* 保存して一覧が変わったら編集中の状態を作り直す */}
-        <ListEditor<{ tone: CategoryTone; hasLecturer: boolean }>
+        <ListEditor<{ tone: CategoryTone; hasLecturer: boolean; hasReport: boolean }>
           key={JSON.stringify(categories)}
           title="イベントの種類"
           saved={categories}
           noun="種類"
           labelMax={CATEGORY_LABEL_MAX}
-          newRowExtra={{ tone: 'accent', hasLecturer: true }}
+          newRowExtra={{ tone: 'accent', hasLecturer: true, hasReport: true }}
           minRows={1}
           toPayload={(rows) => ({
-            categories: rows.map((row) => ({ ...(row.id ? { id: row.id } : {}), label: row.label, tone: row.tone, hasLecturer: row.hasLecturer })),
+            categories: rows.map((row) => ({ ...(row.id ? { id: row.id } : {}), label: row.label, tone: row.tone, hasLecturer: row.hasLecturer, hasReport: row.hasReport })),
           })}
           renderExtra={(row, patch) => (
             <span className={css({ display: 'inline-flex', alignItems: 'center', gap: 'xs' })}>
@@ -74,6 +74,7 @@ function EventSettingsView({ categories }: { categories: Category[] }) {
                 ))}
               </select>
               <Checkbox label="講師あり" checked={row.hasLecturer} onChange={(e) => patch({ hasLecturer: e.currentTarget.checked })} />
+              <Checkbox label="報告書あり" checked={row.hasReport} onChange={(e) => patch({ hasReport: e.currentTarget.checked })} />
             </span>
           )}
           onDirtyChange={setDirty}

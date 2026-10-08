@@ -7,6 +7,7 @@ import { activityReports, events, userDivisions, users } from '../../db/schema'
 import type { AppEnv, Session } from '../../env'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
 import { validate } from '../../lib/validator'
+import { rulesOf } from '../events/category-rules'
 import { isApprover } from './access'
 import { assertApprover, assertEditable, assertOwnDivision, findReport, submitReport, updateIfUnchanged, type ReportRow } from './common'
 import { findEventForSummary, submissionProgress, summaryMembersOf, summaryReportOf, summaryWriterIdOf, type SummaryMember } from './queries'
@@ -42,6 +43,7 @@ export function visibleMembers(
 async function assertSummaryWriter(db: Db, eventId: string, userId: string) {
   const event = await findEventForSummary(db, eventId)
   if (!event) throw notFound('イベントが見つかりません')
+  if (!(await rulesOf(db, event.category)).hasReport) throw badRequest('この種類のイベントは報告書を書きません')
   if ((await summaryWriterIdOf(db, event)) !== userId) throw forbidden('まとめ報告書は担当者だけが書けます')
   if (event.startsAt > nowInJst()) throw badRequest('まとめ報告書はイベントが始まってから書けます')
   return event

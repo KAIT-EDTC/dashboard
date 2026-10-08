@@ -42,7 +42,7 @@ import {
   summaryWriterIdOf,
 } from '../reports/queries'
 import { eventCategoriesRoute } from './categories'
-import { dropLecturers } from './lecturer'
+import { dropLecturers } from './category-rules'
 import { notifyEventCreated } from './notifications'
 
 /** 終了日時が無いイベントは開始日の終わりまでを開催中とみなす */
@@ -135,6 +135,15 @@ function replaceTargets(db: Db, eventId: string, divisions: Division[], userIds:
     ...(divisions.length > 0 ? [db.insert(td).values(divisions.map((division) => ({ eventId, division })))] : []),
     ...(userIds.length > 0 ? [db.insert(tu).values(userIds.map((userId) => ({ eventId, userId })))] : []),
   ]
+}
+
+/**
+ * 書きかけ（下書き・修正依頼）のまとめ報告書を新しい担当者に引き継ぐ文（batch に入れる）。
+ * 所属部署と承認者は前の担当者が選んだものなので外す。提出後や担当者が変わらないときは何もしない
+ */
+function handOverSummary(db: Db, summary: { id: string; authorId: string; status: string } | undefined, nextWriterId: string | null) {
+  if (!summary || !nextWriterId || nextWriterId === summary.authorId || (summary.status !== 'draft' && summary.status !== 'rejected')) return []
+  return [db.update(activityReports).set({ authorId: nextWriterId, division: null, approverId: null }).where(eq(activityReports.id, summary.id))]
 }
 
 export const eventsRoute = new Hono<AppEnv>()
@@ -260,10 +269,10 @@ export const eventsRoute = new Hono<AppEnv>()
       myReportOf(db, event.id, userId),
       summaryReportOf(db, event.id),
       summaryMembersOf(db, event.id),
-      summaryWriterIdOf(db, { id: event.id, summaryWriterId: null }),
+      summaryWriterIdOf(db, found),
     ])
-    // まとめ報告書の担当者: 書き始めた人、指名された人、講師の順
-    const writerId = summary?.authorId ?? event.summaryWriterId ?? defaultWriterId
+    // まとめ報告書の担当者: 書き始めた人。まだなら講師（講師を置かない種類は指名された人）
+    const writerId = summary?.authorId ?? defaultWriterId
     const writer = writerId ? (event.participants.find((p) => p.userId === writerId)?.user ?? null) : null
     const targeted = targetDivisions.length > 0 || targetUsers.length > 0
     const targetMembers = targeted ? await findTargetMembers(db, event.id) : []
@@ -274,8 +283,9 @@ export const eventsRoute = new Hono<AppEnv>()
         ...event,
         categoryLabel: category?.label ?? event.category,
         categoryTone: category?.tone ?? ('neutral' as CategoryTone),
-        /** 講師を置くか（種類の設定） */
+        /** 講師を置くか・報告書を書くか（種類の設定） */
         hasLecturer: category?.hasLecturer ?? true,
+        hasReport: category?.hasReport ?? true,
         targetDivisions: sortDivisions(targetDivisions.map((t) => t.division)),
         targetUsers: targetUsers.map((t) => t.user),
       },
@@ -287,12 +297,12 @@ export const eventsRoute = new Hono<AppEnv>()
       /** 承認済みの活動報告書と、自分の報告書の状態 */
       reports,
       myReport: myReport ?? null,
-      /** 参加した人は、イベントが始まったら報告書を書ける（まとめ報告書の担当者は書かなくてよい） */
-      canWriteReport: !!mine && isReportTarget(mine) && event.startsAt <= nowInJst() && writerId !== userId,
+      /** 参加した人は、イベントが始まったら報告書を書ける（報告書を書かない種類は除く。まとめ報告書の担当者は書かなくてよい） */
+      canWriteReport: (category?.hasReport ?? true) && !!mine && isReportTarget(mine) && event.startsAt <= nowInJst() && writerId !== userId,
       /** まとめ報告書。下書きは担当者にだけ見せる */
       summary: {
         writer,
-        /** 指名された担当者（いなければ講師が担当） */
+        /** 指名された担当者（講師を置かない種類のみ使う） */
         assignedId: event.summaryWriterId,
         report:
           summary && (summary.status !== 'draft' || summary.authorId === userId)
@@ -395,13 +405,14 @@ export const eventsRoute = new Hono<AppEnv>()
     if (input.role === 'lecturer' && !(await findCategory(db, event.category)).hasLecturer) throw badRequest('この種類のイベントには講師を置きません')
     const update = db.update(eventParticipants).set(input).where(target)
     if (input.role === 'lecturer') {
-      // 講師は1人だけ。新しく講師にしたら、それまでの講師は講師補助に戻す
+      // 講師は1人だけ。新しく講師にしたら、それまでの講師は講師補助に戻す。書きかけのまとめ報告書は新しい講師に引き継ぐ
       await db.batch([
         db
           .update(eventParticipants)
           .set({ role: 'assistant' })
           .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.role, 'lecturer'))),
         update,
+        ...handOverSummary(db, await summaryReportOf(db, event.id), participant.userId),
       ])
     } else {
       await update
@@ -409,13 +420,14 @@ export const eventsRoute = new Hono<AppEnv>()
     return c.json({ ok: true })
   })
 
-  // まとめ報告書の担当者を指名する（主催者・管理者）。null で講師に戻す。
+  // まとめ報告書の担当者を指名する（講師を置かない種類のイベントで、主催者・管理者）。null で未定に戻す。
   // 書きかけ（下書き・修正依頼）のまとめ報告書は新しい担当者に引き継ぐ。提出後は替えられない
   .put('/:id/summary-writer', validate('json', summaryWriterSchema), async (c) => {
     const { userId } = c.req.valid('json')
     const db = createDb(c.env)
     const event = await findEvent(db, c.req.param('id'))
     assertCanManage(c.get('session'), event.createdBy)
+    if ((await findCategory(db, event.category)).hasLecturer) throw badRequest('講師を置く種類のイベントは、講師がまとめ報告書を書きます')
 
     if (userId) {
       const participant = await db
@@ -430,14 +442,7 @@ export const eventsRoute = new Hono<AppEnv>()
       throw conflict('提出済みのまとめ報告書があるため、担当者を変更できません')
     }
 
-    const nextWriterId = userId ?? (await summaryWriterIdOf(db, { id: event.id, summaryWriterId: null }))
-    await db.batch([
-      db.update(events).set({ summaryWriterId: userId }).where(eq(events.id, event.id)),
-      // 所属部署と承認者は前の担当者が選んだものなので外す
-      ...(summary && nextWriterId && nextWriterId !== summary.authorId
-        ? [db.update(activityReports).set({ authorId: nextWriterId, division: null, approverId: null }).where(eq(activityReports.id, summary.id))]
-        : []),
-    ])
+    await db.batch([db.update(events).set({ summaryWriterId: userId }).where(eq(events.id, event.id)), ...handOverSummary(db, summary, userId)])
     return c.json({ ok: true })
   })
 

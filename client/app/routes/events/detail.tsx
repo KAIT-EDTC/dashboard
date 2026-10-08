@@ -111,7 +111,7 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
                 </ButtonLink>
               )
             )}
-            <SummaryButton eventId={event.id} summary={summary} userId={me.id} started={started} />
+            {event.hasReport && <SummaryButton eventId={event.id} summary={summary} userId={me.id} started={started} />}
             {/* イベントのタイトルと日付を引き継いだブログの下書きを作る */}
             <Form method="post" action="/blog?index">
               <input type="hidden" name="eventId" value={event.id} />
@@ -133,8 +133,9 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
           <EventInfo event={event} />
           <EventNotices reports={reports} />
-          <EventSummary event={event} summary={summary} canManage={canManage} started={started} />
-          {started && <EventReports event={event} reports={reports} />}
+          {/* 報告書を書かない種類のイベントには出さない（書かない設定にする前の承認済みの報告書は残す） */}
+          {event.hasReport && <EventSummary event={event} summary={summary} canManage={canManage} started={started} />}
+          {started && (event.hasReport || reports.length > 0) && <EventReports event={event} reports={reports} />}
           <ItemList event={event} userId={me.id} canManage={canManage} />
         </div>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>

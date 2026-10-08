@@ -2,14 +2,32 @@ import { and, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm'
 import type { Db } from '../../db'
 import { eventCategories, eventParticipants, events } from '../../db/schema'
 
-/** 講師を置くかはイベントの種類で決まる（「イベント設定」で管理者が変える）。種類が見つからなければ置く */
+/**
+ * イベントの種類ごとの決まり（「イベント設定」で管理者が変える）。
+ * 講師を置くか・報告書を書くか。種類が見つからなければどちらも「する」とみなす
+ */
+
+/** イベント（events を from/join しているクエリ）が講師を置くか */
 export const eventHasLecturer = sql<boolean>`coalesce((select ${eventCategories.hasLecturer} from ${eventCategories} where ${eventCategories.id} = ${events.category}), 1)`.mapWith(Boolean)
+
+/** イベント（events を from/join しているクエリ）が報告書を書くか */
+export const eventHasReport = sql<boolean>`coalesce((select ${eventCategories.hasReport} from ${eventCategories} where ${eventCategories.id} = ${events.category}), 1)`.mapWith(Boolean)
 
 /** 種類ごとに講師を置くか。読み込んだイベント（category を持つもの）に当てはめる */
 export async function lecturerByCategory(db: Db): Promise<(category: string) => boolean> {
   const rows = await db.select({ id: eventCategories.id, hasLecturer: eventCategories.hasLecturer }).from(eventCategories)
   const map = new Map(rows.map((row) => [row.id, row.hasLecturer]))
   return (category) => map.get(category) ?? true
+}
+
+/** 1つの種類の決まり */
+export async function rulesOf(db: Db, category: string): Promise<{ hasLecturer: boolean; hasReport: boolean }> {
+  const row = await db
+    .select({ hasLecturer: eventCategories.hasLecturer, hasReport: eventCategories.hasReport })
+    .from(eventCategories)
+    .where(eq(eventCategories.id, category))
+    .get()
+  return row ?? { hasLecturer: true, hasReport: true }
 }
 
 /**

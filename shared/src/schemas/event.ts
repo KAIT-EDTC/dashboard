@@ -67,6 +67,8 @@ export const eventCategoriesSaveSchema = z.object({
         tone: z.enum(CATEGORY_TONES),
         /** 講師を置くか。置かない種類のイベントは役割がなく、まとめ報告書の担当者を参加者から指名する */
         hasLecturer: z.boolean().default(true),
+        /** 報告書を書くか。書かない種類のイベントは活動報告書・まとめ報告書の対象にならない */
+        hasReport: z.boolean().default(true),
       }),
     )
     .min(1, '種類は1つ以上必要です')

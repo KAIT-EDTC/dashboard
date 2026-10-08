@@ -72,7 +72,8 @@ export function EventSummary({ event, summary, canManage, started }: { event: Ev
             </Badge>
           )}
         </div>
-        {canManage && !locked && (
+        {/* 講師を置く種類は講師が書くので、担当者を選ぶのは講師を置かない種類だけ */}
+        {canManage && !locked && !event.hasLecturer && (
           <SelectField
             label="担当者"
             value={summary.assignedId ?? ''}
@@ -82,7 +83,7 @@ export function EventSummary({ event, summary, canManage, started }: { event: Ev
             }
             className={css({ maxW: '280px' })}
           >
-            <option value="">{event.hasLecturer ? '講師' : '未定'}</option>
+            <option value="">未定</option>
             {candidates.map((p) => (
               <option key={p.userId} value={p.userId}>
                 {fullName(p.user)}

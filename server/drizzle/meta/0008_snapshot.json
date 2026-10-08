@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "8a00461f-69be-4a13-8929-942f458a9f8b",
+  "id": "16d018f0-22bd-4e4b-8120-1041ba33ed50",
   "prevId": "a0f85167-7d02-4155-9998-d378b008d598",
   "tables": {
     "activity_report_comments": {
@@ -776,6 +776,14 @@
         },
         "has_lecturer": {
           "name": "has_lecturer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "has_report": {
+          "name": "has_report",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

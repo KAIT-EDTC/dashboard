@@ -57,8 +57,10 @@ CREATE UNIQUE INDEX `activity_reports_event_summary_idx` ON `activity_reports` (
 CREATE INDEX `activity_reports_author_idx` ON `activity_reports` (`author_id`);--> statement-breakpoint
 CREATE INDEX `activity_reports_status_division_idx` ON `activity_reports` (`status`,`division`);--> statement-breakpoint
 ALTER TABLE `event_categories` ADD `has_lecturer` integer DEFAULT true NOT NULL;--> statement-breakpoint
--- ミーティング・親睦には講師を置かない（ほかの種類は「イベント設定」で変えられる）
+ALTER TABLE `event_categories` ADD `has_report` integer DEFAULT true NOT NULL;--> statement-breakpoint
+-- ミーティング・親睦には講師を置かない。ミーティングは報告書を書かない（どちらも「イベント設定」で変えられる）
 UPDATE `event_categories` SET `has_lecturer` = false WHERE `id` IN ('meeting', 'social');--> statement-breakpoint
+UPDATE `event_categories` SET `has_report` = false WHERE `id` = 'meeting';--> statement-breakpoint
 ALTER TABLE `event_participants` ADD `role` text DEFAULT 'assistant' NOT NULL;--> statement-breakpoint
 ALTER TABLE `events` ADD `summary_writer_id` text REFERENCES users(id) ON DELETE set null;--> statement-breakpoint
 ALTER TABLE `notification_settings` ADD `on_report_review_requested` integer DEFAULT true NOT NULL;--> statement-breakpoint

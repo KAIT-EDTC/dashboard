@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, lte, not, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import {
@@ -28,7 +28,7 @@ import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
 import { validate } from '../../lib/validator'
 import { requireAuth } from '../../middleware/auth'
-import { eventHasLecturer, lecturerByCategory } from '../events/lecturer'
+import { eventHasLecturer, eventHasReport, lecturerByCategory } from '../events/category-rules'
 import { canReviewNow, canView, isApprover } from './access'
 import { assertApprover, assertEditable, assertOwnDivision, findReport, nameOf, submitReport, summaryOf, updateIfUnchanged } from './common'
 import { notifyApproved, notifyAwaitingReview, notifyRejected } from './notifications'
@@ -46,12 +46,13 @@ const eventColumns = {
 /** 報告書を書けるのは、参加したイベントが始まってから。書く人のそのイベントでの役割を返す */
 async function assertCanWrite(db: Db, eventId: string, userId: string) {
   const participation = await db
-    .select({ startsAt: events.startsAt, role: eventParticipants.role, hasLecturer: eventHasLecturer })
+    .select({ startsAt: events.startsAt, role: eventParticipants.role, hasLecturer: eventHasLecturer, hasReport: eventHasReport })
     .from(eventParticipants)
     .innerJoin(events, eq(events.id, eventParticipants.eventId))
     .where(and(eq(eventParticipants.eventId, eventId), eq(eventParticipants.userId, userId), isTargetParticipant))
     .get()
   if (!participation) throw forbidden('このイベントに参加した人だけが報告書を書けます')
+  if (!participation.hasReport) throw badRequest('この種類のイベントは報告書を書きません')
   if (participation.startsAt > nowInJst()) throw badRequest('報告書はイベントが始まってから書けます')
   // 講師を置かないイベントには役割がない
   return participation.hasLecturer ? participation.role : null
@@ -80,9 +81,11 @@ async function summaryTargetsOf(db: Db, userId: string) {
     .where(
       and(
         lte(events.startsAt, nowInJst()),
+        eventHasReport,
         or(
-          eq(events.summaryWriterId, userId),
-          and(isNull(events.summaryWriterId), inArray(events.id, lecturing)),
+          // 講師を置く種類は講師、置かない種類は指名された人
+          and(eventHasLecturer, inArray(events.id, lecturing)),
+          and(not(eventHasLecturer), eq(events.summaryWriterId, userId)),
           eq(activityReports.authorId, userId),
         ),
       ),
@@ -117,7 +120,7 @@ export const reportsRoute = new Hono<AppEnv>()
       .from(eventParticipants)
       .innerJoin(events, eq(events.id, eventParticipants.eventId))
       .leftJoin(activityReports, and(eq(activityReports.eventId, events.id), eq(activityReports.authorId, userId), isActivity))
-      .where(and(eq(eventParticipants.userId, userId), isTargetParticipant, lte(events.startsAt, nowInJst())))
+      .where(and(eq(eventParticipants.userId, userId), isTargetParticipant, lte(events.startsAt, nowInJst()), eventHasReport))
       .orderBy(desc(events.startsAt))
       .limit(50)
     const summaries = await summaryTargetsOf(db, userId)
@@ -182,7 +185,7 @@ export const reportsRoute = new Hono<AppEnv>()
         hasLecturer: eventHasLecturer,
       })
       .from(events)
-      .where(lte(events.startsAt, nowInJst()))
+      .where(and(lte(events.startsAt, nowInJst()), eventHasReport))
       .orderBy(desc(events.startsAt))
       .limit(20)
     if (recent.length === 0) return c.json({ events: [] })
@@ -217,7 +220,8 @@ export const reportsRoute = new Hono<AppEnv>()
         const members = participants.filter((p) => p.eventId === event.id)
         const summary = summaryByEvent.get(event.id)
         // 担当者: 書き始めた人、指名された人、講師の順
-        const writerId = summary?.authorId ?? summaryWriterId ?? members.find((m) => m.role === 'lecturer')?.userId
+        // 担当者: 書き始めた人。まだなら講師（講師を置かない種類は指名された人）
+        const writerId = summary?.authorId ?? (hasLecturer ? members.find((m) => m.role === 'lecturer')?.userId : summaryWriterId)
         return {
           ...event,
           members: members.map((p) => {

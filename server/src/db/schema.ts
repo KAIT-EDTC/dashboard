@@ -128,6 +128,8 @@ export const eventCategories = sqliteTable('event_categories', {
   tone: text('tone').$type<CategoryTone>().notNull().default('neutral'),
   /** 講師を置くか。置かない種類（ミーティング・親睦など）のイベントは講師・講師補助の役割がなく、まとめ報告書の担当者を指名する */
   hasLecturer: integer('has_lecturer', { mode: 'boolean' }).notNull().default(true),
+  /** 活動報告書・まとめ報告書を書くか。書かない種類（ミーティングなど）のイベントは報告書の対象にならない */
+  hasReport: integer('has_report', { mode: 'boolean' }).notNull().default(true),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamps.createdAt,
 })
