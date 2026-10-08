@@ -20,13 +20,9 @@ export const RSVP_STATUS_LABELS: Record<RsvpStatus, string> = {
   declined: '不参加',
 }
 
-/** personal: 各自が持参するもの / shared: 誰か1人が用意すればよいもの（担当者を決める） */
+/** personal: 参加者全員がそれぞれ持ってくるもの / shared: 誰か1人が持ってくるもの（担当者を決める。未定なら募集） */
 export const ITEM_KINDS = ['personal', 'shared'] as const
 export type ItemKind = (typeof ITEM_KINDS)[number]
-export const ITEM_KIND_LABELS: Record<ItemKind, string> = {
-  personal: '各自持参',
-  shared: '共有（担当者が用意）',
-}
 
 /** 活動での役割。講師は1イベントにつき1人まで（主催者が選ぶ）、それ以外の参加者は講師補助 */
 export const PARTICIPANT_ROLES = ['lecturer', 'assistant'] as const

@@ -45,7 +45,7 @@ const itemFields = {
   note: z.string().trim().max(200, 'メモは200文字以内にしてください'),
 }
 
-export const itemInputSchema = z.object(itemFields)
+export const itemInputSchema = z.object({ ...itemFields, assigneeId: z.string().nullable().optional() })
 
 export const itemUpdateSchema = z
   .object({

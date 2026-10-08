@@ -452,8 +452,14 @@ export const eventsRoute = new Hono<AppEnv>()
     const db = createDb(c.env)
     const event = await findEvent(db, c.req.param('id'))
     assertCanManage(c.get('session'), event.createdBy)
+    const input = c.req.valid('json')
+    if (input.kind === 'personal') input.assigneeId = null
+    else if (input.assigneeId) {
+      const assignee = await db.select({ id: users.id }).from(users).where(eq(users.id, input.assigneeId)).get()
+      if (!assignee) throw badRequest('担当者が見つかりません')
+    }
     const id = crypto.randomUUID()
-    await db.insert(eventItems).values({ ...c.req.valid('json'), id, eventId: event.id })
+    await db.insert(eventItems).values({ ...input, id, eventId: event.id })
     return c.json({ id }, 201)
   })
 
@@ -490,9 +496,15 @@ export const eventsRoute = new Hono<AppEnv>()
       if (!assignee) throw badRequest('担当者が見つかりません')
     }
 
+    // 全員が持ってくるものには担当者も準備済みもない（非主催者は kind を変えられない）
+    const toPersonal = canManage(session, event.createdBy) && (input.kind ?? item.kind) === 'personal'
     await db
       .update(eventItems)
-      .set({ ...input, ...(assigneeChanged && input.prepared === undefined && { prepared: false }) })
+      .set({
+        ...input,
+        ...(assigneeChanged && input.prepared === undefined && { prepared: false }),
+        ...(toPersonal && { assigneeId: null, prepared: false }),
+      })
       .where(eq(eventItems.id, item.id))
     return c.json({ ok: true })
   })

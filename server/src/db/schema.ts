@@ -244,7 +244,7 @@ export const eventItems = sqliteTable(
     kind: text('kind', { enum: ITEM_KINDS }).notNull(),
     quantity: integer('quantity').notNull().default(1),
     note: text('note').notNull().default(''),
-    /** 共有の持ち物を用意する人 */
+    /** 持ってくる人（未定なら null。全員が持ってくるものは常に null） */
     assigneeId: text('assignee_id').references(() => users.id, { onDelete: 'set null' }),
     prepared: integer('prepared', { mode: 'boolean' }).notNull().default(false),
     createdAt: timestamps.createdAt,
