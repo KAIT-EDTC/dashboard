@@ -12,16 +12,18 @@ import {
   nowInJst,
   participantUpdateSchema,
   rsvpSchema,
+  type CategoryTone,
   type Division,
   type RsvpStatus,
 } from '@edtc/shared'
 import { createDb, memberSummaryColumns, type Db } from '../../db'
-import { eventAttachments, eventItems, eventParticipants, events, eventTargetDivisions, eventTargetUsers, userDivisions, users } from '../../db/schema'
+import { eventAttachments, eventCategories, eventItems, eventParticipants, events, eventTargetDivisions, eventTargetUsers, userDivisions, users } from '../../db/schema'
 import type { AppEnv } from '../../env'
 import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
 import { validate } from '../../lib/validator'
 import { assertCanManage, canManage, requireAuth } from '../../middleware/auth'
+import { eventCategoriesRoute } from './categories'
 import { notifyEventCreated } from './notifications'
 
 /** 終了日時が無いイベントは開始日の終わりまでを開催中とみなす */
@@ -89,6 +91,17 @@ function targetLabel(divisions: Division[], userCount: number): string | null {
   return parts.length > 0 ? parts.join(' ＋ ') : null
 }
 
+/** 一覧・詳細で種類の表示名と色を添える（種類が見つからなければ id と灰色） */
+const categoryLabelSql = sql<string>`coalesce((select ${eventCategories.label} from ${eventCategories} where ${eventCategories.id} = ${events.category}), ${events.category})`
+const categoryToneSql = sql<CategoryTone>`coalesce((select ${eventCategories.tone} from ${eventCategories} where ${eventCategories.id} = ${events.category}), 'neutral')`
+
+/** イベントの種類が今あるものか確かめて、その行を返す */
+async function findCategory(db: Db, id: string) {
+  const category = await db.select().from(eventCategories).where(eq(eventCategories.id, id)).get()
+  if (!category) throw badRequest('イベントの種類が正しくありません。画面を読み込み直してください')
+  return category
+}
+
 async function assertUsersExist(db: Db, userIds: string[]) {
   if (userIds.length === 0) return
   const found = await db.select({ id: users.id }).from(users).where(inArray(users.id, userIds))
@@ -107,6 +120,9 @@ function replaceTargets(db: Db, eventId: string, divisions: Division[], userIds:
 
 export const eventsRoute = new Hono<AppEnv>()
   .use(requireAuth)
+
+  // /:id より先に登録する
+  .route('/categories', eventCategoriesRoute)
 
   .get('/', validate('query', listQuerySchema), async (c) => {
     const { scope, from, to } = c.req.valid('query')
@@ -131,6 +147,8 @@ export const eventsRoute = new Hono<AppEnv>()
         ),
         targetUserCount: sql<number>`(select count(*) from ${tu} where ${tu.eventId} = ${events.id})`.mapWith(Number),
         isTarget: isTargetOf(userId),
+        categoryLabel: categoryLabelSql,
+        categoryTone: categoryToneSql,
       })
       .from(events)
       .leftJoin(p, eq(p.eventId, events.id))
@@ -167,6 +185,7 @@ export const eventsRoute = new Hono<AppEnv>()
     const { userId } = c.get('session')
     const db = createDb(c.env)
     const id = crypto.randomUUID()
+    const category = await findCategory(db, input.category)
     await assertUsersExist(db, targetUserIds)
 
     // 作成者は主催者として参加扱いにする
@@ -185,7 +204,7 @@ export const eventsRoute = new Hono<AppEnv>()
     const mentionIds = label ? (await findTargetMembers(db, id)).map((m) => m.id).filter((memberId) => memberId !== userId) : []
     runInBackground(
       c,
-      notifyEventCreated(c.env, db, { id, ...input }, organizer ? `${organizer.lastName} ${organizer.firstName}` : '', {
+      notifyEventCreated(c.env, db, { id, ...input, categoryLabel: category.label }, organizer ? `${organizer.lastName} ${organizer.firstName}` : '', {
         label,
         mentionIds,
       }),
@@ -220,11 +239,18 @@ export const eventsRoute = new Hono<AppEnv>()
     if (!found) throw notFound('イベントが見つかりません')
 
     const { targetDivisions, targetUsers, ...event } = found
+    const category = await db.select().from(eventCategories).where(eq(eventCategories.id, event.category)).get()
     const targeted = targetDivisions.length > 0 || targetUsers.length > 0
     const targetMembers = targeted ? await findTargetMembers(db, event.id) : []
     const answered = new Set(event.participants.map((p) => p.userId))
     return c.json({
-      event: { ...event, targetDivisions: sortDivisions(targetDivisions.map((t) => t.division)), targetUsers: targetUsers.map((t) => t.user) },
+      event: {
+        ...event,
+        categoryLabel: category?.label ?? event.category,
+        categoryTone: category?.tone ?? ('neutral' as CategoryTone),
+        targetDivisions: sortDivisions(targetDivisions.map((t) => t.division)),
+        targetUsers: targetUsers.map((t) => t.user),
+      },
       canManage: canManage(c.get('session'), event.createdBy),
       /** 自分が対象か（全員向けなら常に true） */
       isTarget: !targeted || targetMembers.some((m) => m.id === userId),
@@ -239,6 +265,7 @@ export const eventsRoute = new Hono<AppEnv>()
     assertCanManage(c.get('session'), event.createdBy)
     const { targetDivisions, targetUserIds: rawUserIds, ...input } = c.req.valid('json')
     const targetUserIds = [...new Set(rawUserIds)]
+    await findCategory(db, input.category)
     await assertUsersExist(db, targetUserIds)
     await db.batch([
       db.update(events).set(input).where(eq(events.id, event.id)),

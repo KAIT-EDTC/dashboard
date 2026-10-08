@@ -31,3 +31,5 @@ export async function listReviewerIds(db: Db) {
   const rows = await db.select({ userId: blogReviewers.userId }).from(blogReviewers)
   return rows.map((row) => row.userId)
 }
+
+/** 今あるイベント種別（並び順どおり） */

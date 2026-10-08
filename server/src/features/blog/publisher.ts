@@ -1,5 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm'
-import { buildMarkdown, referencedImages, type BlogPostContent } from '@edtc/shared'
+import { buildMarkdown, referencedImages, seriesLabel, type BlogPostContent } from '@edtc/shared'
 import type { Db } from '../../db'
 import { blogImages } from '../../db/schema'
 import type { Bindings } from '../../env'
@@ -170,7 +170,7 @@ export class BlogPublisher {
       `| 記事ID | \`${articleId}\` |`,
       `| イベント実施日 | ${content.eventDate} |`,
       `| 執筆者 | ${target.authorLabel} |`,
-      `| タグ | ${content.tags.join(', ')} |`,
+      `| 種別 | ${seriesLabel(content.series)}${content.pickup ? '（ピックアップ）' : ''} |`,
       '',
       `本文は \`${dir}/index.md\` の「Files changed」で画像つきで確認できます。`,
       '',

@@ -83,6 +83,7 @@ export function ChipCheckbox({ label, ...props }: { label: ReactNode } & Omit<Co
   return (
     <label
       className={css({
+        position: 'relative', // 隠しinputの基準。無いとフォーカス時に画面枠(overflow:hidden)がスクロールして崩れる
         display: 'inline-flex',
         alignItems: 'center',
         gap: 'xs',

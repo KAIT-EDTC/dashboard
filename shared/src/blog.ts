@@ -9,16 +9,21 @@
  * 旧ルール（YY-MM-DD-slug、例: 26-05-16-yugyou01）で提出済みの記事IDはそのまま使い続ける。
  */
 
-/** 記事のイベント種別（記事IDの末尾になる）。タグとは別で、コードで固定 */
+/**
+ * 記事のイベント種別（記事ごとに1つ）。id は記事IDの末尾・EDTCHPのフォルダ名と、サイトの一覧ページのURLになる。
+ * サイトはこの種別ごとに記事を並べる。遊行塾・レク以外は、学内か学外かで選ぶ。
+ * EDTCHP_v2 の src/lib/tags.ts の BLOG_SERIES と必ず同じにする（増やすときは両方のリポジトリを直す）
+ */
 export const BLOG_SERIES = [
   { id: 'yugyou', label: '遊行塾' },
-  { id: 'event', label: 'イベント' },
-  { id: 'outreach', label: '対外活動' },
-  { id: 'play', label: '遊び' },
-  { id: 'other', label: 'その他' },
+  { id: 'offcampus', label: '学外イベント' },
+  { id: 'oncampus', label: '学内イベント' },
+  { id: 'play', label: 'レク' },
 ] as const
 export type BlogSeriesId = (typeof BLOG_SERIES)[number]['id']
 export const BLOG_SERIES_IDS = BLOG_SERIES.map((series) => series.id) as [BlogSeriesId, ...BlogSeriesId[]]
+export const isBlogSeriesId = (value: string): value is BlogSeriesId => (BLOG_SERIES_IDS as readonly string[]).includes(value)
+export const seriesLabel = (id: string) => BLOG_SERIES.find((series) => series.id === id)?.label ?? ''
 
 export const BLOG_STATUSES = ['draft', 'in_review', 'published'] as const
 export type BlogStatus = (typeof BLOG_STATUSES)[number]
@@ -35,13 +40,13 @@ export type BlogPostContent = {
   title: string
   /** イベント実施日 YYYY-MM-DD */
   eventDate: string
-  /** イベント種別ID（BLOG_SERIES）。未選択は '' */
-  series: string
+  /** イベント種別ID（BLOG_SERIES）。未選択（下書き）は '' */
+  series: BlogSeriesId | ''
   /** 記事一覧・OGPに使う短い説明 */
   description: string
   authorName: string
-  /** タグの表示名（管理者がダッシュボードで管理する） */
-  tags: string[]
+  /** サイトの「ピックアップ」に載せるか */
+  pickup: boolean
   /** サムネイル画像のファイル名 */
   thumbnail: string | null
   /** Markdown。画像は ![説明](./img-xxxxxxxx.webp) で参照する */
@@ -51,7 +56,7 @@ export type BlogPostContent = {
 /** 2026-05-16 + yugyou → 26-05-16-yugyou（連番を付ける前の記事ID） */
 export function articleIdBase(eventDate: string, series: string): string {
   const m = eventDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (!m || !BLOG_SERIES_IDS.includes(series as BlogSeriesId)) return ''
+  if (!m || !isBlogSeriesId(series)) return ''
   return `${m[1].slice(2)}-${m[2]}-${m[3]}-${series}`
 }
 
@@ -92,27 +97,22 @@ export function buildMarkdown(content: BlogPostContent): string {
     `date: ${content.eventDate}`,
     `author: ${yamlString(content.authorName.trim())}`,
     `description: ${yamlString(content.description.trim())}`,
-    `tags: [${content.tags.map(yamlString).join(', ')}]`,
+    `series: ${content.series}`,
+    ...(content.pickup ? ['pickup: true'] : []),
     ...(content.thumbnail ? [`thumbnail: ./${content.thumbnail}`] : []),
   ]
   const body = content.body.replace(/\r\n/g, '\n').trim()
   return `---\n${frontmatter.join('\n')}\n---\n\n${body}\n`
 }
 
-/**
- * PR作成（提出）前のチェック。
- * 旧ルールで記事IDが決まっている記事は、イベント種別未選択でも提出できる（seriesOptional）
- */
-export function validateForSubmit(content: BlogPostContent, { seriesOptional = false } = {}): string[] {
+/** PR作成（提出）前のチェック。サイトは種別で記事を分けるので、旧ルールの記事IDを持つ記事も種別は必須 */
+export function validateForSubmit(content: BlogPostContent): string[] {
   const errors: string[] = []
   if (!content.title.trim()) errors.push('タイトルを入力してください')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(content.eventDate)) errors.push('イベント実施日を入力してください')
-  if (!content.series) {
-    if (!seriesOptional) errors.push('イベント種別を選択してください')
-  } else if (!BLOG_SERIES_IDS.includes(content.series as BlogSeriesId)) errors.push('イベント種別が正しくありません')
+  if (!isBlogSeriesId(content.series)) errors.push('イベント種別を選択してください')
   if (!content.description.trim()) errors.push('一覧用の説明文を入力してください')
   if (!content.authorName.trim()) errors.push('執筆者名を入力してください')
-  if (content.tags.length === 0) errors.push('タグを1つ以上選択してください')
   if (!content.thumbnail) errors.push('サムネイル画像を設定してください')
   if (!content.body.trim()) errors.push('本文を入力してください')
   if (/<\s*(img|script|iframe)\b/i.test(content.body)) {

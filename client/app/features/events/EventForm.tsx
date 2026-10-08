@@ -1,4 +1,4 @@
-import { EVENT_CATEGORIES, EVENT_CATEGORY_LABELS, type Division, type EventInput } from '@edtc/shared'
+import type { Division, EventInput } from '@edtc/shared'
 import { useState, type ReactNode } from 'react'
 import { Form } from 'react-router'
 import { css } from 'styled-system/css'
@@ -18,6 +18,8 @@ type EventFormProps = {
   /** 編集時の、すでに添付されているファイルとイベントID */
   attachments?: EventAttachment[]
   eventId?: string
+  /** 種類の選択肢（管理者が管理する） */
+  categories: { id: string; label: string }[]
   /** 対象者の選択と人数の表示に使う */
   members: MemberListItem[]
   errors?: FormErrors
@@ -27,7 +29,7 @@ type EventFormProps = {
   secondaryActions?: ReactNode
 }
 
-export function EventForm({ defaultValue = {}, attachments, eventId, members, errors, submitting, submitLabel, secondaryActions }: EventFormProps) {
+export function EventForm({ defaultValue = {}, attachments, eventId, categories, members, errors, submitting, submitLabel, secondaryActions }: EventFormProps) {
   const e = errors?.fieldErrors ?? {}
   const [targetDivisions, setTargetDivisions] = useState<Division[]>(defaultValue.targetDivisions ?? [])
   const [targetUserIds, setTargetUserIds] = useState<string[]>(defaultValue.targetUserIds ?? [])
@@ -41,10 +43,10 @@ export function EventForm({ defaultValue = {}, attachments, eventId, members, er
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
           <TextField label="タイトル" name="title" required defaultValue={defaultValue.title} placeholder="例: 第3回 遊行塾" error={e.title} />
           <div className={grid}>
-            <SelectField label="種類" name="category" defaultValue={defaultValue.category ?? 'activity'} error={e.category}>
-              {EVENT_CATEGORIES.map((category) => (
-                <option key={category} value={category}>
-                  {EVENT_CATEGORY_LABELS[category]}
+            <SelectField label="種類" name="category" defaultValue={defaultValue.category ?? categories[0]?.id} error={e.category}>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.label}
                 </option>
               ))}
             </SelectField>

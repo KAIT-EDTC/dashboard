@@ -98,7 +98,7 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
     <>
       <PageHeader
         title={event.title}
-        description={<CategoryBadge category={event.category} />}
+        description={<CategoryBadge label={event.categoryLabel} tone={event.categoryTone} />}
         back={{ to: '/events', label: 'イベント一覧' }}
         actions={
           <>

@@ -18,12 +18,12 @@ import type { PostDetailResponse } from './types'
 export type EditorIntent = 'save' | 'submit' | 'delete'
 export type EditorActionData = (FormErrors & { intent: EditorIntent }) | { ok: true; intent: EditorIntent; prUrl?: string }
 
-export function BlogEditor({ post, availableTags, hasUnsubmittedChanges, githubConfigured }: PostDetailResponse) {
+export function BlogEditor({ post, hasUnsubmittedChanges, githubConfigured }: PostDetailResponse) {
   const [content, setContent] = useState<BlogPostContent>(() => contentOf(post))
   const fetcher = useFetcher<EditorActionData>()
   const pendingIntent = fetcher.state === 'idle' ? null : (fetcher.json as { intent?: EditorIntent } | undefined)?.intent
   const dirty = JSON.stringify(content) !== JSON.stringify(contentOf(post))
-  const problems = validateForSubmit(content, { seriesOptional: !!post.articleId })
+  const problems = validateForSubmit(content)
   const fieldErrors = fetcher.data && 'fieldErrors' in fetcher.data ? (fetcher.data.fieldErrors ?? {}) : {}
   const locked = !!post.publishedAt
 
@@ -50,9 +50,6 @@ export function BlogEditor({ post, availableTags, hasUnsubmittedChanges, githubC
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
-
-  // 管理者が削除したタグが記事に残っている場合も外せるようにする
-  const tagLabels = [...availableTags.map((tag) => tag.label), ...content.tags.filter((tag) => !availableTags.some((t) => t.label === tag))]
 
   return (
     <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
@@ -81,12 +78,12 @@ export function BlogEditor({ post, availableTags, hasUnsubmittedChanges, githubC
               <SelectField
                 label="イベント種別"
                 value={content.series}
-                onChange={(e) => set('series', e.currentTarget.value)}
-                required={!post.articleId}
-                disabled={locked}
+                onChange={(e) => set('series', e.currentTarget.value as BlogPostContent['series'])}
+                required
                 error={fieldErrors.series}
+                hint="遊行塾・レク以外は、学内か学外かで選ぶ"
               >
-                <option value="">{post.articleId ? '（今の記事IDのまま）' : '選択してください'}</option>
+                <option value="">選択してください</option>
                 {BLOG_SERIES.map((series) => (
                   <option key={series.id} value={series.id}>
                     {series.label}
@@ -96,19 +93,9 @@ export function BlogEditor({ post, availableTags, hasUnsubmittedChanges, githubC
             </div>
             <TextField label="執筆者名" value={content.authorName} onChange={(e) => set('authorName', e.currentTarget.value)} required hint="サイトに表示される名前" />
             <TextareaField label="一覧用の説明文" value={content.description} onChange={(e) => set('description', e.currentTarget.value)} rows={2} required error={fieldErrors.description} />
-            <fieldset>
-              <legend className={css({ fontSize: 'sm', fontWeight: '600', color: 'fg.muted', mb: '6px' })}>タグ</legend>
-              <div className={css({ display: 'flex', flexWrap: 'wrap', gap: 'sm' })}>
-                {tagLabels.map((tag) => (
-                  <ChipCheckbox
-                    key={tag}
-                    label={availableTags.some((t) => t.label === tag) ? tag : `${tag}（削除済み）`}
-                    checked={content.tags.includes(tag)}
-                    onChange={(e) => set('tags', e.currentTarget.checked ? [...content.tags, tag] : content.tags.filter((t) => t !== tag))}
-                  />
-                ))}
-              </div>
-            </fieldset>
+            <div>
+              <ChipCheckbox label="ピックアップに載せる" checked={content.pickup} onChange={(e) => set('pickup', e.currentTarget.checked)} />
+            </div>
             <div className={css({ maxW: '320px' })}>
               <p className={css({ fontSize: 'sm', fontWeight: '600', color: 'fg.muted', mb: '6px' })}>サムネイル</p>
               <ImagePicker postId={post.id} label="サムネイル" fileName={content.thumbnail} onChange={(fileName) => set('thumbnail', fileName)} />

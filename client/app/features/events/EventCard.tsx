@@ -39,7 +39,7 @@ export function EventCard({ event }: { event: EventListItem }) {
       <DateBlock startsAt={event.startsAt} />
       <div className={css({ flex: 1, minW: 0, display: 'flex', flexDirection: 'column', gap: '6px' })}>
         <div className={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'xs' })}>
-          <CategoryBadge category={event.category} />
+          <CategoryBadge label={event.categoryLabel} tone={event.categoryTone} />
           <TargetBadge divisions={event.targetDivisions} userCount={event.targetUserCount} />
           <RsvpBadge status={event.myStatus} isTarget={event.isTarget} />
         </div>

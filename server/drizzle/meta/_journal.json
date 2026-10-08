@@ -40,8 +40,29 @@
     {
       "idx": 5,
       "version": "6",
-      "when": 1791004838608,
-      "tag": "0005_glamorous_green_goblin",
+      "when": 1790998647676,
+      "tag": "0005_true_ultron",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791207710971,
+      "tag": "0006_blog_series_pickup",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791207711616,
+      "tag": "0007_drop_blog_tags",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791472159712,
+      "tag": "0008_event_attachments",
       "breakpoints": true
     }
   ]
