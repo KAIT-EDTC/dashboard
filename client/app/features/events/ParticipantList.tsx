@@ -2,10 +2,12 @@ import { RSVP_STATUS_LABELS, RSVP_STATUSES } from '@edtc/shared'
 import { Link, useFetcher } from 'react-router'
 import { css } from 'styled-system/css'
 import { Avatar } from '~/components/ui/Avatar'
+import { Badge } from '~/components/ui/Badge'
 import { Card } from '~/components/ui/Card'
 import { Checkbox } from '~/components/ui/Field'
 import { formatYen, fullName } from '~/lib/format'
-import type { EventDetail, EventParticipant, PendingMember } from './types'
+import { RoleBadge } from './EventBadges'
+import type { EventDetail, EventDetailResponse, EventParticipant, PendingMember } from './types'
 
 /** 出席・支払いのチェック（主催者・管理者のみ） */
 function ParticipantToggles({ participant, showPaid }: { participant: EventParticipant; showPaid: boolean }) {
@@ -24,7 +26,15 @@ function ParticipantToggles({ participant, showPaid }: { participant: EventParti
   )
 }
 
-export function ParticipantList({ event, pending, canManage }: { event: EventDetail; pending: PendingMember[]; canManage: boolean }) {
+type Props = {
+  event: EventDetail
+  pending: PendingMember[]
+  canManage: boolean
+  summary: EventDetailResponse['summary']
+}
+
+export function ParticipantList({ event, pending, canManage, summary }: Props) {
+  const writerId = summary.writer?.id
   const going = event.participants.filter((p) => p.status === 'going')
   const paidCount = going.filter((p) => p.paid).length
 
@@ -46,12 +56,16 @@ export function ParticipantList({ event, pending, canManage }: { event: EventDet
             <ul className={css({ display: 'flex', flexDirection: 'column', gap: 'sm' })}>
               {list.map((p) => (
                 <li key={p.userId} className={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'sm' })}>
-                  <Link to={`/members/${p.userId}`} className={css({ display: 'flex', alignItems: 'center', gap: 'sm', flex: 1, minW: '140px', color: 'fg', _hover: { color: 'accent' } })}>
+                  <Link to={`/members/${p.userId}`} className={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 'sm', rowGap: 'xs', flex: 1, minW: 0, color: 'fg', _hover: { color: 'accent' } })}>
                     <Avatar user={p.user} size={28} />
-                    <span className={css({ fontSize: 'sm', fontWeight: '500' })}>{fullName(p.user)}</span>
+                    <span className={css({ fontSize: 'sm', fontWeight: '500', whiteSpace: 'nowrap' })}>{fullName(p.user)}</span>
+                    {status === 'going' && event.hasLecturer && <RoleBadge role={p.role} />}
+                    {p.userId === writerId && <Badge tone="accent">まとめ担当</Badge>}
                     {p.comment && <span className={css({ fontSize: 'xs', color: 'fg.muted', truncate: true })}>「{p.comment}」</span>}
                   </Link>
-                  {canManage && status === 'going' && <ParticipantToggles participant={p} showPaid={!!event.fee} />}
+                  {canManage && status === 'going' && (
+                    <ParticipantToggles participant={p} showPaid={!!event.fee} />
+                  )}
                 </li>
               ))}
             </ul>

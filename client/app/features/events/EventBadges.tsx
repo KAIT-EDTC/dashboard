@@ -1,4 +1,11 @@
-import { RSVP_STATUS_LABELS, type CategoryTone, type Division, type RsvpStatus } from '@edtc/shared'
+import {
+  PARTICIPANT_ROLE_LABELS,
+  RSVP_STATUS_LABELS,
+  type CategoryTone,
+  type Division,
+  type ParticipantRole,
+  type RsvpStatus,
+} from '@edtc/shared'
 import { Badge, type BadgeTone } from '~/components/ui/Badge'
 
 /** イベントの種類。表示名と色はAPIが返す（管理者が「種類・種別の管理」で決める） */
@@ -18,4 +25,8 @@ export function RsvpBadge({ status, isTarget = true }: { status: RsvpStatus | nu
 export function TargetBadge({ divisions, userCount }: { divisions: Division[]; userCount: number }) {
   if (divisions.length > 0) return <Badge>{divisions.join('・')}{userCount > 0 && ' ほか'}向け</Badge>
   return userCount > 0 ? <Badge>対象者限定</Badge> : null
+}
+
+export function RoleBadge({ role }: { role: ParticipantRole }) {
+  return <Badge tone={role === 'lecturer' ? 'accent' : 'neutral'}>{PARTICIPANT_ROLE_LABELS[role]}</Badge>
 }

@@ -23,3 +23,11 @@ export const RSVP_STATUS_LABELS: Record<RsvpStatus, string> = {
 /** personal: 参加者全員がそれぞれ持ってくるもの / shared: 誰か1人が持ってくるもの（担当者を決める。未定なら募集） */
 export const ITEM_KINDS = ['personal', 'shared'] as const
 export type ItemKind = (typeof ITEM_KINDS)[number]
+
+/** 活動での役割。講師は1イベントにつき1人まで（主催者が選ぶ）、それ以外の参加者は講師補助 */
+export const PARTICIPANT_ROLES = ['lecturer', 'assistant'] as const
+export type ParticipantRole = (typeof PARTICIPANT_ROLES)[number]
+export const PARTICIPANT_ROLE_LABELS: Record<ParticipantRole, string> = {
+  lecturer: '講師',
+  assistant: '講師補助',
+}

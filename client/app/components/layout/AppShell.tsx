@@ -4,12 +4,13 @@ import { css, cx } from 'styled-system/css'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
-import { BellIcon, CalendarIcon, HomeIcon, ListIcon, LogOutIcon, PenIcon, SlidersIcon, UserIcon, UsersIcon } from '../ui/Icons'
+import { BellIcon, CalendarIcon, FileTextIcon, HomeIcon, ListIcon, LogOutIcon, PenIcon, SlidersIcon, UserIcon, UsersIcon } from '../ui/Icons'
 import { Logo } from './Logo'
 
 const NAV_ITEMS = [
   { to: '/', label: 'ホーム', icon: HomeIcon, end: true },
   { to: '/events', label: 'イベント', icon: CalendarIcon, end: false },
+  { to: '/reports', label: '報告書', icon: FileTextIcon, end: false },
   { to: '/blog', label: 'ブログ', icon: PenIcon, end: false },
   { to: '/members', label: 'メンバー', icon: UsersIcon, end: false },
 ]
