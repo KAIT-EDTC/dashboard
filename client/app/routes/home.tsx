@@ -54,7 +54,7 @@ export default function HomePage({ loaderData }: Route.ComponentProps) {
         )}
       </section>
 
-      <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', lg: '3fr 2fr' }, gap: 'lg', alignItems: 'start' })}>
+      <div className={css({ display: 'grid', gridTemplateColumns: { base: 'minmax(0, 1fr)', lg: 'minmax(0, 3fr) minmax(0, 2fr)' }, gap: 'lg', alignItems: 'start' })}>
         <UpcomingEventsCard events={loaderData.events} />
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
           <HomeReportsCard targets={loaderData.targets} summaries={loaderData.summaries} />

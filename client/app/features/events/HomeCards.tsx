@@ -39,7 +39,7 @@ export function UpcomingEventsCard({ events }: { events: EventListItem[] }) {
             <li key={event.id}>
               <Link to={`/events/${event.id}`} className={rowLink}>
                 <span className={css({ fontSize: 'sm', color: 'fg.muted', minW: '112px', flexShrink: 0 })}>{formatDateTime(event.startsAt)}</span>
-                <span className={css({ flex: 1, fontWeight: '500', truncate: true })}>{event.title}</span>
+                <span className={css({ flex: 1, minW: 0, fontWeight: '500', truncate: true })}>{event.title}</span>
                 <RsvpBadge status={event.myStatus} isTarget={event.isTarget} />
               </Link>
             </li>
