@@ -1,7 +1,7 @@
 import type { NotificationKind } from '@edtc/shared'
 import type { Db } from '../db'
 import type { Bindings } from '../env'
-import { getNotificationSettings, resolveWebhook } from '../features/admin/notification-settings'
+import { getNotificationSettings, resolveWebhook, webhookTargetOf } from '../features/admin/notification-settings'
 
 const API = 'https://discord.com/api/v10'
 
@@ -119,13 +119,13 @@ export async function sendWebhook(url: string, message: NotificationMessage): Pr
 }
 
 /**
- * 設定で有効な通知だけを、設定された通知先に送る。
+ * 設定で有効な通知だけを、種類に応じた通知先（イベント用・ブログ用）に送る。
  * 通知の失敗で本来の処理を失敗させないよう、例外は握りつぶしてログだけ残す
  */
 export async function notify(env: Bindings, db: Db, kind: NotificationKind, message: NotificationMessage): Promise<void> {
   try {
     const settings = await getNotificationSettings(db)
-    const { url } = resolveWebhook(env, settings)
+    const url = resolveWebhook(env, webhookTargetOf(kind))
     if (!url || !settings.enabled[kind]) return
     const result = await sendWebhook(url, message)
     if (!result.ok) console.error('Discord通知に失敗しました', kind, result.error)

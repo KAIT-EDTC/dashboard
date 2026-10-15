@@ -211,9 +211,8 @@ npm run dev                        # client: http://localhost:5173 / server: htt
 1. [Developer Portal](https://discord.com/developers/applications) でアプリを作り、OAuth2 の Redirects に `<APIのURL>/api/auth/callback` を登録
 2. `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` / `DISCORD_REDIRECT_URI` / `DISCORD_GUILD_ID` を設定
 3. スコープは `identify` と `guilds.members.read`（サーバー内のニックネームを本人のトークンで読むため、ログインにBotは不要）
-4. 通知したいチャンネルでWebhookを作り、ダッシュボードの「通知設定」に登録する（管理者のみ）。通知の種類ごとのオン/オフ、テスト送信、ブログ提出時にメンションする **レビュー担当**（メンバーのドロップダウンから選ぶ）も同じ画面で設定する
-   - Webhook URLは保存すると画面には末尾しか表示されない。Discordのウェブフック以外のURLは登録できない
-   - 環境変数 `DISCORD_WEBHOOK_URL` は、画面で設定するまでの代わりとして使われる（画面の設定が優先）
+4. 通知したいチャンネルでWebhookを作り、環境変数に設定する。イベントの通知は `DISCORD_EVENT_WEBHOOK_URL`、ブログの通知は `DISCORD_BLOG_WEBHOOK_URL`（別のチャンネルにできる。未設定の通知は送られない）。ダッシュボードの「通知設定」（管理者のみ）では、通知先の確認とテスト送信、通知の種類ごとのオン/オフ、ブログ提出時にメンションする **レビュー担当**（メンバーのドロップダウンから選ぶ）を設定する
+   - Webhook URLは画面には末尾しか表示されない
 5. 活動報告書の通知は、関係者だけに届くようBotのDMで送る（チャンネルには流さない）。Botは常駐させず、通知のときにREST APIを呼ぶだけ
    - Developer Portal のアプリの「Bot」で「Reset Token」を押してトークンを発行し、`DISCORD_BOT_TOKEN` に設定する（Privileged Gateway Intents はすべてオフでよい）
    - 「OAuth2 → URL Generator」で scope に `bot` だけを選び（Bot Permissions は何も選ばない）、生成されたURLからEDTCのサーバーに招待する
@@ -252,7 +251,8 @@ npx wrangler secret put DISCORD_CLIENT_ID --env production
 npx wrangler secret put DISCORD_CLIENT_SECRET --env production
 npx wrangler secret put DISCORD_REDIRECT_URI --env production        # https://<公開URL>/api/auth/callback
 npx wrangler secret put DISCORD_GUILD_ID --env production
-npx wrangler secret put DISCORD_WEBHOOK_URL --env production   # 任意（「通知設定」で登録するなら不要）
+npx wrangler secret put DISCORD_EVENT_WEBHOOK_URL --env production      # 任意（イベントの通知先）
+npx wrangler secret put DISCORD_BLOG_WEBHOOK_URL --env production       # 任意（ブログの通知先）
 npx wrangler secret put DISCORD_BOT_TOKEN --env production              # 活動報告書のDM通知
 npx wrangler secret put GITHUB_APP_ID --env production
 npx wrangler secret put GITHUB_APP_PRIVATE_KEY --env production < your-app.pem

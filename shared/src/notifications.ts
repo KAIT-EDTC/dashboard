@@ -10,9 +10,3 @@ export const NOTIFICATION_KINDS = [
 ] as const
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number]['id']
 export const NOTIFICATION_KIND_IDS = NOTIFICATION_KINDS.map((kind) => kind.id) as [NotificationKind, ...NotificationKind[]]
-
-/**
- * 通知に使えるWebhook URL。サーバーがこのURLにリクエストするので、Discord以外は受け付けない
- * （任意のURLを入れられると、サーバーから内部のネットワークへリクエストさせられてしまう）
- */
-export const DISCORD_WEBHOOK_URL_PATTERN = /^https:\/\/(?:discord|discordapp)\.com\/api\/(?:v\d+\/)?webhooks\/\d+\/[\w-]+$/
