@@ -144,12 +144,11 @@ export const blogReviewers = sqliteTable('blog_reviewers', {
 })
 
 /**
- * Discord通知の設定（1行だけ。id は常に 1）。行が無ければ「通知先なし・すべてオン」として扱う。
- * webhook_url は管理者が「通知設定」で入力する。画面には返さず、末尾だけ見せる
+ * Discord通知の種類ごとのオン/オフ（1行だけ。id は常に 1）。行が無ければ「すべてオン」として扱う。
+ * 通知先のWebhook URLは環境変数（DISCORD_EVENT_WEBHOOK_URL / DISCORD_BLOG_WEBHOOK_URL）で設定する
  */
 export const notificationSettings = sqliteTable('notification_settings', {
   id: integer('id').primaryKey(),
-  webhookUrl: text('webhook_url'),
   onEventCreated: integer('on_event_created', { mode: 'boolean' }).notNull().default(true),
   onBlogSubmitted: integer('on_blog_submitted', { mode: 'boolean' }).notNull().default(true),
   onBlogPublished: integer('on_blog_published', { mode: 'boolean' }).notNull().default(true),

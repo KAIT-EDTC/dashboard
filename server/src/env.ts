@@ -13,8 +13,10 @@ export type Bindings = {
   DISCORD_CLIENT_SECRET: string
   DISCORD_REDIRECT_URI: string
   DISCORD_GUILD_ID: string
-  /** 通知用Webhook URL。未設定なら通知しない */
-  DISCORD_WEBHOOK_URL?: string
+  /** イベントの通知を送るチャンネルのWebhook URL。未設定ならイベントの通知はしない */
+  DISCORD_EVENT_WEBHOOK_URL?: string
+  /** ブログの通知を送るチャンネルのWebhook URL。未設定ならブログの通知はしない */
+  DISCORD_BLOG_WEBHOOK_URL?: string
   /** 活動報告書の通知を関係者だけにDMで送るためのBotトークン。未設定ならDMを送らない */
   DISCORD_BOT_TOKEN?: string
 

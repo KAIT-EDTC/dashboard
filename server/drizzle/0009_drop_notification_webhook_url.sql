@@ -1,0 +1,1 @@
+ALTER TABLE `notification_settings` DROP COLUMN `webhook_url`;
