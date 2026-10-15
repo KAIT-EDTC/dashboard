@@ -38,7 +38,7 @@ export function notifySubmitted(env: Bindings, db: Db, post: PostSummary, isResu
 export function notifyPublished(env: Bindings, db: Db, post: PostSummary, articleId: string | null) {
   const siteUrl = env.BLOG_SITE_URL && articleId ? `${env.BLOG_SITE_URL.replace(/\/+$/, '')}/blog/${articleId}` : undefined
   return notify(env, db, 'blogPublished', {
-    content: `🎉 ${mention(post.authorId)} さんのブログ記事がマージされました！まもなくサイトに公開されます。`,
+    content: `🎉 ${mention(post.authorId)} さんのブログ記事のレビューが完了しました！まもなくホームページ（kaitedtc.com）に公開されます。`,
     mentionUserIds: [post.authorId],
     embeds: [{ title: post.title, url: siteUrl ?? post.prUrl, color: EMBED_COLORS.success }],
   })
@@ -46,7 +46,7 @@ export function notifyPublished(env: Bindings, db: Db, post: PostSummary, articl
 
 export function notifyClosed(env: Bindings, db: Db, post: PostSummary) {
   return notify(env, db, 'blogClosed', {
-    content: `↩️ ${mention(post.authorId)} さんのブログ記事のPRがクローズされました。内容を確認して再提出してください。`,
+    content: `↩️ ${mention(post.authorId)} さんのブログ記事のレビュー依頼が取り下げられました（ホームページには載っていません）。内容を確認して再提出してください。`,
     mentionUserIds: [post.authorId],
     embeds: [{ title: post.title, url: dashboardUrl(env, post.id), color: EMBED_COLORS.warning }],
   })
