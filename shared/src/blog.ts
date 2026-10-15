@@ -107,6 +107,11 @@ export function buildMarkdown(content: BlogPostContent): string {
 
 /** PR作成（提出）前のチェック。サイトは種別で記事を分けるので、旧ルールの記事IDを持つ記事も種別は必須 */
 export function validateForSubmit(content: BlogPostContent): string[] {
+  return [...validateInfoForSubmit(content), ...validateBodyForSubmit(content)]
+}
+
+/** 提出前チェックのうち「記事の情報」（タイトル・日付・種別・説明文・執筆者・サムネイル）の分 */
+export function validateInfoForSubmit(content: BlogPostContent): string[] {
   const errors: string[] = []
   if (!content.title.trim()) errors.push('タイトルを入力してください')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(content.eventDate)) errors.push('イベント実施日を入力してください')
@@ -114,6 +119,12 @@ export function validateForSubmit(content: BlogPostContent): string[] {
   if (!content.description.trim()) errors.push('一覧用の説明文を入力してください')
   if (!content.authorName.trim()) errors.push('執筆者名を入力してください')
   if (!content.thumbnail) errors.push('サムネイル画像を設定してください')
+  return errors
+}
+
+/** 提出前チェックのうち「本文」（本文・画像）の分 */
+export function validateBodyForSubmit(content: BlogPostContent): string[] {
+  const errors: string[] = []
   if (!content.body.trim()) errors.push('本文を入力してください')
   if (/<\s*(img|script|iframe)\b/i.test(content.body)) {
     errors.push('本文にHTMLの画像・スクリプトタグは使えません。画像は ![説明](...) の形で追加してください')
