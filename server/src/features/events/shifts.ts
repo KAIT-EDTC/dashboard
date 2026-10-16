@@ -4,12 +4,11 @@ import {
   availabilitySchema,
   dayTime,
   shiftDays,
-  shiftHourSlots,
   shiftInputSchema,
+  shiftHours,
   shiftJoinSchema,
   shiftUpdateSchema,
   timesOverlap,
-  unavailableDuring,
 } from '@edtc/shared'
 import type { Db } from '../../db'
 import { createDb } from '../../db'
@@ -21,11 +20,11 @@ import { assertCanManage } from '../../middleware/auth'
 
 type TimeRange = { startsAt: string; endsAt: string }
 
-type ShiftSettings = Pick<typeof events.$inferSelect, 'startsAt' | 'endsAt' | 'hasShifts' | 'shiftStartHour' | 'shiftEndHour' | 'shiftSplitHour' | 'shiftCapacity'>
+type ShiftSettings = Pick<typeof events.$inferSelect, 'startsAt' | 'endsAt' | 'hasShifts' | 'shiftStartHour' | 'shiftEndHour' | 'shiftSplitHour'>
 
 /** イベントの設定から作る枠: 日ごとに、区切りがあれば午前・午後、無ければ1枠 */
 function slotsOf(event: ShiftSettings) {
-  const { shiftStartHour: start, shiftEndHour: end, shiftSplitHour: split, shiftCapacity: capacity } = event
+  const { shiftStartHour: start, shiftEndHour: end, shiftSplitHour: split } = event
   if (!event.hasShifts || start === null || end === null) return []
   return shiftDays(event).flatMap((day) =>
     (split === null
@@ -34,7 +33,7 @@ function slotsOf(event: ShiftSettings) {
           { label: '午前', from: start, to: split },
           { label: '午後', from: split, to: end },
         ]
-    ).map(({ label, from, to }) => ({ label, startsAt: dayTime(day, from), endsAt: dayTime(day, to), capacity: capacity ?? 1 })),
+    ).map(({ label, from, to }) => ({ label, startsAt: dayTime(day, from), endsAt: dayTime(day, to) })),
   )
 }
 
@@ -77,11 +76,11 @@ async function findShift(db: Db, eventId: string, shiftId: string) {
   return shift
 }
 
-/** シフトに入れるのは、参加か未定と回答していて、その時間に出れる人だけ */
-async function assertAssignable(db: Db, eventId: string, range: TimeRange, userIds: string[], { self = false } = {}) {
+/** シフトに入れるのは、参加か未定と回答した人だけ */
+async function assertAssignable(db: Db, eventId: string, userIds: string[], { self = false } = {}) {
   if (userIds.length === 0) return
   const found = await db
-    .select({ userId: eventParticipants.userId, unavailable: eventParticipants.unavailable, lastName: users.lastName, firstName: users.firstName })
+    .select({ userId: eventParticipants.userId })
     .from(eventParticipants)
     .innerJoin(users, eq(users.id, eventParticipants.userId))
     .where(and(eq(eventParticipants.eventId, eventId), inArray(eventParticipants.userId, userIds), ne(eventParticipants.status, 'declined')))
@@ -90,8 +89,6 @@ async function assertAssignable(db: Db, eventId: string, range: TimeRange, userI
       self ? 'シフトに入るには、先に出欠で「参加」か「未定」と回答してください' : 'シフトに入れるのは、参加か未定と回答した人だけです。画面を読み込み直してください',
     )
   }
-  const busy = found.find((p) => unavailableDuring(p.unavailable, range))
-  if (busy) throw conflict(`${self ? 'あなた' : `${busy.lastName} ${busy.firstName}さん`}は、この時間に出れないと回答しています`)
 }
 
 /** 同じイベントの別のシフトと時間が重なる人がいないか（1人が同時に2か所には入れない）。self は自分で入るとき */
@@ -139,8 +136,7 @@ export const eventShiftsRoute = new Hono<AppEnv>()
     if (!event.hasShifts) throw badRequest('先にイベントの編集で「シフトあり」にしてください')
     const { memberIds: rawMemberIds, ...input } = c.req.valid('json')
     const memberIds = [...new Set(rawMemberIds)]
-    if (memberIds.length > input.capacity) throw badRequest(`入る人が人数（${input.capacity}人）を超えています`)
-    await assertAssignable(db, event.id, input, memberIds)
+    await assertAssignable(db, event.id, memberIds)
     await assertNoOverlap(db, event.id, null, input, memberIds)
 
     const id = crypto.randomUUID()
@@ -160,8 +156,7 @@ export const eventShiftsRoute = new Hono<AppEnv>()
     const memberIds = rawMemberIds
       ? [...new Set(rawMemberIds)]
       : (await db.select({ userId: eventShiftMembers.userId }).from(eventShiftMembers).where(eq(eventShiftMembers.shiftId, shift.id))).map((m) => m.userId)
-    if (memberIds.length > next.capacity) throw badRequest(`入る人が人数（${next.capacity}人）を超えています`)
-    await assertAssignable(db, event.id, next, memberIds)
+    await assertAssignable(db, event.id, memberIds)
     await assertNoOverlap(db, event.id, shift.id, next, memberIds)
 
     await db.batch([
@@ -179,34 +174,27 @@ export const eventShiftsRoute = new Hono<AppEnv>()
     return c.json({ ok: true })
   })
 
-  // 自分の出れない時間（1時間ごと）を置き換える。入っているシフトの時間は出れないにできない
+  // 入っているシフトの中で、自分が出れない時間（1時間ごと）を置き換える。シフトの外の時間は捨てる
   .put('/availability', validate('json', availabilitySchema), async (c) => {
     const { userId } = c.get('session')
     const db = createDb(c.env)
     const event = await findEvent(db, c.req.param('id')!)
     if (!event.hasShifts) throw badRequest('このイベントにはシフトがありません')
-    const slots = new Set(shiftHourSlots(event))
-    const unavailable = [...new Set(c.req.valid('json').unavailable)].filter((slot) => slots.has(slot)).sort()
-
-    const target = and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, userId))
-    const participant = await db.select({ status: eventParticipants.status }).from(eventParticipants).where(target).get()
-    if (!participant || participant.status === 'declined') throw badRequest('出れない時間を入れるには、先に出欠で「参加」か「未定」と回答してください')
 
     const mine = await db
-      .select({ label: eventShifts.label, startsAt: eventShifts.startsAt, endsAt: eventShifts.endsAt })
+      .select({ startsAt: eventShifts.startsAt, endsAt: eventShifts.endsAt })
       .from(eventShiftMembers)
       .innerJoin(eventShifts, eq(eventShifts.id, eventShiftMembers.shiftId))
       .where(and(eq(eventShifts.eventId, event.id), eq(eventShiftMembers.userId, userId)))
-    const clash = mine.find((shift) => unavailableDuring(unavailable, shift))
-    if (clash) {
-      throw conflict(`「${clash.label}」（${clash.startsAt.slice(5, 10).replace('-', '/')} ${clash.startsAt.slice(11)}〜${clash.endsAt.slice(11)}）のシフトに入っているため、その時間は出れないにできません。先にシフトを抜けてください`)
-    }
+    const slots = new Set(mine.flatMap(shiftHours))
+    const unavailable = [...new Set(c.req.valid('json').unavailable)].filter((slot) => slots.has(slot)).sort()
 
+    const target = and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, userId))
     await db.update(eventParticipants).set({ unavailable }).where(target)
     return c.json({ ok: true })
   })
 
-  // 自分がシフトに入る（空きがあるときだけ）／抜ける
+  // 自分がシフトに入る／抜ける
   .put('/:shiftId/me', validate('json', shiftJoinSchema), async (c) => {
     const { joined } = c.req.valid('json')
     const { userId } = c.get('session')
@@ -219,25 +207,9 @@ export const eventShiftsRoute = new Hono<AppEnv>()
       return c.json({ ok: true })
     }
 
-    await assertAssignable(db, event.id, shift, [userId], { self: true })
+    await assertAssignable(db, event.id, [userId], { self: true })
     await assertNoOverlap(db, event.id, shift.id, shift, [userId], { self: true })
-
-    // 同時に申し込まれても人数を超えないよう、空きを確かめながら入れる
-    const m = eventShiftMembers
-    const result = await db.run(sql`
-      insert into ${m} (${sql.identifier(m.shiftId.name)}, ${sql.identifier(m.userId.name)})
-      select ${shift.id}, ${userId}
-      where (select count(*) from ${m} where ${m.shiftId} = ${shift.id}) < ${shift.capacity}
-      on conflict do nothing
-    `)
-    if (result.meta.changes === 0) {
-      const already = await db
-        .select({ userId: m.userId })
-        .from(m)
-        .where(and(eq(m.shiftId, shift.id), eq(m.userId, userId)))
-        .get()
-      if (!already) throw conflict('このシフトはもう埋まっています')
-    }
+    await db.insert(eventShiftMembers).values({ shiftId: shift.id, userId }).onConflictDoNothing()
     return c.json({ ok: true })
   })
 

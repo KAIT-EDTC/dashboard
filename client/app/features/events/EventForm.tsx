@@ -1,4 +1,4 @@
-import { hourLabel, SHIFT_CAPACITY_MAX, type Division, type EventInput } from '@edtc/shared'
+import { hourLabel, type Division, type EventInput } from '@edtc/shared'
 import { useState, type ReactNode } from 'react'
 import { Form } from 'react-router'
 import { css } from 'styled-system/css'
@@ -34,7 +34,7 @@ function ShiftSettings({ defaultValue, errors, assigned }: { defaultValue: Parti
   const [start, setStart] = useState(defaultValue.shiftStartHour ?? 9)
   const [end, setEnd] = useState(defaultValue.shiftEndHour ?? 17)
   const [split, setSplit] = useState<number | null>(defaultValue.hasShifts ? (defaultValue.shiftSplitHour ?? null) : 12)
-  const grid = css({ display: 'grid', gridTemplateColumns: { base: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 'md' })
+  const grid = css({ display: 'grid', gridTemplateColumns: { base: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 'md' })
   const validSplit = split !== null && split > start && split < end
 
   return (
@@ -72,23 +72,12 @@ function ShiftSettings({ defaultValue, errors, assigned }: { defaultValue: Parti
                   </option>
                 ))}
               </SelectField>
-              <TextField
-                label="1枠の人数"
-                name="shiftCapacity"
-                type="number"
-                min={1}
-                max={SHIFT_CAPACITY_MAX}
-                required
-                defaultValue={defaultValue.shiftCapacity ?? 2}
-                error={errors.shiftCapacity}
-              />
             </div>
             <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
               {end > start &&
                 (validSplit
                   ? `イベントの日ごとに「午前 ${hourLabel(start)}〜${hourLabel(split)}」「午後 ${hourLabel(split)}〜${hourLabel(end)}」の枠を作ります。`
                   : `イベントの日ごとに ${hourLabel(start)}〜${hourLabel(end)} の枠を1つ作ります。`)}
-              参加者は出れない時間を1時間ごとに入れ、主催者がそれを見て枠に入る人を決めます（空きがあれば参加者も自分で入れます）。
               {assigned && ' すでに入っている人がいるので、時間帯を変えても枠は作り直しません。枠はイベントページのシフト欄で直してください。'}
             </p>
           </>

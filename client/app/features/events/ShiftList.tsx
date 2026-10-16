@@ -1,10 +1,9 @@
-import { SHIFT_CAPACITY_MAX, unavailableDuring } from '@edtc/shared'
+import { shiftHours } from '@edtc/shared'
 import { useEffect, useState } from 'react'
 import { useFetcher } from 'react-router'
 import { css } from 'styled-system/css'
 import { Alert } from '~/components/ui/Alert'
 import { Avatar } from '~/components/ui/Avatar'
-import { Badge } from '~/components/ui/Badge'
 import { Button } from '~/components/ui/Button'
 import { Card } from '~/components/ui/Card'
 import { Dialog } from '~/components/ui/Dialog'
@@ -30,7 +29,20 @@ const minutesBetween = (from: string, to: string) => (new Date(`${to}:00Z`).getT
 const timeRange = (shift: EventShift) =>
   `${shift.startsAt.slice(11)}〜${shift.startsAt.slice(0, 10) === shift.endsAt.slice(0, 10) ? shift.endsAt.slice(11) : `${formatDate(shift.endsAt)} ${shift.endsAt.slice(11)}`}`
 
-function MemberChip({ member, mine }: { member: EventShift['members'][number]; mine: boolean }) {
+/** 出れない時間（1時間ごと）を続いている範囲ごとにまとめる（例: 11〜13時） */
+function hourRanges(slots: string[]): string[] {
+  const hours = slots.map((slot) => Number(slot.slice(11, 13)))
+  const ranges: string[] = []
+  for (let i = 0; i < hours.length; i++) {
+    let j = i
+    while (j + 1 < hours.length && hours[j + 1] === hours[j] + 1) j++
+    ranges.push(`${hours[i]}〜${hours[j] + 1}時`)
+    i = j
+  }
+  return ranges
+}
+
+function MemberChip({ member, mine, away }: { member: EventShift['members'][number]; mine: boolean; away: string[] }) {
   return (
     <li
       className={css({
@@ -49,20 +61,19 @@ function MemberChip({ member, mine }: { member: EventShift['members'][number]; m
     >
       <Avatar user={member.user} size={20} />
       {fullName(member.user)}
+      {away.length > 0 && <span className={css({ fontSize: 'xs', color: 'danger.fg' })}>{hourRanges(away).join('・')} 不在</span>}
     </li>
   )
 }
 
 function ShiftRow({ shift, userId, canJoin, canManage, candidates }: { shift: EventShift; userId: string; canJoin: boolean; canManage: boolean; candidates: Member[] }) {
-  const myUnavailable = candidates.find((c) => c.userId === userId)?.unavailable ?? []
-  const iAmBusy = unavailableDuring(myUnavailable, shift)
-  // まだ入っていなくて、この時間に出れる人
-  const freeCount = candidates.filter((c) => !unavailableDuring(c.unavailable, shift) && !shift.members.some((m) => m.userId === c.userId)).length
+  const hours = new Set(shiftHours(shift))
+  // このシフトの中で出れない時間
+  const awayOf = (memberId: string) => (candidates.find((c) => c.userId === memberId)?.unavailable ?? []).filter((slot) => hours.has(slot))
   const fetcher = useFetcher<FormErrors>()
   const [editing, setEditing] = useState(false)
   const busy = fetcher.state !== 'idle'
   const joined = shift.members.some((m) => m.userId === userId)
-  const left = shift.capacity - shift.members.length
   const join = (value: boolean) => fetcher.submit({ intent: 'join-shift', shiftId: shift.id, joined: String(value) }, { method: 'post' })
   // 不参加にした人などが入ったままでも、選択肢から消えないようにする
   const options = [...candidates, ...shift.members.filter((m) => !candidates.some((c) => c.userId === m.userId)).map((m) => ({ ...m, unavailable: [] }))]
@@ -73,17 +84,13 @@ function ShiftRow({ shift, userId, canJoin, canManage, candidates }: { shift: Ev
       <div className={css({ flex: 1, minW: '180px', display: 'flex', flexDirection: 'column', gap: 'xs' })}>
         <p className={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'xs', fontWeight: '600', fontSize: 'sm' })}>
           {shift.label}
-          <span className={css({ color: 'fg.muted', fontWeight: '400' })}>
-            {shift.members.length}/{shift.capacity}人
-          </span>
-          {left > 0 ? <Badge tone="warning">あと{left}人</Badge> : <Badge tone="success">決定</Badge>}
+          <span className={css({ color: 'fg.muted', fontWeight: '400' })}>{shift.members.length}人</span>
         </p>
         {shift.note && <p className={css({ fontSize: 'xs', color: 'fg.muted' })}>{shift.note}</p>}
-        {left > 0 && <p className={css({ fontSize: 'xs', color: 'fg.muted' })}>この時間に出れる人（未割り当て）: {freeCount}人</p>}
         {shift.members.length > 0 && (
           <ul className={css({ display: 'flex', flexWrap: 'wrap', gap: 'xs' })}>
             {shift.members.map((member) => (
-              <MemberChip key={member.userId} member={member} mine={member.userId === userId} />
+              <MemberChip key={member.userId} member={member} mine={member.userId === userId} away={awayOf(member.userId)} />
             ))}
           </ul>
         )}
@@ -95,15 +102,11 @@ function ShiftRow({ shift, userId, canJoin, canManage, candidates }: { shift: Ev
             抜ける
           </Button>
         ) : (
-          canJoin &&
-          left > 0 &&
-          (iAmBusy ? (
-            <Badge tone="danger">出れない時間</Badge>
-          ) : (
+          canJoin && (
             <Button variant="primary" loading={busy} onClick={() => join(true)}>
               入る
             </Button>
-          ))
+          )
         )}
         {canManage && (
           <>
@@ -121,7 +124,7 @@ function ShiftRow({ shift, userId, canJoin, canManage, candidates }: { shift: Ev
   )
 }
 
-type ShiftDefaults = Pick<EventShift, 'label' | 'startsAt' | 'endsAt' | 'capacity'>
+type ShiftDefaults = Pick<EventShift, 'label' | 'startsAt' | 'endsAt'>
 
 /** 追加と編集で共通のフォーム。shift があれば編集（削除もここから） */
 function ShiftForm({ shift, defaults, candidates, onDone }: { shift?: EventShift; defaults?: ShiftDefaults; candidates: Member[]; onDone: () => void }) {
@@ -130,15 +133,12 @@ function ShiftForm({ shift, defaults, candidates, onDone }: { shift?: EventShift
   const deleting = busy && fetcher.formData?.get('intent') === 'delete-shift'
   const initial = shift ?? defaults
   const [memberIds, setMemberIds] = useState<string[]>(shift?.members.map((m) => m.userId) ?? [])
-  const [capacity, setCapacity] = useState(String(initial?.capacity ?? 2))
   const [range, setRange] = useState({ startsAt: initial?.startsAt ?? '', endsAt: initial?.endsAt ?? '' })
-  const busyDuring = (member: Member) => !!range.startsAt && !!range.endsAt && unavailableDuring(member.unavailable, range)
   useEffect(() => {
     if (fetcher.state === 'idle' && fetcher.data && 'ok' in fetcher.data) onDone()
   }, [fetcher.state, fetcher.data, onDone])
   const errors = fetcher.data && 'error' in fetcher.data ? fetcher.data : undefined
   const e = errors?.fieldErrors ?? {}
-  const over = memberIds.length > Number(capacity || 0)
 
   return (
     <fetcher.Form method="post" className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
@@ -166,21 +166,9 @@ function ShiftForm({ shift, defaults, candidates, onDone }: { shift?: EventShift
           error={e.endsAt}
         />
       </div>
-      <TextField
-        label="人数"
-        name="capacity"
-        type="number"
-        min={1}
-        max={SHIFT_CAPACITY_MAX}
-        required
-        value={capacity}
-        onChange={(event) => setCapacity(event.currentTarget.value)}
-        error={e.capacity}
-        hint="空きがあるうちは、参加者が自分で「入る」を押して入れます"
-      />
       <fieldset className={css({ display: 'flex', flexDirection: 'column', gap: '6px' })}>
         <legend className={css({ fontSize: 'sm', fontWeight: '600', color: 'fg.muted', mb: '6px' })}>
-          入る人（{memberIds.length}/{capacity || 0}人）
+          入る人（{memberIds.length}人）
         </legend>
         {candidates.length === 0 ? (
           <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>まだ参加者がいません</p>
@@ -191,9 +179,7 @@ function ShiftForm({ shift, defaults, candidates, onDone }: { shift?: EventShift
                 key={member.userId}
                 name="memberIds"
                 value={member.userId}
-                label={busyDuring(member) ? `${fullName(member.user)}（出れない）` : fullName(member.user)}
-                // 出れない人は選べない（もう入っている人は外せるようにしておく）
-                disabled={busyDuring(member) && !memberIds.includes(member.userId)}
+                label={fullName(member.user)}
                 checked={memberIds.includes(member.userId)}
                 onChange={(event) => {
                   const { checked } = event.currentTarget
@@ -203,9 +189,7 @@ function ShiftForm({ shift, defaults, candidates, onDone }: { shift?: EventShift
             ))}
           </div>
         )}
-        <p className={css({ fontSize: 'xs', color: over || e.memberIds ? 'danger.fg' : 'fg.subtle' })}>
-          {over ? '人数を超えています' : (e.memberIds ?? '参加・未定と回答した人から選べます。出れない時間にかかる人や、同じ時間帯の別のシフトに入っている人は入れられません')}
-        </p>
+        {e.memberIds && <p className={css({ fontSize: 'xs', color: 'danger.fg' })}>{e.memberIds}</p>}
       </fieldset>
       <TextField label="メモ（任意）" name="note" placeholder="例: 釣り銭の確認をお願いします" defaultValue={shift?.note ?? ''} error={e.note} />
       <div className={css({ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 'sm' })}>
@@ -217,7 +201,7 @@ function ShiftForm({ shift, defaults, candidates, onDone }: { shift?: EventShift
         ) : (
           <span />
         )}
-        <Button type="submit" variant="primary" loading={busy && !deleting} disabled={busy || over}>
+        <Button type="submit" variant="primary" loading={busy && !deleting} disabled={busy}>
           {shift ? '保存' : '追加'}
         </Button>
       </div>
@@ -225,11 +209,11 @@ function ShiftForm({ shift, defaults, candidates, onDone }: { shift?: EventShift
   )
 }
 
-/** 新しいシフトの初期値: 直前のシフトの続き（同じ長さ・人数）。まだ無ければイベントの開始から1時間 */
+/** 新しいシフトの初期値: 直前のシフトの続き（同じ長さ）。まだ無ければイベントの開始から1時間 */
 function nextDefaults(event: EventDetail): ShiftDefaults {
   const last = event.shifts.at(-1)
-  if (last) return { label: last.label, startsAt: last.endsAt, endsAt: addMinutes(last.endsAt, minutesBetween(last.startsAt, last.endsAt)), capacity: last.capacity }
-  return { label: '', startsAt: event.startsAt, endsAt: addMinutes(event.startsAt, 60), capacity: 2 }
+  if (last) return { label: last.label, startsAt: last.endsAt, endsAt: addMinutes(last.endsAt, minutesBetween(last.startsAt, last.endsAt)) }
+  return { label: '', startsAt: event.startsAt, endsAt: addMinutes(event.startsAt, 60) }
 }
 
 export function ShiftList({ event, userId, canManage }: Props) {
@@ -241,8 +225,6 @@ export function ShiftList({ event, userId, canManage }: Props) {
     .filter((p) => p.status !== 'declined')
     .map((p) => ({ userId: p.userId, user: p.user, unavailable: p.unavailable }))
   const canJoin = candidates.some((c) => c.userId === userId)
-  const mine = event.shifts.filter((shift) => shift.members.some((m) => m.userId === userId))
-  const openCount = event.shifts.reduce((sum, shift) => sum + Math.max(0, shift.capacity - shift.members.length), 0)
   const days = [...new Set(event.shifts.map((shift) => shift.startsAt.slice(0, 10)))]
 
   return (
@@ -257,27 +239,10 @@ export function ShiftList({ event, userId, canManage }: Props) {
         )
       }
     >
-      <section className={css({ mb: 'lg' })}>
-        <h3 className={css({ fontSize: 'sm', fontWeight: '700', mb: 'xs' })}>出れない時間</h3>
-        <AvailabilityGrid event={event} userId={userId} editable={canJoin} />
-      </section>
-      <h3 className={css({ fontSize: 'sm', fontWeight: '700', mb: 'xs' })}>シフトの枠</h3>
       {event.shifts.length === 0 ? (
-        <EmptyState icon={<ClockIcon size={28} />} title="シフトの枠はまだありません">
-          {canManage ? '「シフトを追加」から枠を作れます' : '主催者が枠を作るまでお待ちください'}
-        </EmptyState>
+        <EmptyState icon={<ClockIcon size={28} />} title="シフトの枠はまだありません" />
       ) : (
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
-          <div className={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'sm', fontSize: 'sm' })}>
-            {mine.length > 0 ? (
-              <span>
-                あなたのシフト: <strong>{mine.map((shift) => `${shift.label} ${timeRange(shift)}`).join('、')}</strong>
-              </span>
-            ) : (
-              <span className={css({ color: 'fg.muted' })}>{canJoin ? 'あなたはまだシフトに入っていません' : 'シフトに入るには、出欠で「参加」か「未定」と回答してください'}</span>
-            )}
-            {openCount > 0 && <Badge tone="warning">空き {openCount}人分</Badge>}
-          </div>
           {days.map((day) => (
             <section key={day}>
               {days.length > 1 && <h3 className={css({ fontSize: 'sm', fontWeight: '700', mb: 'xs' })}>{formatDate(day)}</h3>}
@@ -290,6 +255,9 @@ export function ShiftList({ event, userId, canManage }: Props) {
               </ul>
             </section>
           ))}
+          <div className={css({ pt: 'md', borderTopWidth: '1px', _empty: { display: 'none' } })}>
+            <AvailabilityGrid event={event} userId={userId} />
+          </div>
         </div>
       )}
 

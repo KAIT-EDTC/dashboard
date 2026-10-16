@@ -21,8 +21,7 @@ export function parseEventForm(form: FormData) {
           shiftStartHour: optionalInt(form, 'shiftStartHour'),
           shiftEndHour: optionalInt(form, 'shiftEndHour'),
           shiftSplitHour: optionalInt(form, 'shiftSplitHour'),
-          shiftCapacity: optionalInt(form, 'shiftCapacity'),
         }
-      : { hasShifts: false, shiftStartHour: null, shiftEndHour: null, shiftSplitHour: null, shiftCapacity: null }),
+      : { hasShifts: false, shiftStartHour: null, shiftEndHour: null, shiftSplitHour: null }),
   })
 }

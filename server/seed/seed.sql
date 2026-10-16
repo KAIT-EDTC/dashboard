@@ -215,11 +215,11 @@ INSERT INTO event_items (id, event_id, name, kind, quantity, note, assignee_id, 
   ('seed-item-15', 'seed-ev-08', '軍手', 'personal', 1, '', NULL, 0),
   ('seed-item-16', 'seed-ev-08', 'ゴミ袋', 'shared', 20, '45L', 'seed-09', 0);
 
--- シフト（オープンキャンパス。9〜17時を12時で午前・午後に分け、1枠3人。空きがある枠も残す）
-UPDATE events SET has_shifts = 1, shift_start_hour = 9, shift_end_hour = 17, shift_split_hour = 12, shift_capacity = 3 WHERE id = 'seed-ev-04';
+-- シフト（オープンキャンパス。9〜17時を12時で午前・午後に分ける）
+UPDATE events SET has_shifts = 1, shift_start_hour = 9, shift_end_hour = 17, shift_split_hour = 12 WHERE id = 'seed-ev-04';
 
-INSERT INTO event_shifts (id, event_id, label, starts_at, ends_at, capacity)
-SELECT sh.id, 'seed-ev-04', sh.label, substr(events.starts_at, 1, 10) || 'T' || sh.start_time, substr(events.starts_at, 1, 10) || 'T' || sh.end_time, 3
+INSERT INTO event_shifts (id, event_id, label, starts_at, ends_at)
+SELECT sh.id, 'seed-ev-04', sh.label, substr(events.starts_at, 1, 10) || 'T' || sh.start_time, substr(events.starts_at, 1, 10) || 'T' || sh.end_time
 FROM (SELECT 'seed-shift-01' AS id, '午前' AS label, '09:00' AS start_time, '12:00' AS end_time UNION ALL SELECT 'seed-shift-02', '午後', '12:00', '17:00') AS sh, events
 WHERE events.id = 'seed-ev-04';
 
@@ -230,20 +230,13 @@ INSERT INTO event_shift_members (shift_id, user_id) VALUES
   ('seed-shift-02', 'seed-08'),
   ('seed-shift-02', 'seed-04');
 
--- 出れない時間（1時間ごと）。午前だけの佐藤さんは午後、午後からの中村さんは午前が出れない
+-- 出れない時間（入っているシフトの中で、1時間ごと）。佐藤さんは午前の11時台、中村さんは午後の16時台に抜ける
 UPDATE event_participants SET unavailable = (
-  SELECT json_group_array(substr(events.starts_at, 1, 10) || 'T' || h.hour || ':00')
-  FROM events, (SELECT '12' AS hour UNION ALL SELECT '13' UNION ALL SELECT '14' UNION ALL SELECT '15' UNION ALL SELECT '16') AS h
-  WHERE events.id = 'seed-ev-04'
+  SELECT json_group_array(substr(events.starts_at, 1, 10) || 'T11:00') FROM events WHERE events.id = 'seed-ev-04'
 ) WHERE event_id = 'seed-ev-04' AND user_id = 'seed-01';
 UPDATE event_participants SET unavailable = (
-  SELECT json_group_array(substr(events.starts_at, 1, 10) || 'T' || h.hour || ':00')
-  FROM events, (SELECT '09' AS hour UNION ALL SELECT '10' UNION ALL SELECT '11') AS h
-  WHERE events.id = 'seed-ev-04'
+  SELECT json_group_array(substr(events.starts_at, 1, 10) || 'T16:00') FROM events WHERE events.id = 'seed-ev-04'
 ) WHERE event_id = 'seed-ev-04' AND user_id = 'seed-08';
-UPDATE event_participants SET unavailable = (
-  SELECT json_group_array(substr(events.starts_at, 1, 10) || 'T14:00') FROM events WHERE events.id = 'seed-ev-04'
-) WHERE event_id = 'seed-ev-04' AND user_id = 'seed-14';
 
 -- ---------------------------------------------------------------------------
 -- 役職（活動報告書の承認者）と、遊行塾の講師

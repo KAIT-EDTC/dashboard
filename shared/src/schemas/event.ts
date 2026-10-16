@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { DIVISIONS } from '../divisions'
-import { CATEGORY_TONES, ITEM_KINDS, PARTICIPANT_ROLES, RSVP_STATUSES, SHIFT_CAPACITY_MAX, SHIFT_DAYS_MAX, SHIFT_HOUR_MAX, SHIFT_HOUR_MIN } from '../events'
+import { CATEGORY_TONES, ITEM_KINDS, PARTICIPANT_ROLES, RSVP_STATUSES, SHIFT_DAYS_MAX, SHIFT_MEMBERS_MAX, SHIFT_HOUR_MAX, SHIFT_HOUR_MIN } from '../events'
 
 /** 日本時間の YYYY-MM-DDTHH:mm */
 const dateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, '日時の形式が正しくありません')
@@ -24,14 +24,12 @@ export const eventInputSchema = z
     targetUserIds: z.array(z.string().min(1)).max(100, '対象者は100人までにしてください').default([]),
     /**
      * シフト（文化祭の店番など）。ありにすると、開始〜終了の時間帯を区切りで午前・午後に分けた枠を日ごとに作る。
-     * 区切りが無ければ1日1枠。参加者は出れない時間を1時間ごとに指定する
+     * 区切りが無ければ1日1枠。枠に入った人は、その中で出れない時間を1時間ごとに指定する
      */
     hasShifts: z.boolean().default(false),
     shiftStartHour: shiftHour.nullable().default(null),
     shiftEndHour: shiftHour.nullable().default(null),
     shiftSplitHour: shiftHour.nullable().default(null),
-    /** 1枠に入る人数 */
-    shiftCapacity: z.number().int().min(1, '人数は1人以上にしてください').max(SHIFT_CAPACITY_MAX, `人数は${SHIFT_CAPACITY_MAX}人までにしてください`).nullable().default(null),
   })
   .refine((v) => !v.endsAt || v.endsAt >= v.startsAt, {
     path: ['endsAt'],
@@ -46,7 +44,6 @@ export const eventInputSchema = z
     path: ['shiftSplitHour'],
     message: '午前・午後の区切りは、開始と終了のあいだにしてください',
   })
-  .refine((v) => !v.hasShifts || v.shiftCapacity !== null, { path: ['shiftCapacity'], message: '1枠の人数を入力してください' })
   .refine((v) => !v.hasShifts || !v.endsAt || (Date.parse(v.endsAt.slice(0, 10)) - Date.parse(v.startsAt.slice(0, 10))) / 86_400_000 < SHIFT_DAYS_MAX, {
     path: ['endsAt'],
     message: `シフトを組めるのは${SHIFT_DAYS_MAX}日までです`,
@@ -106,12 +103,10 @@ const shiftFields = {
   label: z.string().trim().min(1, '持ち場を入力してください').max(40, '持ち場が長すぎます'),
   startsAt: dateTime,
   endsAt: dateTime,
-  /** 必要な人数 */
-  capacity: z.number().int().min(1, '人数は1人以上にしてください').max(SHIFT_CAPACITY_MAX, `人数は${SHIFT_CAPACITY_MAX}人までにしてください`),
   note: z.string().trim().max(200, 'メモは200文字以内にしてください'),
 }
 /** 入る人（主催者・管理者が決める）。参加者から選ぶ */
-const shiftMemberIds = z.array(z.string().min(1)).max(SHIFT_CAPACITY_MAX)
+const shiftMemberIds = z.array(z.string().min(1)).max(SHIFT_MEMBERS_MAX)
 
 const shiftTimeOrder = (v: { startsAt?: string; endsAt?: string }) => !v.startsAt || !v.endsAt || v.endsAt > v.startsAt
 const shiftTimeOrderError = { path: ['endsAt'], message: '終了時刻は開始時刻より後にしてください' }
@@ -125,7 +120,7 @@ export const shiftUpdateSchema = z.object({ ...shiftFields, memberIds: shiftMemb
 /** 自分がシフトに入る／抜ける */
 export const shiftJoinSchema = z.object({ joined: z.boolean() })
 
-/** 出れない時間（1時間ごとの枠の開始 `YYYY-MM-DDTHH:00`）を丸ごと置き換える */
+/** 入っているシフトの中で出れない時間（1時間ごとの枠の開始 `YYYY-MM-DDTHH:00`）を丸ごと置き換える */
 export const availabilitySchema = z.object({
   unavailable: z
     .array(z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:00$/, '時間の形式が正しくありません'))

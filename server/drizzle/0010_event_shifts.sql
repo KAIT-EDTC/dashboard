@@ -14,7 +14,6 @@ CREATE TABLE `event_shifts` (
 	`label` text NOT NULL,
 	`starts_at` text NOT NULL,
 	`ends_at` text NOT NULL,
-	`capacity` integer NOT NULL,
 	`note` text DEFAULT '' NOT NULL,
 	`created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
 	FOREIGN KEY (`event_id`) REFERENCES `events`(`id`) ON UPDATE no action ON DELETE cascade
@@ -25,5 +24,4 @@ ALTER TABLE `event_participants` ADD `unavailable` text DEFAULT '[]' NOT NULL;--
 ALTER TABLE `events` ADD `has_shifts` integer DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE `events` ADD `shift_start_hour` integer;--> statement-breakpoint
 ALTER TABLE `events` ADD `shift_end_hour` integer;--> statement-breakpoint
-ALTER TABLE `events` ADD `shift_split_hour` integer;--> statement-breakpoint
-ALTER TABLE `events` ADD `shift_capacity` integer;
+ALTER TABLE `events` ADD `shift_split_hour` integer;

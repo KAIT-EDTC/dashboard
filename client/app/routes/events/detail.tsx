@@ -32,7 +32,6 @@ const shiftFields = (form: FormData) => ({
   label: text(form, 'label'),
   startsAt: text(form, 'startsAt'),
   endsAt: text(form, 'endsAt'),
-  capacity: Number(text(form, 'capacity') || 1),
   note: text(form, 'note'),
   memberIds: texts(form, 'memberIds'),
 })

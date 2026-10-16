@@ -1183,13 +1183,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "capacity": {
-          "name": "capacity",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "note": {
           "name": "note",
           "type": "text",
@@ -1455,13 +1448,6 @@
         },
         "shift_split_hour": {
           "name": "shift_split_hour",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "shift_capacity": {
-          "name": "shift_capacity",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,

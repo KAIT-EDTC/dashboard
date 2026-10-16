@@ -209,8 +209,6 @@ export const events = sqliteTable(
     shiftEndHour: integer('shift_end_hour'),
     /** 午前と午後の区切り（時）。無ければ1日1枠 */
     shiftSplitHour: integer('shift_split_hour'),
-    /** 作る枠の人数 */
-    shiftCapacity: integer('shift_capacity'),
     /** まとめ報告書の担当者（主催者が指名する）。未指名なら講師が担当 */
     summaryWriterId: text('summary_writer_id').references(() => users.id, { onDelete: 'set null' }),
     ...timestamps,
@@ -235,7 +233,7 @@ export const eventParticipants = sqliteTable(
     attended: integer('attended', { mode: 'boolean' }).notNull().default(false),
     /** 参加費の支払い（主催者が記録） */
     paid: integer('paid', { mode: 'boolean' }).notNull().default(false),
-    /** シフトに出れない時間（1時間ごとの枠の開始 YYYY-MM-DDTHH:00）。本人が指定する */
+    /** 入っているシフトの中で出れない時間（1時間ごとの枠の開始 YYYY-MM-DDTHH:00）。本人が指定する */
     unavailable: text('unavailable', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
     ...timestamps,
   },
@@ -274,8 +272,6 @@ export const eventShifts = sqliteTable(
     /** 日本時間 YYYY-MM-DDTHH:mm */
     startsAt: text('starts_at').notNull(),
     endsAt: text('ends_at').notNull(),
-    /** 必要な人数 */
-    capacity: integer('capacity').notNull(),
     note: text('note').notNull().default(''),
     createdAt: timestamps.createdAt,
   },
