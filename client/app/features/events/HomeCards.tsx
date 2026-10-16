@@ -3,10 +3,10 @@ import { css } from 'styled-system/css'
 import { Badge } from '~/components/ui/Badge'
 import { Card } from '~/components/ui/Card'
 import { EmptyState } from '~/components/ui/EmptyState'
-import { CalendarIcon, PackageIcon } from '~/components/ui/Icons'
-import { formatDateTime } from '~/lib/format'
+import { CalendarIcon, ClockIcon, PackageIcon } from '~/components/ui/Icons'
+import { formatDate, formatDateTime } from '~/lib/format'
 import { RsvpBadge } from './EventBadges'
-import type { EventListItem, MyItem } from './types'
+import type { EventListItem, MyItem, MyShift } from './types'
 
 const rowLink = css({
   display: 'flex',
@@ -75,6 +75,30 @@ export function MyItemsCard({ items }: { items: MyItem[] }) {
           ))}
         </ul>
       )}
+    </Card>
+  )
+}
+
+/** シフトに入っているときだけ出す */
+export function MyShiftsCard({ shifts }: { shifts: MyShift[] }) {
+  if (shifts.length === 0) return null
+  return (
+    <Card title="自分のシフト" padded={false}>
+      <ul>
+        {shifts.map((shift) => (
+          <li key={shift.id}>
+            <Link to={`/events/${shift.eventId}`} className={rowLink}>
+              <ClockIcon size={16} />
+              <span className={css({ flex: 1, minW: 0 })}>
+                <span className={css({ display: 'block', fontWeight: '500' })}>
+                  {formatDate(shift.startsAt)} {shift.startsAt.slice(11)}〜{shift.endsAt.slice(11)} {shift.label}
+                </span>
+                <span className={css({ display: 'block', fontSize: 'xs', color: 'fg.muted', truncate: true })}>{shift.eventTitle}</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </Card>
   )
 }

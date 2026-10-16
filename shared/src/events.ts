@@ -31,3 +31,56 @@ export const PARTICIPANT_ROLE_LABELS: Record<ParticipantRole, string> = {
   lecturer: '講師',
   assistant: '講師補助',
 }
+
+/** シフト1枠に入れる人数の上限 */
+export const SHIFT_CAPACITY_MAX = 50
+
+/** 2つの時間帯が重なるか（`YYYY-MM-DDTHH:mm` の文字列比較。終わりと始まりが同じ時刻なら重ならない） */
+export const timesOverlap = (a: { startsAt: string; endsAt: string }, b: { startsAt: string; endsAt: string }) =>
+  a.startsAt < b.endsAt && b.startsAt < a.endsAt
+
+/** シフトの時間帯で選べる時刻（時）。終了は 24 まで */
+export const SHIFT_HOUR_MIN = 0
+export const SHIFT_HOUR_MAX = 24
+/** シフトを組める日数の上限（イベントの開始日から終了日まで） */
+export const SHIFT_DAYS_MAX = 7
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** 時（9）→ 09:00。24 は 24:00 と書く */
+export const hourLabel = (hour: number) => `${pad2(hour)}:00`
+
+/** 1時間の枠の開始（`YYYY-MM-DDTHH:00`）。出れない時間はこの形で保存する */
+export const hourSlot = (day: string, hour: number) => `${day}T${pad2(hour)}:00`
+
+/** 枠の終わりの日時。24時は翌日の0時にする（文字列比較で前後が分かるように） */
+export function dayTime(day: string, hour: number): string {
+  if (hour < 24) return hourSlot(day, hour)
+  const next = new Date(`${day}T00:00:00Z`)
+  next.setUTCDate(next.getUTCDate() + 1)
+  return `${next.toISOString().slice(0, 10)}T00:00`
+}
+
+/** シフトを組む日（イベントの開始日〜終了日。終了日が無ければ開始日だけ）。多すぎる分は切る */
+export function shiftDays(event: { startsAt: string; endsAt: string | null }): string[] {
+  const first = event.startsAt.slice(0, 10)
+  const last = (event.endsAt ?? event.startsAt).slice(0, 10)
+  const days: string[] = []
+  for (const d = new Date(`${first}T00:00:00Z`); days.length < SHIFT_DAYS_MAX; d.setUTCDate(d.getUTCDate() + 1)) {
+    const day = d.toISOString().slice(0, 10)
+    if (day > last) break
+    days.push(day)
+  }
+  return days
+}
+
+/** シフトの時間帯の1時間ごとの枠（`YYYY-MM-DDTHH:00`） */
+export function shiftHourSlots(event: { startsAt: string; endsAt: string | null; shiftStartHour: number | null; shiftEndHour: number | null }): string[] {
+  if (event.shiftStartHour === null || event.shiftEndHour === null) return []
+  const hours = Array.from({ length: event.shiftEndHour - event.shiftStartHour }, (_, i) => event.shiftStartHour! + i)
+  return shiftDays(event).flatMap((day) => hours.map((hour) => hourSlot(day, hour)))
+}
+
+/** 出れない時間（1時間ごとの枠の開始）が、その時間帯にかかっているか */
+export const unavailableDuring = (unavailable: readonly string[], range: { startsAt: string; endsAt: string }) =>
+  unavailable.some((slot) => slot >= range.startsAt.slice(0, 13) + ':00' && slot < range.endsAt)
