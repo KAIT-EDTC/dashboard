@@ -5,10 +5,10 @@ import { createDb } from '../../db'
 import { blogReviewers, users } from '../../db/schema'
 import type { AppEnv } from '../../env'
 import { badRequest, notFound } from '../../lib/errors'
-import { sendWebhook } from '../../lib/discord'
+import { fetchGuildTextChannels, sendChannelMessage } from '../../lib/discord'
 import { validate } from '../../lib/validator'
 import { assertAdmin, requireAuth } from '../../middleware/auth'
-import { getNotificationSettings, resolveWebhook, saveNotificationSettings, WEBHOOK_ENV_NAMES, webhookHint, type WebhookTarget } from './notification-settings'
+import { getNotificationSettings, saveNotificationSettings } from './notification-settings'
 
 /** 管理者専用の設定（ユーザーの権限・通知のメンション先） */
 export const adminRoute = new Hono<AppEnv>()
@@ -78,30 +78,46 @@ export const adminRoute = new Hono<AppEnv>()
 
   // --- 通知設定 ---------------------------------------------------------------
 
-  /** Webhook URL は返さない（知っていれば誰でも投稿できるため）。設定の有無と末尾だけ返す */
   .get('/notifications', async (c) => {
     const settings = await getNotificationSettings(createDb(c.env))
-    const hint = (target: WebhookTarget) => {
-      const url = resolveWebhook(c.env, target)
-      return url ? webhookHint(url) : null
+    return c.json({ botConfigured: Boolean(c.env.DISCORD_BOT_TOKEN), channels: settings.channels, enabled: settings.enabled })
+  })
+
+  /** 通知先に選べるチャンネル。Botが未設定なら空 */
+  .get('/notifications/channels', async (c) => {
+    if (!c.env.DISCORD_BOT_TOKEN) return c.json({ channels: [] })
+    const result = await fetchGuildTextChannels(c.env)
+    if (!result.ok) {
+      console.error('チャンネル一覧を取得できませんでした', result.error)
+      throw badRequest('チャンネルの一覧を取得できませんでした。BotがEDTCのサーバーに参加しているか確認してください')
     }
-    return c.json({ webhooks: { event: hint('event'), blog: hint('blog') }, enabled: settings.enabled })
+    return c.json({ channels: result.channels })
   })
 
   .put('/notifications', validate('json', notificationSettingsSchema), async (c) => {
-    await saveNotificationSettings(createDb(c.env), c.req.valid('json'))
+    const input = c.req.valid('json')
+    // 他のサーバーのチャンネルに送らせないよう、このサーバーのチャンネルかを確認する
+    const chosen = [input.eventChannelId, input.blogChannelId].filter((id): id is string => Boolean(id))
+    if (chosen.length > 0) {
+      const result = await fetchGuildTextChannels(c.env)
+      if (!result.ok) throw badRequest('チャンネルを確認できませんでした。Botが設定されているか確認してください')
+      if (!chosen.every((id) => result.channels.some((channel) => channel.id === id))) {
+        throw badRequest('選んだチャンネルが見つかりません。画面を読み込み直してください')
+      }
+    }
+    await saveNotificationSettings(createDb(c.env), input)
     return c.json({ ok: true })
   })
 
   /** 指定した送り先にテストメッセージを送る（通知の種類のオン/オフは見ない） */
   .post('/notifications/test', validate('json', notificationTestSchema), async (c) => {
     const { target } = c.req.valid('json')
-    const url = resolveWebhook(c.env, target)
-    if (!url) throw badRequest(`通知先が設定されていません。サーバーの環境変数 ${WEBHOOK_ENV_NAMES[target]} を設定してください`)
-    const result = await sendWebhook(url, { content: '✅ EDTCダッシュボードからのテスト通知です。この通知が見えていれば設定は正しく動いています。' })
+    const channelId = (await getNotificationSettings(createDb(c.env))).channels[target]
+    if (!channelId) throw badRequest('通知先のチャンネルが選ばれていません。先にチャンネルを選んでください')
+    const result = await sendChannelMessage(c.env, channelId, { content: '✅ EDTCダッシュボードからのテスト通知です。この通知が見えていれば設定は正しく動いています。' })
     if (!result.ok) {
       console.error('テスト通知に失敗しました', result.error)
-      throw badRequest('通知を送れませんでした。Webhook URLが正しいか、削除されていないか確認してください')
+      throw badRequest('通知を送れませんでした。Botがそのチャンネルを見られるか、メッセージを送信できる権限があるか確認してください')
     }
     return c.json({ ok: true })
   })

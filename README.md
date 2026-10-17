@@ -6,7 +6,7 @@ EDTCメンバー専用サイト。イベントの出欠・持ち物・集金、�
 - **イベント**: 出欠（参加/未定/不参加・コメント・定員・回答期限）、持ち物（各自持参／共有の担当者・準備状況）、参加費の集金と当日の出席記録、カレンダー表示。作成時にDiscordへ通知
 - **活動報告書**: 参加したイベントを選んで書く（活動日時・活動名・場所・役割はイベントから入る）。部員の分は所属部署の部署長、役職者の分は本人が選んだ承認者が確認し、承認するか、本文の範囲にコメント・書き直し案を付けて修正を依頼する。承認されるとイベントページに載り、伝言事項は「連絡事項」にまとまる
 - **まとめ報告書**: イベントごとに担当者1人（講師、または主催者が指名した人）が、参加者全員の活動報告書がそろってから書く。担当者自身は活動報告書を書かなくてよい。提出・承認の流れは活動報告書と同じ
-- **ブログ**: Markdownで書き（画像は貼り付け・ドラッグ＆ドロップ可）、提出するとGitHub App経由でEDTCHP_v2にPRを作成。レビューや公開はWebhookで追跡し、執筆者にDiscordで通知
+- **ブログ**: Markdownで書き（画像は貼り付け・ドラッグ＆ドロップ可）、提出するとGitHub App経由でEDTCHP_v2にPRを作成。レビューや公開はGitHubのWebhookで追跡し、執筆者にDiscordで通知
 - **メンバー**: 名簿（学年・部署・趣味で検索）とプロフィール（自己紹介・興味・リンク・書いた記事）
 
 ## 構成
@@ -27,7 +27,7 @@ app.ts                 # ルーティングの組み立て・CORS/CSRF・エラ�
 env.ts                 # Bindings（環境変数）とセッションの型
 db/schema.ts           # テーブル定義（users, user_divisions, events, event_participants, event_items, activity_reports(+_reviews, _comments), blog_posts, blog_images）
 middleware/auth.ts     # requireAuth（ロールは毎回DBから読む）と権限チェック
-lib/                   # discord（OAuth・Webhook通知）、github（App認証・Webhook署名検証）など外部サービス
+lib/                   # discord（OAuth・Bot通知）、github（App認証・Webhook署名検証）など外部サービス
 features/
   auth/                # OAuth・新規登録・セッションCookie
   members/             # 名簿・プロフィール
@@ -131,7 +131,7 @@ theme/ (client直下)     # Panda のトークン・グローバルCSS
 
 1. ダッシュボードで記事を書く（イベントページの「ブログを書く」からだとタイトルと日付を引き継ぐ）。画像はブラウザでWebP（最大1600px）に変換してから保存される
 2. 「提出する」で、記事フォルダ（`index.md` と画像）を1コミットにまとめたPRが EDTCHP_v2 に作られ、Discordに通知される。PRの「Files changed」で本文を画像つきで確認できる
-3. レビューコメント・修正依頼・承認・マージ・クローズはWebhookで受け取り、執筆者にメンションで通知。マージされると「公開済み」になる
+3. レビューコメント・修正依頼・承認・マージ・クローズはGitHubのWebhookで受け取り、執筆者にメンションで通知。マージされると「公開済み」になる
 4. 修正して再提出すると同じPRが更新される
 
 PRのブランチは提出のたびに「最新の main + 記事の1コミット」として作り直す。そのため **記事の正はダッシュボード** で、PR上で直接コミットした修正は次の再提出で上書きされる。
@@ -211,13 +211,14 @@ npm run dev                        # client: http://localhost:5173 / server: htt
 1. [Developer Portal](https://discord.com/developers/applications) でアプリを作り、OAuth2 の Redirects に `<APIのURL>/api/auth/callback` を登録
 2. `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` / `DISCORD_REDIRECT_URI` / `DISCORD_GUILD_ID` を設定
 3. スコープは `identify` と `guilds.members.read`（サーバー内のニックネームを本人のトークンで読むため、ログインにBotは不要）
-4. 通知したいチャンネルでWebhookを作り、環境変数に設定する。イベントの通知は `DISCORD_EVENT_WEBHOOK_URL`、ブログの通知は `DISCORD_BLOG_WEBHOOK_URL`（別のチャンネルにできる。未設定の通知は送られない）。ダッシュボードの「通知設定」（管理者のみ）では、通知先の確認とテスト送信、通知の種類ごとのオン/オフ、ブログ提出時にメンションする **レビュー担当**（メンバーのドロップダウンから選ぶ）を設定する
-   - Webhook URLは画面には末尾しか表示されない
-5. 活動報告書の通知は、関係者だけに届くようBotのDMで送る（チャンネルには流さない）。Botは常駐させず、通知のときにREST APIを呼ぶだけ
+4. チャンネルへの通知（イベント・ブログ）も、次の5.のBotで送る。ダッシュボードの「通知設定」（管理者のみ）で、イベント用・ブログ用の通知先を **サーバーのチャンネル一覧から選び**（別のチャンネルにできる。「通知しない」を選ぶとその通知は送られない）、テスト送信、通知の種類ごとのオン/オフ、ブログ提出時にメンションする **レビュー担当**（メンバーのドロップダウンから選ぶ）を設定する
+   - 以前の環境変数（`DISCORD_EVENT_WEBHOOK_URL` / `DISCORD_BLOG_WEBHOOK_URL`）は使わない。移行後は管理者が「通知設定」でチャンネルを選び直す
+   - Botに、通知先チャンネルの「チャンネルを見る」「メッセージを送信」「埋め込みリンク」権限が必要（権限が足りないとテスト送信が失敗する）
+5. Botを使う。チャンネルへの通知（イベント・ブログ）に加え、活動報告書の通知は関係者だけに届くようBotのDMで送る（チャンネルには流さない）。Botは常駐させず、通知のときにREST APIを呼ぶだけ
    - Developer Portal のアプリの「Bot」で「Reset Token」を押してトークンを発行し、`DISCORD_BOT_TOKEN` に設定する（Privileged Gateway Intents はすべてオフでよい）
-   - 「OAuth2 → URL Generator」で scope に `bot` だけを選び（Bot Permissions は何も選ばない）、生成されたURLからEDTCのサーバーに招待する
+   - 「OAuth2 → URL Generator」で scope に `bot` を選び、Bot Permissions に「View Channels」「Send Messages」「Embed Links」を選んで、生成されたURLからEDTCのサーバーに招待する（DMだけなら Bot Permissions は不要）
    - DMはBotと同じサーバーにいて、サーバーメンバーからのDMを許可している人にだけ届く。確認依頼の送り先は「ユーザー管理」で指定した役職から決まる
-   - 「通知設定」の「活動報告書の確認依頼」「活動報告書の承認・修正依頼」をオフにするとDMを送らない（まとめ報告書も同じ設定に従う）。`DISCORD_BOT_TOKEN` が未設定でも送らない（報告書の機能自体は動く）
+   - 「通知設定」の「活動報告書の確認依頼」「活動報告書の承認・修正依頼」をオフにするとDMを送らない（まとめ報告書も同じ設定に従う）。`DISCORD_BOT_TOKEN` が未設定ならチャンネル通知もDMも送らない（各機能自体は動く）
 
 ### GitHub App（ブログ）
 
@@ -251,9 +252,7 @@ npx wrangler secret put DISCORD_CLIENT_ID --env production
 npx wrangler secret put DISCORD_CLIENT_SECRET --env production
 npx wrangler secret put DISCORD_REDIRECT_URI --env production        # https://<公開URL>/api/auth/callback
 npx wrangler secret put DISCORD_GUILD_ID --env production
-npx wrangler secret put DISCORD_EVENT_WEBHOOK_URL --env production      # 任意（イベントの通知先）
-npx wrangler secret put DISCORD_BLOG_WEBHOOK_URL --env production       # 任意（ブログの通知先）
-npx wrangler secret put DISCORD_BOT_TOKEN --env production              # 活動報告書のDM通知
+npx wrangler secret put DISCORD_BOT_TOKEN --env production              # チャンネル通知とDM通知（送り先は「通知設定」で選ぶ）
 npx wrangler secret put GITHUB_APP_ID --env production
 npx wrangler secret put GITHUB_APP_PRIVATE_KEY --env production < your-app.pem
 npx wrangler secret put GITHUB_WEBHOOK_SECRET --env production

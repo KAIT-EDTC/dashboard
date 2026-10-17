@@ -71,6 +71,13 @@
       "when": 1792042554076,
       "tag": "0009_drop_notification_webhook_url",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1792247683244,
+      "tag": "0010_marvelous_maginty",
+      "breakpoints": true
     }
   ]
 }

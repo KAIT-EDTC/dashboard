@@ -1,7 +1,7 @@
 import type { NotificationKind } from '@edtc/shared'
 import type { Db } from '../db'
 import type { Bindings } from '../env'
-import { getNotificationSettings, resolveWebhook, webhookTargetOf } from '../features/admin/notification-settings'
+import { getNotificationSettings, targetOf } from '../features/admin/notification-settings'
 
 const API = 'https://discord.com/api/v10'
 
@@ -72,7 +72,7 @@ export async function fetchGuildMember(accessToken: string, guildId: string): Pr
 }
 
 // ---------------------------------------------------------------------------
-// 通知（Webhook）
+// 通知（Bot）。常駐はせず、送るときにREST APIを呼ぶだけ
 // ---------------------------------------------------------------------------
 
 export type DiscordEmbed = {
@@ -99,12 +99,19 @@ export type NotificationMessage = {
   mentionUserIds?: string[]
 }
 
-/** Webhookに1件送る。失敗したら理由を返す（例外は投げない） */
-export async function sendWebhook(url: string, message: NotificationMessage): Promise<{ ok: true } | { ok: false; error: string }> {
+const botHeaders = (token: string) => ({ Authorization: `Bot ${token}`, 'Content-Type': 'application/json' })
+
+/** Botでチャンネルに1件送る。失敗したら理由を返す（例外は投げない） */
+export async function sendChannelMessage(
+  env: Bindings,
+  channelId: string,
+  message: NotificationMessage,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!env.DISCORD_BOT_TOKEN) return { ok: false, error: 'Botのトークンが設定されていません' }
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`${API}/channels/${channelId}/messages`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: botHeaders(env.DISCORD_BOT_TOKEN),
       body: JSON.stringify({
         content: message.content,
         embeds: message.embeds,
@@ -118,16 +125,35 @@ export async function sendWebhook(url: string, message: NotificationMessage): Pr
   }
 }
 
+export type GuildChannel = { id: string; name: string }
+
+/** 通知先に選べるチャンネル（サーバーのテキスト・アナウンスチャンネル）を、並び順どおりに返す */
+export async function fetchGuildTextChannels(env: Bindings): Promise<{ ok: true; channels: GuildChannel[] } | { ok: false; error: string }> {
+  if (!env.DISCORD_BOT_TOKEN) return { ok: false, error: 'Botのトークンが設定されていません' }
+  try {
+    const res = await fetch(`${API}/guilds/${env.DISCORD_GUILD_ID}/channels`, { headers: botHeaders(env.DISCORD_BOT_TOKEN) })
+    if (!res.ok) return { ok: false, error: `Discordが ${res.status} を返しました: ${await res.text()}` }
+    // type 0: テキスト、5: アナウンス
+    const channels = ((await res.json()) as { id: string; name: string; type: number; position: number }[])
+      .filter((channel) => channel.type === 0 || channel.type === 5)
+      .sort((a, b) => a.position - b.position)
+      .map(({ id, name }) => ({ id, name }))
+    return { ok: true, channels }
+  } catch (error) {
+    return { ok: false, error: String(error) }
+  }
+}
+
 /**
- * 設定で有効な通知だけを、種類に応じた通知先（イベント用・ブログ用）に送る。
+ * 設定で有効な通知だけを、種類に応じた通知先（イベント用・ブログ用）のチャンネルに送る。
  * 通知の失敗で本来の処理を失敗させないよう、例外は握りつぶしてログだけ残す
  */
 export async function notify(env: Bindings, db: Db, kind: NotificationKind, message: NotificationMessage): Promise<void> {
   try {
     const settings = await getNotificationSettings(db)
-    const url = resolveWebhook(env, webhookTargetOf(kind))
-    if (!url || !settings.enabled[kind]) return
-    const result = await sendWebhook(url, message)
+    const channelId = settings.channels[targetOf(kind)]
+    if (!env.DISCORD_BOT_TOKEN || !channelId || !settings.enabled[kind]) return
+    const result = await sendChannelMessage(env, channelId, message)
     if (!result.ok) console.error('Discord通知に失敗しました', kind, result.error)
   } catch (error) {
     console.error('Discord通知に失敗しました', kind, error)
@@ -135,7 +161,7 @@ export async function notify(env: Bindings, db: Db, kind: NotificationKind, mess
 }
 
 // ---------------------------------------------------------------------------
-// DM（Bot）。常駐はせず、送るときにREST APIを呼ぶだけ
+// DM（Bot）
 // ---------------------------------------------------------------------------
 
 /** DiscordのID（数字だけの17〜20桁） */
@@ -152,11 +178,10 @@ export async function sendDirectMessage(
 ): Promise<void> {
   // DiscordのユーザーIDでない相手（開発用シードのダミーユーザーなど）には送らない
   if (!env.DISCORD_BOT_TOKEN || !isSnowflake(userId)) return
-  const headers = { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`, 'Content-Type': 'application/json' }
   try {
     const channelRes = await fetch(`${API}/users/@me/channels`, {
       method: 'POST',
-      headers,
+      headers: botHeaders(env.DISCORD_BOT_TOKEN),
       body: JSON.stringify({ recipient_id: userId }),
     })
     if (!channelRes.ok) {
@@ -164,12 +189,8 @@ export async function sendDirectMessage(
       return
     }
     const channel = (await channelRes.json()) as { id: string }
-    const res = await fetch(`${API}/channels/${channel.id}/messages`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ ...message, allowed_mentions: { parse: [] } }),
-    })
-    if (!res.ok) console.error('DMを送れませんでした', userId, res.status, await res.text())
+    const result = await sendChannelMessage(env, channel.id, message)
+    if (!result.ok) console.error('DMを送れませんでした', userId, result.error)
   } catch (error) {
     console.error('DMを送れませんでした', userId, error)
   }
