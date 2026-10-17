@@ -207,6 +207,12 @@ export const events = sqliteTable(
     createdBy: text('created_by')
       .notNull()
       .references(() => users.id),
+    /** シフトを組むか。組むときは開始〜終了（時）を区切りで午前・午後に分けた枠を、イベントの日ごとに作る */
+    hasShifts: integer('has_shifts', { mode: 'boolean' }).notNull().default(false),
+    shiftStartHour: integer('shift_start_hour'),
+    shiftEndHour: integer('shift_end_hour'),
+    /** 午前と午後の区切り（時）。無ければ1日1枠 */
+    shiftSplitHour: integer('shift_split_hour'),
     /** まとめ報告書の担当者（主催者が指名する）。未指名なら講師が担当 */
     summaryWriterId: text('summary_writer_id').references(() => users.id, { onDelete: 'set null' }),
     ...timestamps,
@@ -231,6 +237,8 @@ export const eventParticipants = sqliteTable(
     attended: integer('attended', { mode: 'boolean' }).notNull().default(false),
     /** 参加費の支払い（主催者が記録） */
     paid: integer('paid', { mode: 'boolean' }).notNull().default(false),
+    /** 入っているシフトの中で出られない時間（1時間ごとの枠の開始 YYYY-MM-DDTHH:00）。本人が指定する */
+    unavailable: text('unavailable', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
     ...timestamps,
   },
   (t) => [primaryKey({ columns: [t.eventId, t.userId] }), index('event_participants_user_idx').on(t.userId)],
@@ -253,6 +261,40 @@ export const eventItems = sqliteTable(
     createdAt: timestamps.createdAt,
   },
   (t) => [index('event_items_event_idx').on(t.eventId), index('event_items_assignee_idx').on(t.assigneeId)],
+)
+
+/** シフト（文化祭の店番など）。時間帯と持ち場ごとに、入る人を決める */
+export const eventShifts = sqliteTable(
+  'event_shifts',
+  {
+    id: text('id').primaryKey(),
+    eventId: text('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    /** 持ち場・担当（例: 受付） */
+    label: text('label').notNull(),
+    /** 日本時間 YYYY-MM-DDTHH:mm */
+    startsAt: text('starts_at').notNull(),
+    endsAt: text('ends_at').notNull(),
+    note: text('note').notNull().default(''),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [index('event_shifts_event_idx').on(t.eventId, t.startsAt)],
+)
+
+/** シフトに入る人。主催者が割り当てるか、参加者が自分で入る */
+export const eventShiftMembers = sqliteTable(
+  'event_shift_members',
+  {
+    shiftId: text('shift_id')
+      .notNull()
+      .references(() => eventShifts.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [primaryKey({ columns: [t.shiftId, t.userId] }), index('event_shift_members_user_idx').on(t.userId)],
 )
 
 /**
@@ -405,6 +447,7 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   creator: one(users, { fields: [events.createdBy], references: [users.id] }),
   participants: many(eventParticipants),
   items: many(eventItems),
+  shifts: many(eventShifts),
   targetDivisions: many(eventTargetDivisions),
   targetUsers: many(eventTargetUsers),
   reports: many(activityReports),
@@ -427,6 +470,16 @@ export const eventParticipantsRelations = relations(eventParticipants, ({ one })
 export const eventItemsRelations = relations(eventItems, ({ one }) => ({
   event: one(events, { fields: [eventItems.eventId], references: [events.id] }),
   assignee: one(users, { fields: [eventItems.assigneeId], references: [users.id] }),
+}))
+
+export const eventShiftsRelations = relations(eventShifts, ({ one, many }) => ({
+  event: one(events, { fields: [eventShifts.eventId], references: [events.id] }),
+  members: many(eventShiftMembers),
+}))
+
+export const eventShiftMembersRelations = relations(eventShiftMembers, ({ one }) => ({
+  shift: one(eventShifts, { fields: [eventShiftMembers.shiftId], references: [eventShifts.id] }),
+  user: one(users, { fields: [eventShiftMembers.userId], references: [users.id] }),
 }))
 
 export const activityReportsRelations = relations(activityReports, ({ one, many }) => ({

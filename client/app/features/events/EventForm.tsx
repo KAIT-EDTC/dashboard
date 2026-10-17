@@ -1,11 +1,11 @@
-import type { Division, EventInput } from '@edtc/shared'
+import { hourLabel, type Division, type EventInput } from '@edtc/shared'
 import { useState, type ReactNode } from 'react'
 import { Form } from 'react-router'
 import { css } from 'styled-system/css'
 import { Alert } from '~/components/ui/Alert'
 import { Button } from '~/components/ui/Button'
 import { Card } from '~/components/ui/Card'
-import { SelectField, TextareaField, TextField } from '~/components/ui/Field'
+import { Checkbox, SelectField, TextareaField, TextField } from '~/components/ui/Field'
 import { DivisionPicker } from '~/features/members/DivisionPicker'
 import { MemberPicker } from '~/features/members/MemberPicker'
 import type { MemberListItem } from '~/features/members/types'
@@ -22,6 +22,66 @@ type EventFormProps = {
   submitLabel: string
   /** 送信ボタンの左に並べる要素（キャンセルなど） */
   secondaryActions?: ReactNode
+}
+
+const HOURS = Array.from({ length: 25 }, (_, hour) => hour)
+
+/** シフトの有無と時間帯。区切りがあれば日ごとに午前・午後の2枠、無ければ1枠を作る */
+function ShiftSettings({ defaultValue, errors }: { defaultValue: Partial<EventInput>; errors: Record<string, string> }) {
+  const [enabled, setEnabled] = useState(defaultValue.hasShifts ?? false)
+  const [start, setStart] = useState(defaultValue.shiftStartHour ?? 9)
+  const [end, setEnd] = useState(defaultValue.shiftEndHour ?? 17)
+  const [split, setSplit] = useState<number | null>(defaultValue.hasShifts ? (defaultValue.shiftSplitHour ?? null) : 12)
+  const grid = css({ display: 'grid', gridTemplateColumns: { base: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 'md' })
+  const validSplit = split !== null && split > start && split < end
+
+  return (
+    <Card title="シフト">
+      <div className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
+        <Checkbox label="シフトを組む（文化祭の店番など）" name="hasShifts" value="true" checked={enabled} onChange={(e) => setEnabled(e.currentTarget.checked)} />
+        {enabled && (
+          <>
+            <div className={grid}>
+              <SelectField label="開始時刻" name="shiftStartHour" value={start} onChange={(e) => setStart(Number(e.currentTarget.value))} error={errors.shiftStartHour}>
+                {HOURS.slice(0, 24).map((hour) => (
+                  <option key={hour} value={hour}>
+                    {hourLabel(hour)}
+                  </option>
+                ))}
+              </SelectField>
+              <SelectField label="終了時刻" name="shiftEndHour" value={end} onChange={(e) => setEnd(Number(e.currentTarget.value))} error={errors.shiftEndHour}>
+                {HOURS.slice(1).map((hour) => (
+                  <option key={hour} value={hour}>
+                    {hourLabel(hour)}
+                  </option>
+                ))}
+              </SelectField>
+              <SelectField
+                label="午前・午後の区切り"
+                name="shiftSplitHour"
+                value={split ?? ''}
+                onChange={(e) => setSplit(e.currentTarget.value === '' ? null : Number(e.currentTarget.value))}
+                error={errors.shiftSplitHour}
+              >
+                <option value="">区切らない</option>
+                {HOURS.filter((hour) => hour > start && hour < end).map((hour) => (
+                  <option key={hour} value={hour}>
+                    {hourLabel(hour)}
+                  </option>
+                ))}
+              </SelectField>
+            </div>
+            <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
+              {end > start &&
+                (validSplit
+                  ? `イベントの日ごとに「午前 ${hourLabel(start)}〜${hourLabel(split)}」「午後 ${hourLabel(split)}〜${hourLabel(end)}」の枠を作ります。`
+                  : `イベントの日ごとに ${hourLabel(start)}〜${hourLabel(end)} の枠を1つ作ります。`)}
+            </p>
+          </>
+        )}
+      </div>
+    </Card>
+  )
 }
 
 export function EventForm({ defaultValue = {}, categories, members, errors, submitting, submitLabel, secondaryActions }: EventFormProps) {
@@ -61,6 +121,7 @@ export function EventForm({ defaultValue = {}, categories, members, errors, subm
         </div>
       </Card>
 
+      <ShiftSettings defaultValue={defaultValue} errors={e} />
 
       <Card
         title="対象"

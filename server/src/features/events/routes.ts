@@ -21,6 +21,8 @@ import {
   eventItems,
   eventParticipants,
   events,
+  eventShiftMembers,
+  eventShifts,
   eventTargetDivisions,
   eventTargetUsers,
   userDivisions,
@@ -44,6 +46,7 @@ import {
 import { eventCategoriesRoute } from './categories'
 import { dropLecturers } from './category-rules'
 import { notifyEventCreated } from './notifications'
+import { eventShiftsRoute, leaveAllShifts, myUpcomingShifts, syncShifts } from './shifts'
 
 /** 終了日時が無いイベントは開始日の終わりまでを開催中とみなす */
 const effectiveEnd = sql`coalesce(${events.endsAt}, substr(${events.startsAt}, 1, 10) || 'T23:59')`
@@ -207,6 +210,12 @@ export const eventsRoute = new Hono<AppEnv>()
     return c.json({ items })
   })
 
+  // 自分が入っている、これからのシフト
+  .get('/my-shifts', async (c) => {
+    const shifts = await myUpcomingShifts(createDb(c.env), c.get('session').userId, nowInJst())
+    return c.json({ shifts })
+  })
+
   .post('/', validate('json', eventInputSchema), async (c) => {
     const { targetDivisions, targetUserIds: rawUserIds, ...input } = c.req.valid('json')
     const targetUserIds = [...new Set(rawUserIds)]
@@ -221,6 +230,7 @@ export const eventsRoute = new Hono<AppEnv>()
       db.insert(events).values({ ...input, id, createdBy: userId }),
       db.insert(eventParticipants).values({ eventId: id, userId, status: 'going' }),
       ...replaceTargets(db, id, targetDivisions, targetUserIds),
+      ...(await syncShifts(db, id, input, null)),
     ])
 
     const organizer = await db
@@ -257,6 +267,16 @@ export const eventsRoute = new Hono<AppEnv>()
         items: {
           with: { assignee: { columns: memberSummaryColumns } },
           orderBy: [asc(eventItems.kind), asc(eventItems.createdAt)],
+        },
+        shifts: {
+          with: {
+            members: {
+              columns: { userId: true },
+              with: { user: { columns: memberSummaryColumns } },
+              orderBy: asc(eventShiftMembers.createdAt),
+            },
+          },
+          orderBy: [asc(eventShifts.startsAt), asc(eventShifts.endsAt), asc(eventShifts.label)],
         },
       },
     })
@@ -328,6 +348,7 @@ export const eventsRoute = new Hono<AppEnv>()
       // 講師を置かない種類に変えたら、講師の役割を外す
       ...(category.hasLecturer ? [] : dropLecturers(db, eq(events.id, event.id))),
       ...replaceTargets(db, event.id, targetDivisions, targetUserIds),
+      ...(await syncShifts(db, event.id, input, event)),
     ])
     return c.json({ id: event.id })
   })
@@ -375,7 +396,7 @@ export const eventsRoute = new Hono<AppEnv>()
         set: { status, comment, updatedAt: now },
       })
 
-    // 不参加にしたら担当していた持ち物と講師の役割を手放す
+    // 不参加にしたら担当していた持ち物・シフトと講師の役割を手放す
     if (status === 'declined') {
       await db.batch([
         db
@@ -386,6 +407,7 @@ export const eventsRoute = new Hono<AppEnv>()
           .update(eventParticipants)
           .set({ role: 'assistant' })
           .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, session.userId))),
+        leaveAllShifts(db, event.id, session.userId),
       ])
     }
     return c.json({ ok: true })
@@ -445,6 +467,10 @@ export const eventsRoute = new Hono<AppEnv>()
     await db.batch([db.update(events).set({ summaryWriterId: userId }).where(eq(events.id, event.id)), ...handOverSummary(db, summary, userId)])
     return c.json({ ok: true })
   })
+
+  // --- シフト ---------------------------------------------------------------
+
+  .route('/:id/shifts', eventShiftsRoute)
 
   // --- 持ち物 ---------------------------------------------------------------
 
