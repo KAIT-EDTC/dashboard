@@ -144,17 +144,21 @@ export const blogReviewers = sqliteTable('blog_reviewers', {
 })
 
 /**
- * Discord通知の種類ごとのオン/オフ（1行だけ。id は常に 1）。行が無ければ「すべてオン」として扱う。
- * 通知先のWebhook URLは環境変数（DISCORD_EVENT_WEBHOOK_URL / DISCORD_BLOG_WEBHOOK_URL）で設定する
+ * Discord通知の種類ごとのオン/オフと送り先チャンネル（1行だけ。id は常に 1）。行が無ければ「すべてオン・送り先なし」として扱う。
+ * チャンネルはBotが送る（管理者が「通知設定」でサーバーのチャンネルから選ぶ）。null の通知は送らない
  */
 export const notificationSettings = sqliteTable('notification_settings', {
   id: integer('id').primaryKey(),
+  /** イベントの通知を送るチャンネルのID */
+  eventChannelId: text('event_channel_id'),
+  /** ブログの通知を送るチャンネルのID */
+  blogChannelId: text('blog_channel_id'),
   onEventCreated: integer('on_event_created', { mode: 'boolean' }).notNull().default(true),
   onBlogSubmitted: integer('on_blog_submitted', { mode: 'boolean' }).notNull().default(true),
   onBlogPublished: integer('on_blog_published', { mode: 'boolean' }).notNull().default(true),
   onBlogClosed: integer('on_blog_closed', { mode: 'boolean' }).notNull().default(true),
   onBlogFeedback: integer('on_blog_feedback', { mode: 'boolean' }).notNull().default(true),
-  /** 活動報告書の通知（Webhookではなく、関係者へのDM） */
+  /** 活動報告書の通知（チャンネルではなく、関係者へのDM） */
   onReportReviewRequested: integer('on_report_review_requested', { mode: 'boolean' }).notNull().default(true),
   onReportReviewed: integer('on_report_reviewed', { mode: 'boolean' }).notNull().default(true),
   updatedAt: timestamps.updatedAt,

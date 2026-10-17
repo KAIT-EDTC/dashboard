@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5ec13489-76ab-437e-9f1a-359be0344d75",
+  "id": "d974f03f-fd18-491e-a307-e6524342c255",
   "prevId": "e4542912-3e72-4c20-b7ab-affd0f2eb7e4",
   "tables": {
     "activity_report_comments": {
@@ -996,14 +996,6 @@
           "autoincrement": false,
           "default": false
         },
-        "unavailable": {
-          "name": "unavailable",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'[]'"
-        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -1067,165 +1059,6 @@
           "name": "event_participants_event_id_user_id_pk"
         }
       },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "event_shift_members": {
-      "name": "event_shift_members",
-      "columns": {
-        "shift_id": {
-          "name": "shift_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
-        }
-      },
-      "indexes": {
-        "event_shift_members_user_idx": {
-          "name": "event_shift_members_user_idx",
-          "columns": [
-            "user_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "event_shift_members_shift_id_event_shifts_id_fk": {
-          "name": "event_shift_members_shift_id_event_shifts_id_fk",
-          "tableFrom": "event_shift_members",
-          "tableTo": "event_shifts",
-          "columnsFrom": [
-            "shift_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "event_shift_members_user_id_users_id_fk": {
-          "name": "event_shift_members_user_id_users_id_fk",
-          "tableFrom": "event_shift_members",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "event_shift_members_shift_id_user_id_pk": {
-          "columns": [
-            "shift_id",
-            "user_id"
-          ],
-          "name": "event_shift_members_shift_id_user_id_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "event_shifts": {
-      "name": "event_shifts",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "event_id": {
-          "name": "event_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "label": {
-          "name": "label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "starts_at": {
-          "name": "starts_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "ends_at": {
-          "name": "ends_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
-        }
-      },
-      "indexes": {
-        "event_shifts_event_idx": {
-          "name": "event_shifts_event_idx",
-          "columns": [
-            "event_id",
-            "starts_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "event_shifts_event_id_events_id_fk": {
-          "name": "event_shifts_event_id_events_id_fk",
-          "tableFrom": "event_shifts",
-          "tableTo": "events",
-          "columnsFrom": [
-            "event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -1424,35 +1257,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "has_shifts": {
-          "name": "has_shifts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "shift_start_hour": {
-          "name": "shift_start_hour",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "shift_end_hour": {
-          "name": "shift_end_hour",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "shift_split_hour": {
-          "name": "shift_split_hour",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "summary_writer_id": {
           "name": "summary_writer_id",
           "type": "text",
@@ -1526,6 +1330,20 @@
           "type": "integer",
           "primaryKey": true,
           "notNull": true,
+          "autoincrement": false
+        },
+        "event_channel_id": {
+          "name": "event_channel_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "blog_channel_id": {
+          "name": "blog_channel_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "on_event_created": {

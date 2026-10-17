@@ -9,9 +9,18 @@ export const blogReviewersSchema = z.object({
   userIds: z.array(z.string().min(1)).max(50, 'レビュー担当が多すぎます'),
 })
 
-/** 通知の種類のオン/オフ。通知先のWebhook URLは環境変数で設定する */
+/** 通知先に選べるチャンネルのID（Discord snowflake）。null で選択を解除し、未指定なら変更しない */
+const channelId = z
+  .string()
+  .regex(/^\d{17,20}$/, 'チャンネルを選び直してください')
+  .nullable()
+  .optional()
+
+/** 通知の種類のオン/オフと、イベント用・ブログ用の通知先チャンネル。送られた項目だけ変更する */
 export const notificationSettingsSchema = z.object({
-  enabled: z.record(z.enum(NOTIFICATION_KIND_IDS), z.boolean()),
+  enabled: z.record(z.enum(NOTIFICATION_KIND_IDS), z.boolean()).optional(),
+  eventChannelId: channelId,
+  blogChannelId: channelId,
 })
 
 /** テスト送信の送り先（イベント用 / ブログ用） */
