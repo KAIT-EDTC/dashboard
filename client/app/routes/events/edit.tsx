@@ -56,7 +56,6 @@ export default function EditEventPage({ loaderData, actionData }: Route.Componen
       <PageHeader title="イベントを編集" back={{ to: `/events/${event.id}`, label: event.title }} />
       <EventForm
         defaultValue={{ ...event, targetUserIds: event.targetUsers.map((user) => user.id) }}
-        shiftsAssigned={event.shifts.some((shift) => shift.members.length > 0)}
         categories={categories}
         members={members}
         errors={actionData}

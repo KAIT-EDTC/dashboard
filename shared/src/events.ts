@@ -32,9 +32,6 @@ export const PARTICIPANT_ROLE_LABELS: Record<ParticipantRole, string> = {
   assistant: '講師補助',
 }
 
-/** シフト1枠に入れる人の上限 */
-export const SHIFT_MEMBERS_MAX = 50
-
 /** 2つの時間帯が重なるか（`YYYY-MM-DDTHH:mm` の文字列比較。終わりと始まりが同じ時刻なら重ならない） */
 export const timesOverlap = (a: { startsAt: string; endsAt: string }, b: { startsAt: string; endsAt: string }) =>
   a.startsAt < b.endsAt && b.startsAt < a.endsAt

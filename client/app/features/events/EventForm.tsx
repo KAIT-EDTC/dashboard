@@ -22,14 +22,12 @@ type EventFormProps = {
   submitLabel: string
   /** 送信ボタンの左に並べる要素（キャンセルなど） */
   secondaryActions?: ReactNode
-  /** 編集時: もう誰かが入っているシフトの枠があるか（あれば時間帯を変えても枠を作り直さない） */
-  shiftsAssigned?: boolean
 }
 
 const HOURS = Array.from({ length: 25 }, (_, hour) => hour)
 
 /** シフトの有無と時間帯。区切りがあれば日ごとに午前・午後の2枠、無ければ1枠を作る */
-function ShiftSettings({ defaultValue, errors, assigned }: { defaultValue: Partial<EventInput>; errors: Record<string, string>; assigned: boolean }) {
+function ShiftSettings({ defaultValue, errors }: { defaultValue: Partial<EventInput>; errors: Record<string, string> }) {
   const [enabled, setEnabled] = useState(defaultValue.hasShifts ?? false)
   const [start, setStart] = useState(defaultValue.shiftStartHour ?? 9)
   const [end, setEnd] = useState(defaultValue.shiftEndHour ?? 17)
@@ -78,7 +76,6 @@ function ShiftSettings({ defaultValue, errors, assigned }: { defaultValue: Parti
                 (validSplit
                   ? `イベントの日ごとに「午前 ${hourLabel(start)}〜${hourLabel(split)}」「午後 ${hourLabel(split)}〜${hourLabel(end)}」の枠を作ります。`
                   : `イベントの日ごとに ${hourLabel(start)}〜${hourLabel(end)} の枠を1つ作ります。`)}
-              {assigned && ' すでに入っている人がいるので、時間帯を変えても枠は作り直しません。枠はイベントページのシフト欄で直してください。'}
             </p>
           </>
         )}
@@ -87,7 +84,7 @@ function ShiftSettings({ defaultValue, errors, assigned }: { defaultValue: Parti
   )
 }
 
-export function EventForm({ defaultValue = {}, categories, members, errors, submitting, submitLabel, secondaryActions, shiftsAssigned = false }: EventFormProps) {
+export function EventForm({ defaultValue = {}, categories, members, errors, submitting, submitLabel, secondaryActions }: EventFormProps) {
   const e = errors?.fieldErrors ?? {}
   const [targetDivisions, setTargetDivisions] = useState<Division[]>(defaultValue.targetDivisions ?? [])
   const [targetUserIds, setTargetUserIds] = useState<string[]>(defaultValue.targetUserIds ?? [])
@@ -124,7 +121,7 @@ export function EventForm({ defaultValue = {}, categories, members, errors, subm
         </div>
       </Card>
 
-      <ShiftSettings defaultValue={defaultValue} errors={e} assigned={shiftsAssigned} />
+      <ShiftSettings defaultValue={defaultValue} errors={e} />
 
       <Card
         title="対象"

@@ -27,15 +27,6 @@ const bool = (value: string) => (value === '' ? undefined : value === 'true')
 const oneOf = <T extends string>(values: readonly T[], value: string, fallback: T): T =>
   (values as readonly string[]).includes(value) ? (value as T) : fallback
 
-/** シフトの追加・編集フォームの内容（入る人はチェックした人に置き換える） */
-const shiftFields = (form: FormData) => ({
-  label: text(form, 'label'),
-  startsAt: text(form, 'startsAt'),
-  endsAt: text(form, 'endsAt'),
-  note: text(form, 'note'),
-  memberIds: texts(form, 'memberIds'),
-})
-
 /** 出欠・持ち物・シフト・参加者の記録は、このページの各パネルから intent 付きで送られてくる */
 export async function clientAction({ request, params }: Route.ClientActionArgs): Promise<FormErrors | { ok: true }> {
   const form = await request.formData()
@@ -74,12 +65,6 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
             },
           }),
         )
-      case 'add-shift':
-        return unwrap(api.events[':id'].shifts.$post({ param: { id }, json: shiftFields(form) }))
-      case 'update-shift':
-        return unwrap(api.events[':id'].shifts[':shiftId'].$patch({ param: { id, shiftId: text(form, 'shiftId') }, json: shiftFields(form) }))
-      case 'delete-shift':
-        return unwrap(api.events[':id'].shifts[':shiftId'].$delete({ param: { id, shiftId: text(form, 'shiftId') } }))
       case 'availability':
         return unwrap(api.events[':id'].shifts.availability.$put({ param: { id }, json: { unavailable: texts(form, 'unavailable') } }))
       case 'join-shift':
@@ -159,7 +144,7 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
           {/* 報告書を書かない種類のイベントには出さない（書かない設定にする前の承認済みの報告書は残す） */}
           {event.hasReport && <EventSummary event={event} summary={summary} canManage={canManage} started={started} />}
           {started && (event.hasReport || reports.length > 0) && <EventReports event={event} reports={reports} />}
-          <ShiftList event={event} userId={me.id} canManage={canManage} />
+          <ShiftList event={event} userId={me.id} />
           <ItemList event={event} userId={me.id} canManage={canManage} />
         </div>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>

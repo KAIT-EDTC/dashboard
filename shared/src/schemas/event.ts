@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { DIVISIONS } from '../divisions'
-import { CATEGORY_TONES, ITEM_KINDS, PARTICIPANT_ROLES, RSVP_STATUSES, SHIFT_DAYS_MAX, SHIFT_MEMBERS_MAX, SHIFT_HOUR_MAX, SHIFT_HOUR_MIN } from '../events'
+import { CATEGORY_TONES, ITEM_KINDS, PARTICIPANT_ROLES, RSVP_STATUSES, SHIFT_DAYS_MAX, SHIFT_HOUR_MAX, SHIFT_HOUR_MIN } from '../events'
 
 /** 日本時間の YYYY-MM-DDTHH:mm */
 const dateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, '日時の形式が正しくありません')
@@ -97,25 +97,6 @@ export const eventCategoriesSaveSchema = z.object({
     .min(1, '種類は1つ以上必要です')
     .max(30, '種類が多すぎます'),
 })
-
-const shiftFields = {
-  /** 持ち場・担当（例: 受付、店番） */
-  label: z.string().trim().min(1, '持ち場を入力してください').max(40, '持ち場が長すぎます'),
-  startsAt: dateTime,
-  endsAt: dateTime,
-  note: z.string().trim().max(200, 'メモは200文字以内にしてください'),
-}
-/** 入る人（主催者・管理者が決める）。参加者から選ぶ */
-const shiftMemberIds = z.array(z.string().min(1)).max(SHIFT_MEMBERS_MAX)
-
-const shiftTimeOrder = (v: { startsAt?: string; endsAt?: string }) => !v.startsAt || !v.endsAt || v.endsAt > v.startsAt
-const shiftTimeOrderError = { path: ['endsAt'], message: '終了時刻は開始時刻より後にしてください' }
-
-export const shiftInputSchema = z.object({ ...shiftFields, memberIds: shiftMemberIds.default([]) }).refine(shiftTimeOrder, shiftTimeOrderError)
-export type ShiftInput = z.input<typeof shiftInputSchema>
-
-/** シフトの編集（主催者・管理者）。送った項目だけ変える */
-export const shiftUpdateSchema = z.object({ ...shiftFields, memberIds: shiftMemberIds }).partial().refine(shiftTimeOrder, shiftTimeOrderError)
 
 /** 自分がシフトに入る／抜ける */
 export const shiftJoinSchema = z.object({ joined: z.boolean() })
