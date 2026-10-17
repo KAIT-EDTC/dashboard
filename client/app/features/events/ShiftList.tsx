@@ -2,10 +2,10 @@ import { shiftHours } from '@edtc/shared'
 import { useFetcher } from 'react-router'
 import { css } from 'styled-system/css'
 import { Avatar } from '~/components/ui/Avatar'
+import { Button } from '~/components/ui/Button'
 import { Card } from '~/components/ui/Card'
-import { ClockIcon, PlusIcon, XIcon } from '~/components/ui/Icons'
+import { ClockIcon } from '~/components/ui/Icons'
 import { EmptyState } from '~/components/ui/EmptyState'
-import { Spinner } from '~/components/ui/Spinner'
 import type { FormErrors } from '~/lib/form'
 import { formatDate, fullName } from '~/lib/format'
 import { AvailabilityGrid } from './AvailabilityGrid'
@@ -30,112 +30,72 @@ function hourRanges(slots: string[]): string[] {
   return ranges
 }
 
-const chipButton = css({
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  w: '20px',
-  h: '20px',
-  mr: '-6px',
-  borderRadius: 'full',
-  color: 'fg.muted',
-  cursor: 'pointer',
-  _hover: { bg: 'danger.subtle', color: 'danger.fg' },
-  _focusVisible: { shadow: 'focus', outline: 'none' },
-})
-
-/** 入っている人。自分なら色を変え、× で抜けられる */
-function MemberChip({ member, away, onLeave }: { member: EventShift['members'][number]; away: string[]; onLeave?: { label: string; busy: boolean; leave: () => void } }) {
+/** 入っている人。自分なら色を変える */
+function MemberChip({ member, mine, away }: { member: EventShift['members'][number]; mine: boolean; away: string[] }) {
   return (
     <li
       className={css({
         display: 'inline-flex',
         alignItems: 'center',
         gap: 'xs',
-        minH: '28px',
         py: '2px',
         pl: '2px',
         pr: 'sm',
         fontSize: 'sm',
         borderRadius: 'full',
         borderWidth: '1px',
-        borderColor: onLeave ? 'accent' : 'border',
-        bg: onLeave ? 'accent.subtle' : 'surface',
+        borderColor: mine ? 'accent' : 'border',
+        bg: mine ? 'accent.subtle' : 'surface',
       })}
     >
       <Avatar user={member.user} size={20} />
       {fullName(member.user)}
       {away.length > 0 && <span className={css({ fontSize: 'xs', color: 'danger.fg' })}>{hourRanges(away).join('・')} 不在</span>}
-      {onLeave && (
-        <button type="button" className={chipButton} disabled={onLeave.busy} aria-label={onLeave.label} title="このシフトから抜ける" onClick={onLeave.leave}>
-          {onLeave.busy ? <Spinner size="sm" /> : <XIcon size={12} />}
-        </button>
-      )}
     </li>
   )
 }
-
-const joinButton = css({
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '4px',
-  minH: '28px',
-  px: 'sm',
-  fontSize: 'sm',
-  color: 'accent.fg',
-  borderRadius: 'full',
-  borderWidth: '1px',
-  borderStyle: 'dashed',
-  borderColor: 'accent',
-  cursor: 'pointer',
-  _hover: { bg: 'accent.subtle' },
-  _focusVisible: { shadow: 'focus', outline: 'none' },
-  _disabled: { opacity: 0.6, cursor: 'wait' },
-})
 
 function ShiftRow({ shift, userId, canJoin, unavailableOf }: { shift: EventShift; userId: string; canJoin: boolean; unavailableOf: (userId: string) => string[] }) {
   const fetcher = useFetcher<FormErrors>()
   const busy = fetcher.state !== 'idle'
   const hours = new Set(shiftHours(shift))
-  // 送っている間は押した結果を先に見せる
   const joined = shift.members.some((m) => m.userId === userId)
   const join = (value: boolean) => fetcher.submit({ intent: 'join-shift', shiftId: shift.id, joined: String(value) }, { method: 'post' })
-  const awayOf = (memberId: string) => unavailableOf(memberId).filter((slot) => hours.has(slot))
 
   return (
     <li className={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 'sm', py: 'sm', borderTopWidth: '1px', _first: { borderTopWidth: '0' } })}>
-      <span className={css({ minW: '104px', fontSize: 'sm', fontWeight: '600', fontVariantNumeric: 'tabular-nums', pt: '4px' })}>{timeRange(shift)}</span>
+      <span className={css({ minW: '104px', fontSize: 'sm', fontWeight: '600', fontVariantNumeric: 'tabular-nums', pt: '2px' })}>{timeRange(shift)}</span>
       <div className={css({ flex: 1, minW: '180px', display: 'flex', flexDirection: 'column', gap: 'xs' })}>
-        <p className={css({ display: 'flex', alignItems: 'center', gap: 'xs', fontWeight: '600', fontSize: 'sm', pt: '4px' })}>
+        <p className={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'xs', fontWeight: '600', fontSize: 'sm' })}>
           {shift.label}
           <span className={css({ color: 'fg.muted', fontWeight: '400' })}>{shift.members.length}人</span>
         </p>
         {shift.note && <p className={css({ fontSize: 'xs', color: 'fg.muted' })}>{shift.note}</p>}
-        <ul className={css({ display: 'flex', flexWrap: 'wrap', gap: 'xs' })}>
-          {shift.members.map((member) => (
-            <MemberChip
-              key={member.userId}
-              member={member}
-              away={awayOf(member.userId)}
-              onLeave={member.userId === userId ? { label: `${shift.label}（${timeRange(shift)}）から抜ける`, busy, leave: () => join(false) } : undefined}
-            />
-          ))}
-          {!joined && canJoin && (
-            <li>
-              <button type="button" className={joinButton} disabled={busy} onClick={() => join(true)}>
-                {busy ? <Spinner size="sm" /> : <PlusIcon size={14} />}
-                入る
-              </button>
-            </li>
-          )}
-        </ul>
+        {shift.members.length > 0 && (
+          <ul className={css({ display: 'flex', flexWrap: 'wrap', gap: 'xs' })}>
+            {shift.members.map((member) => (
+              <MemberChip key={member.userId} member={member} mine={member.userId === userId} away={unavailableOf(member.userId).filter((slot) => hours.has(slot))} />
+            ))}
+          </ul>
+        )}
         {fetcher.data?.error && <p className={css({ fontSize: 'xs', color: 'danger.fg' })}>{fetcher.data.error}</p>}
       </div>
+      {joined ? (
+        <Button variant="ghost" loading={busy} onClick={() => join(false)}>
+          外れる
+        </Button>
+      ) : (
+        canJoin && (
+          <Button variant="primary" loading={busy} onClick={() => join(true)}>
+            入る
+          </Button>
+        )
+      )}
     </li>
   )
 }
 
-/** シフトの枠（イベントの設定から作る）と、入っている人。参加・未定の人は自分で入る／抜ける */
+/** シフトの枠（イベントの設定から作る）と、入っている人。参加・未定の人は自分で入る／外れる */
 export function ShiftList({ event, userId }: Props) {
   // シフトなしのイベントには出さない（イベントの編集で「シフトを組む」にする）
   if (!event.hasShifts) return null

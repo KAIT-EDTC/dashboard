@@ -98,7 +98,7 @@ export const eventCategoriesSaveSchema = z.object({
     .max(30, '種類が多すぎます'),
 })
 
-/** 自分がシフトに入る／抜ける */
+/** 自分がシフトに入る／外れる */
 export const shiftJoinSchema = z.object({ joined: z.boolean() })
 
 /** 入っているシフトの中で出れない時間（1時間ごとの枠の開始 `YYYY-MM-DDTHH:00`）を丸ごと置き換える */
