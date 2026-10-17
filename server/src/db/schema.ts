@@ -237,7 +237,7 @@ export const eventParticipants = sqliteTable(
     attended: integer('attended', { mode: 'boolean' }).notNull().default(false),
     /** 参加費の支払い（主催者が記録） */
     paid: integer('paid', { mode: 'boolean' }).notNull().default(false),
-    /** 入っているシフトの中で出れない時間（1時間ごとの枠の開始 YYYY-MM-DDTHH:00）。本人が指定する */
+    /** 入っているシフトの中で出られない時間（1時間ごとの枠の開始 YYYY-MM-DDTHH:00）。本人が指定する */
     unavailable: text('unavailable', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
     ...timestamps,
   },

@@ -102,9 +102,9 @@ async function assertNoOverlap(db: Db, eventId: string, shift: typeof eventShift
   if (clash) throw conflict(`同じ時間帯の「${clash.label}」（${clash.startsAt.slice(11)}〜${clash.endsAt.slice(11)}）に入っています`)
 }
 
-/** /api/events/:id/shifts — 枠はイベントの設定から作る。参加者は自分で入る／外れると、入ったシフトの中で出れない時間を決める */
+/** /api/events/:id/shifts — 枠はイベントの設定から作る。参加者は自分で入る／外れると、入ったシフトの中で出られない時間を決める */
 export const eventShiftsRoute = new Hono<AppEnv>()
-  // 入っているシフトの中で、自分が出れない時間（1時間ごと）を置き換える。シフトの外の時間は捨てる
+  // 入っているシフトの中で、自分が出られない時間（1時間ごと）を置き換える。シフトの外の時間は捨てる
   .put('/availability', validate('json', availabilitySchema), async (c) => {
     const { userId } = c.get('session')
     const db = createDb(c.env)

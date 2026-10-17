@@ -47,7 +47,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0')
 /** 時（9）→ 09:00。24 は 24:00 と書く */
 export const hourLabel = (hour: number) => `${pad2(hour)}:00`
 
-/** 1時間の枠の開始（`YYYY-MM-DDTHH:00`）。出れない時間はこの形で保存する */
+/** 1時間の枠の開始（`YYYY-MM-DDTHH:00`）。出られない時間はこの形で保存する */
 export const hourSlot = (day: string, hour: number) => `${day}T${pad2(hour)}:00`
 
 /** 枠の終わりの日時。24時は翌日の0時にする（文字列比較で前後が分かるように） */
@@ -71,7 +71,7 @@ export function shiftDays(event: { startsAt: string; endsAt: string | null }): s
   return days
 }
 
-/** シフトの時間帯にかかる1時間ごとの枠（`YYYY-MM-DDTHH:00`）。出れない時間はこの中から選ぶ */
+/** シフトの時間帯にかかる1時間ごとの枠（`YYYY-MM-DDTHH:00`）。出られない時間はこの中から選ぶ */
 export function shiftHours(range: { startsAt: string; endsAt: string }): string[] {
   const slots: string[] = []
   for (const d = new Date(`${range.startsAt.slice(0, 13)}:00:00Z`); slots.length < SHIFT_DAYS_MAX * 24; d.setUTCHours(d.getUTCHours() + 1)) {

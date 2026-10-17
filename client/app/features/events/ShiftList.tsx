@@ -17,7 +17,7 @@ type Props = { event: EventDetail; userId: string }
 const timeRange = (shift: EventShift) =>
   `${shift.startsAt.slice(11)}〜${shift.startsAt.slice(0, 10) === shift.endsAt.slice(0, 10) ? shift.endsAt.slice(11) : `${formatDate(shift.endsAt)} ${shift.endsAt.slice(11)}`}`
 
-/** 出れない時間（1時間ごと）を続いている範囲ごとにまとめる（例: 11〜13時） */
+/** 出られない時間（1時間ごと）を続いている範囲ごとにまとめる（例: 11〜13時） */
 function hourRanges(slots: string[]): string[] {
   const hours = slots.map((slot) => Number(slot.slice(11, 13)))
   const ranges: string[] = []
@@ -78,10 +78,11 @@ function ShiftRow({ shift, userId, canJoin, unavailableOf }: { shift: EventShift
             ))}
           </ul>
         )}
+        {joined && <AvailabilityGrid shift={shift} unavailable={unavailableOf(userId)} />}
         {fetcher.data?.error && <p className={css({ fontSize: 'xs', color: 'danger.fg' })}>{fetcher.data.error}</p>}
       </div>
       {joined ? (
-        <Button variant="ghost" loading={busy} onClick={() => join(false)}>
+        <Button variant="danger" loading={busy} onClick={() => join(false)}>
           外れる
         </Button>
       ) : (
@@ -123,9 +124,6 @@ export function ShiftList({ event, userId }: Props) {
               </ul>
             </section>
           ))}
-          <div className={css({ pt: 'md', borderTopWidth: '1px', _empty: { display: 'none' } })}>
-            <AvailabilityGrid event={event} userId={userId} />
-          </div>
         </div>
       )}
     </Card>

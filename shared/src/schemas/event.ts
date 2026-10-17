@@ -24,7 +24,7 @@ export const eventInputSchema = z
     targetUserIds: z.array(z.string().min(1)).max(100, '対象者は100人までにしてください').default([]),
     /**
      * シフト（文化祭の店番など）。ありにすると、開始〜終了の時間帯を区切りで午前・午後に分けた枠を日ごとに作る。
-     * 区切りが無ければ1日1枠。枠に入った人は、その中で出れない時間を1時間ごとに指定する
+     * 区切りが無ければ1日1枠。枠に入った人は、その中で出られない時間を1時間ごとに指定する
      */
     hasShifts: z.boolean().default(false),
     shiftStartHour: shiftHour.nullable().default(null),
@@ -101,7 +101,7 @@ export const eventCategoriesSaveSchema = z.object({
 /** 自分がシフトに入る／外れる */
 export const shiftJoinSchema = z.object({ joined: z.boolean() })
 
-/** 入っているシフトの中で出れない時間（1時間ごとの枠の開始 `YYYY-MM-DDTHH:00`）を丸ごと置き換える */
+/** 入っているシフトの中で出られない時間（1時間ごとの枠の開始 `YYYY-MM-DDTHH:00`）を丸ごと置き換える */
 export const availabilitySchema = z.object({
   unavailable: z
     .array(z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:00$/, '時間の形式が正しくありません'))

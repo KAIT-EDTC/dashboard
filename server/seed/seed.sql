@@ -230,7 +230,7 @@ INSERT INTO event_shift_members (shift_id, user_id) VALUES
   ('seed-shift-02', 'seed-08'),
   ('seed-shift-02', 'seed-04');
 
--- 出れない時間（入っているシフトの中で、1時間ごと）。佐藤さんは午前の11時台、中村さんは午後の16時台に抜ける
+-- 出られない時間（入っているシフトの中で、1時間ごと）。佐藤さんは午前の11時台、中村さんは午後の16時台に抜ける
 UPDATE event_participants SET unavailable = (
   SELECT json_group_array(substr(events.starts_at, 1, 10) || 'T11:00') FROM events WHERE events.id = 'seed-ev-04'
 ) WHERE event_id = 'seed-ev-04' AND user_id = 'seed-01';
