@@ -1,0 +1,21 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # 公開直後の版は避ける（乗っ取られたパッケージを掴まないため）
+    cooldown:
+      default-days: 7
+    # minor / patch は週1本のPRにまとめる。major は1件ずつ別PRで来る
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

@@ -20,8 +20,8 @@ env:
 
 jobs:
   deploy:
-    # fork からのPRには secret が渡らないので作らない（pull_request_target は使わない）
-    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    # fork と Dependabot のPRには secret が渡らないので作らない（pull_request_target は使わない）
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
@@ -66,7 +66,7 @@ jobs:
             --var "FRONTEND_URL:${{ steps.url.outputs.url }}" --secrets-file "$RUNNER_TEMP/secrets.json"
 
   cleanup:
-    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     environment: preview
     steps:
