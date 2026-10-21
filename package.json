@@ -23,7 +23,7 @@
     "db:migrate:remote": "npm run db:migrate:remote -w server"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2",
+    "concurrently": "^10.0.6",
     "typescript": "~6.0.3"
   }
 }
