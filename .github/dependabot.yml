@@ -7,8 +7,18 @@ updates:
     # 公開直後の版は避ける（乗っ取られたパッケージを掴まないため）
     cooldown:
       default-days: 7
-    # minor / patch は週1本のPRにまとめる。major は1件ずつ別PRで来る
+    ignore:
+      # 実行環境の Node 22 に型を合わせる
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # typescript-eslint が TS 7 に未対応。対応したら外す
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
     groups:
+      # 本体と dev ツールの版がずれると壊れるので、major も含めて必ず一緒に上げる（先に書いた group が優先）
+      react-router:
+        patterns: ["react-router", "@react-router/*"]
+      # minor / patch は週1本のPRにまとめる。それ以外の major は1件ずつ別PRで来る
       minor-and-patch:
         update-types: [minor, patch]
 
