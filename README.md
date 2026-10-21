@@ -281,3 +281,11 @@ npm run deploy    # client をビルドして wrangler deploy --env production
 ```
 
 スキーマを変えた回は、デプロイの前に `npm run db:generate` でマイグレーションを作り、`npm run db:migrate:remote` を実行する。
+
+### PRプレビュー
+
+- PRを開くと Actions が `https://pr-<番号>-edtc-dashboard-preview.<サブドメイン>.workers.dev` を作る。PRの「View deployment」から開ける
+- ログイン画面でダミーユーザーを選んで入る。pushのたびにDBはシードの状態に作り直される。PRを閉じると消える
+- 初回のみ: GitHub の Settings → Environments で `preview` を作り、secret `CLOUDFLARE_API_TOKEN`（本番と同じトークンでよい）を登録する
+- 注意: Discordログイン・ブログ提出・通知はプレビューでは動かない（secrets を渡さないため）。forkからのPRでは作らない
+- 注意: D1 は Free プランだとアカウントあたり10個までなので、開いたままのPRが多いと作れない（`npx wrangler d1 list` で確認・削除）。Worker Previews は open beta
