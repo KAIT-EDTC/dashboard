@@ -17,7 +17,7 @@ import { api, unwrap } from '~/lib/api'
 import { catchApiError, text, texts, type FormErrors } from '~/lib/form'
 import type { Route } from './+types/detail'
 
-export const meta: Route.MetaFunction = ({ data }) => [{ title: `${data?.event.title ?? 'イベント'} | EDTC ダッシュボード` }]
+export const meta: Route.MetaFunction = ({ loaderData: data }) => [{ title: `${data?.event.title ?? 'イベント'} | EDTC ダッシュボード` }]
 
 export async function clientLoader({ params }: Route.ClientLoaderArgs) {
   return unwrap(api.events[':id'].$get({ param: { id: params.eventId } }))

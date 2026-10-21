@@ -13,7 +13,7 @@ import { catchApiError, zodErrors } from '~/lib/form'
 import { fullName } from '~/lib/format'
 import type { Route } from './+types/post'
 
-export const meta: Route.MetaFunction = ({ data }) => [{ title: `${data?.post.title || 'ブログ記事'} | EDTC ダッシュボード` }]
+export const meta: Route.MetaFunction = ({ loaderData: data }) => [{ title: `${data?.post.title || 'ブログ記事'} | EDTC ダッシュボード` }]
 
 export async function clientLoader({ params }: Route.ClientLoaderArgs) {
   return unwrap(api.blog.posts[':id'].$get({ param: { id: params.postId } }))
