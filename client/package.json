@@ -27,7 +27,7 @@
     "@eslint/js": "^10.0.1",
     "@pandacss/dev": "^1.11.4",
     "@react-router/dev": "^7.18.0",
-    "@types/node": "^24.12.3",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "eslint": "^10.12.0",
