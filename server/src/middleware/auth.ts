@@ -14,13 +14,13 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   if (!userId) throw unauthorized()
 
   const user = await createDb(c.env)
-    .select({ id: users.id, role: users.role })
+    .select({ id: users.id, role: users.role, headOf: users.headOf, officer: users.officer })
     .from(users)
     .where(eq(users.id, userId))
     .get()
   if (!user) throw unauthorized()
 
-  c.set('session', { userId: user.id, role: user.role })
+  c.set('session', { userId: user.id, role: user.role, headOf: user.headOf, officer: user.officer })
   await next()
 })
 

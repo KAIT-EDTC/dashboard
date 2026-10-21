@@ -61,8 +61,36 @@
     {
       "idx": 8,
       "version": "6",
-      "when": 1791472159712,
-      "tag": "0008_event_attachments",
+      "when": 1791374277230,
+      "tag": "0008_activity_reports",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792042554076,
+      "tag": "0009_drop_notification_webhook_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1792247683244,
+      "tag": "0010_marvelous_maginty",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1792255562126,
+      "tag": "0011_event_shifts",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1792583075758,
+      "tag": "0012_event_attachments",
       "breakpoints": true
     }
   ]

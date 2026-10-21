@@ -13,6 +13,12 @@ export default [
       route(':eventId', 'routes/events/detail.tsx'),
       route(':eventId/edit', 'routes/events/edit.tsx'),
     ]),
+    ...prefix('reports', [
+      index('routes/reports/list.tsx'),
+      route('new', 'routes/reports/new.tsx'),
+      route('summaries/new', 'routes/reports/summary-new.tsx'),
+      route(':reportId', 'routes/reports/detail.tsx'),
+    ]),
     ...prefix('blog', [
       index('routes/blog/list.tsx'),
       route(':postId', 'routes/blog/post.tsx'),

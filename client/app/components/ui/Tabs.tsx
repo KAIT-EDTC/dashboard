@@ -10,6 +10,8 @@ const tabStyle = css({
   fontWeight: '600',
   color: 'fg.muted',
   borderRadius: 'md',
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
   _hover: { color: 'fg' },
 })
 const activeStyle = css({ bg: 'surface', color: 'fg', shadow: 'card', _hover: { color: 'fg' } })
@@ -17,7 +19,7 @@ const activeStyle = css({ bg: 'surface', color: 'fg', shadow: 'card', _hover: { 
 /** URL（クエリ）で切り替えるタブ */
 export function TabLinks({ items }: { items: { to: string; label: string; active: boolean }[] }) {
   return (
-    <nav className={css({ display: 'inline-flex', gap: '2px', p: '3px', bg: 'surface.muted', borderRadius: 'lg' })}>
+    <nav className={css({ display: 'inline-flex', maxW: 'full', overflowX: 'auto', scrollbarWidth: 'none', gap: '2px', p: '3px', bg: 'surface.muted', borderRadius: 'lg' })}>
       {items.map((item) => (
         <Link
           key={item.to}

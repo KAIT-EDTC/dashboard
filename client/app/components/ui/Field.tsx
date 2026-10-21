@@ -102,6 +102,7 @@ export function ChipCheckbox({ label, ...props }: { label: ReactNode } & Omit<Co
         _hover: { borderColor: 'border.strong' },
         '&:has(input:checked)': { bg: 'accent.subtle', borderColor: 'accent', color: 'accent.fg' },
         '&:has(input:focus-visible)': { shadow: 'focus' },
+        '&:has(input:disabled)': { opacity: 0.5, cursor: 'not-allowed', _hover: { borderColor: 'border' } },
       })}
     >
       <input type="checkbox" className={css({ srOnly: true })} {...props} />

@@ -12,19 +12,45 @@ import {
   nowInJst,
   participantUpdateSchema,
   rsvpSchema,
+  summaryWriterSchema,
   type CategoryTone,
   type Division,
   type RsvpStatus,
 } from '@edtc/shared'
 import { createDb, memberSummaryColumns, type Db } from '../../db'
-import { eventAttachments, eventCategories, eventItems, eventParticipants, events, eventTargetDivisions, eventTargetUsers, userDivisions, users } from '../../db/schema'
+import {
+  activityReports,
+  eventAttachments,
+  eventCategories,
+  eventItems,
+  eventParticipants,
+  events,
+  eventShiftMembers,
+  eventShifts,
+  eventTargetDivisions,
+  eventTargetUsers,
+  userDivisions,
+  users,
+} from '../../db/schema'
 import type { AppEnv } from '../../env'
 import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
 import { validate } from '../../lib/validator'
 import { assertCanManage, canManage, requireAuth } from '../../middleware/auth'
+import {
+  approvedReportsOf,
+  isReportTarget,
+  isTargetParticipant,
+  myReportOf,
+  submissionProgress,
+  summaryMembersOf,
+  summaryReportOf,
+  summaryWriterIdOf,
+} from '../reports/queries'
 import { eventCategoriesRoute } from './categories'
+import { dropLecturers } from './category-rules'
 import { notifyEventCreated } from './notifications'
+import { eventShiftsRoute, leaveAllShifts, myUpcomingShifts, syncShifts } from './shifts'
 
 /** 終了日時が無いイベントは開始日の終わりまでを開催中とみなす */
 const effectiveEnd = sql`coalesce(${events.endsAt}, substr(${events.startsAt}, 1, 10) || 'T23:59')`
@@ -118,6 +144,15 @@ function replaceTargets(db: Db, eventId: string, divisions: Division[], userIds:
   ]
 }
 
+/**
+ * 書きかけ（下書き・修正依頼）のまとめ報告書を新しい担当者に引き継ぐ文（batch に入れる）。
+ * 所属部署と承認者は前の担当者が選んだものなので外す。提出後や担当者が変わらないときは何もしない
+ */
+function handOverSummary(db: Db, summary: { id: string; authorId: string; status: string } | undefined, nextWriterId: string | null) {
+  if (!summary || !nextWriterId || nextWriterId === summary.authorId || (summary.status !== 'draft' && summary.status !== 'rejected')) return []
+  return [db.update(activityReports).set({ authorId: nextWriterId, division: null, approverId: null }).where(eq(activityReports.id, summary.id))]
+}
+
 export const eventsRoute = new Hono<AppEnv>()
   .use(requireAuth)
 
@@ -179,6 +214,12 @@ export const eventsRoute = new Hono<AppEnv>()
     return c.json({ items })
   })
 
+  // 自分が入っている、これからのシフト
+  .get('/my-shifts', async (c) => {
+    const shifts = await myUpcomingShifts(createDb(c.env), c.get('session').userId, nowInJst())
+    return c.json({ shifts })
+  })
+
   .post('/', validate('json', eventInputSchema), async (c) => {
     const { targetDivisions, targetUserIds: rawUserIds, ...input } = c.req.valid('json')
     const targetUserIds = [...new Set(rawUserIds)]
@@ -193,6 +234,7 @@ export const eventsRoute = new Hono<AppEnv>()
       db.insert(events).values({ ...input, id, createdBy: userId }),
       db.insert(eventParticipants).values({ eventId: id, userId, status: 'going' }),
       ...replaceTargets(db, id, targetDivisions, targetUserIds),
+      ...(await syncShifts(db, id, input, null)),
     ])
 
     const organizer = await db
@@ -234,20 +276,44 @@ export const eventsRoute = new Hono<AppEnv>()
           columns: { id: true, name: true, size: true, contentType: true, createdAt: true },
           orderBy: asc(eventAttachments.createdAt),
         },
+        shifts: {
+          with: {
+            members: {
+              columns: { userId: true },
+              with: { user: { columns: memberSummaryColumns } },
+              orderBy: asc(eventShiftMembers.createdAt),
+            },
+          },
+          orderBy: [asc(eventShifts.startsAt), asc(eventShifts.endsAt), asc(eventShifts.label)],
+        },
       },
     })
     if (!found) throw notFound('イベントが見つかりません')
 
     const { targetDivisions, targetUsers, ...event } = found
-    const category = await db.select().from(eventCategories).where(eq(eventCategories.id, event.category)).get()
+    const [category, reports, myReport, summary, summaryMembers, defaultWriterId] = await Promise.all([
+      db.select().from(eventCategories).where(eq(eventCategories.id, event.category)).get(),
+      approvedReportsOf(db, event.id),
+      myReportOf(db, event.id, userId),
+      summaryReportOf(db, event.id),
+      summaryMembersOf(db, event.id),
+      summaryWriterIdOf(db, found),
+    ])
+    // まとめ報告書の担当者: 書き始めた人。まだなら講師（講師を置かない種類は指名された人）
+    const writerId = summary?.authorId ?? defaultWriterId
+    const writer = writerId ? (event.participants.find((p) => p.userId === writerId)?.user ?? null) : null
     const targeted = targetDivisions.length > 0 || targetUsers.length > 0
     const targetMembers = targeted ? await findTargetMembers(db, event.id) : []
     const answered = new Set(event.participants.map((p) => p.userId))
+    const mine = event.participants.find((p) => p.userId === userId)
     return c.json({
       event: {
         ...event,
         categoryLabel: category?.label ?? event.category,
         categoryTone: category?.tone ?? ('neutral' as CategoryTone),
+        /** 講師を置くか・報告書を書くか（種類の設定） */
+        hasLecturer: category?.hasLecturer ?? true,
+        hasReport: category?.hasReport ?? true,
         targetDivisions: sortDivisions(targetDivisions.map((t) => t.division)),
         targetUsers: targetUsers.map((t) => t.user),
       },
@@ -256,6 +322,24 @@ export const eventsRoute = new Hono<AppEnv>()
       isTarget: !targeted || targetMembers.some((m) => m.id === userId),
       /** 対象者のうち、まだ出欠を回答していない人 */
       pending: targetMembers.filter((m) => !answered.has(m.id)),
+      /** 承認済みの活動報告書と、自分の報告書の状態 */
+      reports,
+      myReport: myReport ?? null,
+      /** 参加した人は、イベントが始まったら報告書を書ける（報告書を書かない種類は除く。まとめ報告書の担当者は書かなくてよい） */
+      canWriteReport: (category?.hasReport ?? true) && !!mine && isReportTarget(mine) && event.startsAt <= nowInJst() && writerId !== userId,
+      /** まとめ報告書。下書きは担当者にだけ見せる */
+      summary: {
+        writer,
+        /** 指名された担当者（講師を置かない種類のみ使う） */
+        assignedId: event.summaryWriterId,
+        report:
+          summary && (summary.status !== 'draft' || summary.authorId === userId)
+            ? { id: summary.id, status: summary.status, approvalSteps: summary.approvalSteps, currentStep: summary.currentStep }
+            : null,
+        /** 書き始めたか（提出前に担当を替えられるかの目安） */
+        started: !!summary,
+        ...submissionProgress(summaryMembers, writerId),
+      },
     })
   })
 
@@ -265,11 +349,14 @@ export const eventsRoute = new Hono<AppEnv>()
     assertCanManage(c.get('session'), event.createdBy)
     const { targetDivisions, targetUserIds: rawUserIds, ...input } = c.req.valid('json')
     const targetUserIds = [...new Set(rawUserIds)]
-    await findCategory(db, input.category)
+    const category = await findCategory(db, input.category)
     await assertUsersExist(db, targetUserIds)
     await db.batch([
       db.update(events).set(input).where(eq(events.id, event.id)),
+      // 講師を置かない種類に変えたら、講師の役割を外す
+      ...(category.hasLecturer ? [] : dropLecturers(db, eq(events.id, event.id))),
       ...replaceTargets(db, event.id, targetDivisions, targetUserIds),
+      ...(await syncShifts(db, event.id, input, event)),
     ])
     return c.json({ id: event.id })
   })
@@ -395,30 +482,81 @@ export const eventsRoute = new Hono<AppEnv>()
         set: { status, comment, updatedAt: now },
       })
 
-    // 不参加にしたら担当していた持ち物を手放す
+    // 不参加にしたら担当していた持ち物・シフトと講師の役割を手放す
     if (status === 'declined') {
-      await db
-        .update(eventItems)
-        .set({ assigneeId: null, prepared: false })
-        .where(and(eq(eventItems.eventId, event.id), eq(eventItems.assigneeId, session.userId)))
+      await db.batch([
+        db
+          .update(eventItems)
+          .set({ assigneeId: null, prepared: false })
+          .where(and(eq(eventItems.eventId, event.id), eq(eventItems.assigneeId, session.userId))),
+        db
+          .update(eventParticipants)
+          .set({ role: 'assistant' })
+          .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, session.userId))),
+        leaveAllShifts(db, event.id, session.userId),
+      ])
     }
     return c.json({ ok: true })
   })
 
-  // 出席・支払いの記録（主催者・管理者）
+  // 出席・支払い・役割の記録（主催者・管理者）
   .patch('/:id/participants/:userId', validate('json', participantUpdateSchema), async (c) => {
+    const input = c.req.valid('json')
     const db = createDb(c.env)
     const event = await findEvent(db, c.req.param('id'))
     assertCanManage(c.get('session'), event.createdBy)
 
-    const updated = await db
-      .update(eventParticipants)
-      .set(c.req.valid('json'))
-      .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, c.req.param('userId'))))
-      .returning({ userId: eventParticipants.userId })
-    if (updated.length === 0) throw notFound('参加者が見つかりません')
+    const target = and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, c.req.param('userId')))
+    const participant = await db.select({ userId: eventParticipants.userId }).from(eventParticipants).where(target).get()
+    if (!participant) throw notFound('参加者が見つかりません')
+
+    if (input.role === 'lecturer' && !(await findCategory(db, event.category)).hasLecturer) throw badRequest('この種類のイベントには講師を置きません')
+    const update = db.update(eventParticipants).set(input).where(target)
+    if (input.role === 'lecturer') {
+      // 講師は1人だけ。新しく講師にしたら、それまでの講師は講師補助に戻す。書きかけのまとめ報告書は新しい講師に引き継ぐ
+      await db.batch([
+        db
+          .update(eventParticipants)
+          .set({ role: 'assistant' })
+          .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.role, 'lecturer'))),
+        update,
+        ...handOverSummary(db, await summaryReportOf(db, event.id), participant.userId),
+      ])
+    } else {
+      await update
+    }
     return c.json({ ok: true })
   })
+
+  // まとめ報告書の担当者を指名する（講師を置かない種類のイベントで、主催者・管理者）。null で未定に戻す。
+  // 書きかけ（下書き・修正依頼）のまとめ報告書は新しい担当者に引き継ぐ。提出後は替えられない
+  .put('/:id/summary-writer', validate('json', summaryWriterSchema), async (c) => {
+    const { userId } = c.req.valid('json')
+    const db = createDb(c.env)
+    const event = await findEvent(db, c.req.param('id'))
+    assertCanManage(c.get('session'), event.createdBy)
+    if ((await findCategory(db, event.category)).hasLecturer) throw badRequest('講師を置く種類のイベントは、講師がまとめ報告書を書きます')
+
+    if (userId) {
+      const participant = await db
+        .select({ userId: eventParticipants.userId })
+        .from(eventParticipants)
+        .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, userId), isTargetParticipant))
+        .get()
+      if (!participant) throw badRequest('担当者は参加者から選んでください')
+    }
+    const summary = await summaryReportOf(db, event.id)
+    if (summary && summary.status !== 'draft' && summary.status !== 'rejected') {
+      throw conflict('提出済みのまとめ報告書があるため、担当者を変更できません')
+    }
+
+    await db.batch([db.update(events).set({ summaryWriterId: userId }).where(eq(events.id, event.id)), ...handOverSummary(db, summary, userId)])
+    return c.json({ ok: true })
+  })
+
+  // --- シフト ---------------------------------------------------------------
+
+  .route('/:id/shifts', eventShiftsRoute)
 
   // --- 持ち物 ---------------------------------------------------------------
 
@@ -426,8 +564,14 @@ export const eventsRoute = new Hono<AppEnv>()
     const db = createDb(c.env)
     const event = await findEvent(db, c.req.param('id'))
     assertCanManage(c.get('session'), event.createdBy)
+    const input = c.req.valid('json')
+    if (input.kind === 'personal') input.assigneeId = null
+    else if (input.assigneeId) {
+      const assignee = await db.select({ id: users.id }).from(users).where(eq(users.id, input.assigneeId)).get()
+      if (!assignee) throw badRequest('担当者が見つかりません')
+    }
     const id = crypto.randomUUID()
-    await db.insert(eventItems).values({ ...c.req.valid('json'), id, eventId: event.id })
+    await db.insert(eventItems).values({ ...input, id, eventId: event.id })
     return c.json({ id }, 201)
   })
 
@@ -464,9 +608,15 @@ export const eventsRoute = new Hono<AppEnv>()
       if (!assignee) throw badRequest('担当者が見つかりません')
     }
 
+    // 全員が持ってくるものには担当者も準備済みもない（非主催者は kind を変えられない）
+    const toPersonal = canManage(session, event.createdBy) && (input.kind ?? item.kind) === 'personal'
     await db
       .update(eventItems)
-      .set({ ...input, ...(assigneeChanged && input.prepared === undefined && { prepared: false }) })
+      .set({
+        ...input,
+        ...(assigneeChanged && input.prepared === undefined && { prepared: false }),
+        ...(toPersonal && { assigneeId: null, prepared: false }),
+      })
       .where(eq(eventItems.id, item.id))
     return c.json({ ok: true })
   })

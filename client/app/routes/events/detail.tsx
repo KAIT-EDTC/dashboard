@@ -1,19 +1,22 @@
-import { ITEM_KINDS, RSVP_STATUSES } from '@edtc/shared'
+import { isEditableStatus, nowInJst, PARTICIPANT_ROLES, RSVP_STATUSES } from '@edtc/shared'
 import { Form, useSearchParams } from 'react-router'
 import { css } from 'styled-system/css'
 import { Button, ButtonLink } from '~/components/ui/Button'
-import { EditIcon, PenIcon } from '~/components/ui/Icons'
+import { EditIcon, FileTextIcon, PenIcon } from '~/components/ui/Icons'
 import { PageHeader } from '~/components/ui/PageHeader'
 import { useCurrentUser } from '~/features/auth/use-current-user'
 import { CategoryBadge } from '~/features/events/EventBadges'
 import { Alert } from '~/components/ui/Alert'
 import { filesFrom, uploadAttachments } from '~/features/events/attachments'
 import { EventInfo } from '~/features/events/EventInfo'
-import { ItemList } from '~/features/events/ItemList'
+import { bringerToFields, ItemList } from '~/features/events/ItemList'
 import { ParticipantList } from '~/features/events/ParticipantList'
 import { RsvpPanel } from '~/features/events/RsvpPanel'
+import { ShiftList } from '~/features/events/ShiftList'
+import { EventNotices, EventReports } from '~/features/reports/EventReports'
+import { EventSummary, SummaryButton } from '~/features/reports/EventSummary'
 import { ApiError, api, unwrap } from '~/lib/api'
-import { catchApiError, text, type FormErrors } from '~/lib/form'
+import { catchApiError, text, texts, type FormErrors } from '~/lib/form'
 import type { Route } from './+types/detail'
 
 export const meta: Route.MetaFunction = ({ data }) => [{ title: `${data?.event.title ?? 'イベント'} | EDTC ダッシュボード` }]
@@ -26,7 +29,7 @@ const bool = (value: string) => (value === '' ? undefined : value === 'true')
 const oneOf = <T extends string>(values: readonly T[], value: string, fallback: T): T =>
   (values as readonly string[]).includes(value) ? (value as T) : fallback
 
-/** 出欠・持ち物・参加者の記録は、このページの各パネルから intent 付きで送られてくる */
+/** 出欠・持ち物・シフト・参加者の記録は、このページの各パネルから intent 付きで送られてくる */
 export async function clientAction({ request, params }: Route.ClientActionArgs): Promise<FormErrors | { ok: true }> {
   const form = await request.formData()
   const id = params.eventId
@@ -45,7 +48,7 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
             param: { id },
             json: {
               name: text(form, 'name'),
-              kind: oneOf(ITEM_KINDS, text(form, 'kind'), 'shared'),
+              ...bringerToFields(text(form, 'bringer')),
               quantity: Number(text(form, 'quantity') || 1),
               note: text(form, 'note'),
             },
@@ -56,11 +59,20 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
           api.events[':id'].items[':itemId'].$patch({
             param: { id, itemId: text(form, 'itemId') },
             json: {
+              // 編集モーダルは持ち物・数量・メモをまとめて送る
+              ...(form.has('name') && { name: text(form, 'name'), quantity: Number(text(form, 'quantity') || 1), note: text(form, 'note') }),
+              ...(form.has('bringer') && bringerToFields(text(form, 'bringer'))),
               ...(form.has('assigneeId') && { assigneeId: text(form, 'assigneeId') || null }),
               ...(form.has('prepared') && { prepared: bool(text(form, 'prepared')) }),
             },
           }),
         )
+      case 'availability':
+        return unwrap(api.events[':id'].shifts.availability.$put({ param: { id }, json: { unavailable: texts(form, 'unavailable') } }))
+      case 'join-shift':
+        return unwrap(api.events[':id'].shifts[':shiftId'].me.$put({ param: { id, shiftId: text(form, 'shiftId') }, json: { joined: text(form, 'joined') === 'true' } }))
+      case 'summary-writer':
+        return unwrap(api.events[':id']['summary-writer'].$put({ param: { id }, json: { userId: text(form, 'userId') || null } }))
       case 'delete-item':
         return unwrap(api.events[':id'].items[':itemId'].$delete({ param: { id, itemId: text(form, 'itemId') } }))
       case 'upload-attachment': {
@@ -76,7 +88,11 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
         return unwrap(
           api.events[':id'].participants[':userId'].$patch({
             param: { id, userId: text(form, 'userId') },
-            json: { attended: bool(text(form, 'attended')), paid: bool(text(form, 'paid')) },
+            json: {
+              attended: bool(text(form, 'attended')),
+              paid: bool(text(form, 'paid')),
+              ...(form.has('role') && { role: oneOf(PARTICIPANT_ROLES, text(form, 'role'), 'assistant') }),
+            },
           }),
         )
       default:
@@ -89,10 +105,11 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
 
 export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
-  const { event, canManage, isTarget, pending } = loaderData
+  const { event, canManage, isTarget, pending, reports, myReport, canWriteReport, summary } = loaderData
   const me = useCurrentUser()
   const [params] = useSearchParams()
   const attachFailed = Number(params.get('attachFailed')) || 0
+  const started = event.startsAt <= nowInJst()
 
   return (
     <>
@@ -102,6 +119,20 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
         back={{ to: '/events', label: 'イベント一覧' }}
         actions={
           <>
+            {myReport ? (
+              <ButtonLink to={`/reports/${myReport.id}`}>
+                <FileTextIcon size={16} />
+                {isEditableStatus(myReport.status) ? '報告書の続きを書く' : '報告書を見る'}
+              </ButtonLink>
+            ) : (
+              canWriteReport && (
+                <ButtonLink to={`/reports/new?eventId=${encodeURIComponent(event.id)}`}>
+                  <FileTextIcon size={16} />
+                  報告書を書く
+                </ButtonLink>
+              )
+            )}
+            {event.hasReport && <SummaryButton eventId={event.id} summary={summary} userId={me.id} started={started} />}
             {/* イベントのタイトルと日付を引き継いだブログの下書きを作る */}
             <Form method="post" action="/blog?index">
               <input type="hidden" name="eventId" value={event.id} />
@@ -127,11 +158,16 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
       <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', lg: '3fr 2fr' }, gap: 'lg', alignItems: 'start' })}>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
           <EventInfo event={event} canManage={canManage} />
+          <EventNotices reports={reports} />
+          {/* 報告書を書かない種類のイベントには出さない（書かない設定にする前の承認済みの報告書は残す） */}
+          {event.hasReport && <EventSummary event={event} summary={summary} canManage={canManage} started={started} />}
+          {started && (event.hasReport || reports.length > 0) && <EventReports event={event} reports={reports} />}
+          <ShiftList event={event} userId={me.id} />
           <ItemList event={event} userId={me.id} canManage={canManage} />
         </div>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
           <RsvpPanel event={event} userId={me.id} canManage={canManage} isTarget={isTarget} />
-          <ParticipantList event={event} pending={pending} canManage={canManage} />
+          <ParticipantList event={event} pending={pending} canManage={canManage} summary={summary} />
         </div>
       </div>
     </>

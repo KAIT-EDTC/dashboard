@@ -1,5 +1,5 @@
 import { blogPostInputSchema } from '@edtc/shared'
-import { redirect } from 'react-router'
+import { redirect, type ShouldRevalidateFunction } from 'react-router'
 import { css } from 'styled-system/css'
 import { Card } from '~/components/ui/Card'
 import { ExternalLinkIcon } from '~/components/ui/Icons'
@@ -18,6 +18,10 @@ export const meta: Route.MetaFunction = ({ data }) => [{ title: `${data?.post.ti
 export async function clientLoader({ params }: Route.ClientLoaderArgs) {
   return unwrap(api.blog.posts[':id'].$get({ param: { id: params.postId } }))
 }
+
+/** タブ（?step=）を切り替えただけなら記事を取り直さない */
+export const shouldRevalidate: ShouldRevalidateFunction = ({ currentUrl, nextUrl, formMethod, defaultShouldRevalidate }) =>
+  !formMethod && currentUrl.pathname === nextUrl.pathname ? false : defaultShouldRevalidate
 
 /** エディタから JSON で { intent, content } が送られてくる */
 export async function clientAction({ request, params }: Route.ClientActionArgs): Promise<EditorActionData | Response> {
@@ -67,7 +71,7 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
             <Card title="レビュー">
               <a href={post.prUrl} target="_blank" rel="noopener noreferrer" className={css({ display: 'inline-flex', alignItems: 'center', gap: 'xs', fontSize: 'sm' })}>
                 <ExternalLinkIcon size={14} />
-                GitHubでPRを見る
+                GitHubでレビューの状況を見る
               </a>
             </Card>
           )}
