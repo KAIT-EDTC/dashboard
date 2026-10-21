@@ -9,7 +9,7 @@ import { api, unwrap } from '~/lib/api'
 import { catchApiError, zodErrors } from '~/lib/form'
 import type { Route } from './+types/new'
 
-export const meta: Route.MetaFunction = ({ data }) => [{ title: `活動報告書を書く: ${data?.event.title ?? ''} | EDTC ダッシュボード` }]
+export const meta: Route.MetaFunction = ({ loaderData: data }) => [{ title: `活動報告書を書く: ${data?.event.title ?? ''} | EDTC ダッシュボード` }]
 
 /** /reports/new?eventId=… 。すでに書いていればその報告書へ */
 export async function clientLoader({ request }: Route.ClientLoaderArgs) {

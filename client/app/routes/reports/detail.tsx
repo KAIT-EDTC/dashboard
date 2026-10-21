@@ -27,7 +27,7 @@ import { catchApiError, zodErrors } from '~/lib/form'
 import { fullName } from '~/lib/format'
 import type { Route } from './+types/detail'
 
-export const meta: Route.MetaFunction = ({ data }) => [
+export const meta: Route.MetaFunction = ({ loaderData: data }) => [
   { title: `${REPORT_KIND_LABELS[data?.report.kind ?? 'activity']}: ${data?.report.event.title ?? ''} | EDTC ダッシュボード` },
 ]
 
