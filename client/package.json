@@ -12,15 +12,15 @@
   "dependencies": {
     "@edtc/shared": "*",
     "@react-router/node": "^7.18.0",
-    "dompurify": "^3.4.16",
+    "dompurify": "^3.4.17",
     "fflate": "^0.8.3",
-    "hono": "^4.13.11",
+    "hono": "^4.13.13",
     "isbot": "^5.1.44",
-    "marked": "^18.0.14",
+    "marked": "^18.1.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router": "^7.18.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@edtc/server": "*",
@@ -30,11 +30,11 @@
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "eslint": "^10.3.0",
+    "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "globals": "^17.6.0",
-    "postcss": "^8.5.16",
-    "typescript-eslint": "^8.59.2",
-    "vite": "^8.1.0"
+    "globals": "^17.13.0",
+    "postcss": "^8.5.30",
+    "typescript-eslint": "^8.71.2",
+    "vite": "^8.3.4"
   }
 }
