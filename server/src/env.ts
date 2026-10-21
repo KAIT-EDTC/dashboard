@@ -26,7 +26,7 @@ export type Bindings = {
   GITHUB_APP_PRIVATE_KEY?: string
   GITHUB_WEBHOOK_SECRET?: string
 
-  /** "true" のとき、ログイン画面からシードのダミーユーザーを選んでログインできる（ローカル開発専用） */
+  /** ログイン画面からシードのダミーユーザーを選んでログインできる。"true" はローカル開発、"preview" はPRプレビュー（workers.dev）専用 */
   DEV_LOGIN?: string
 }
 

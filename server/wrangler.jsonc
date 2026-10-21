@@ -54,6 +54,34 @@
           "migrations_dir": "drizzle"
         }
       ]
+    },
+
+    // ---- PRプレビュー（.github/workflows/preview.yml が wrangler preview --env preview で作る） ----
+    // 本番とは別のWorker。本番の vars・secrets・D1 は使わない（previews に書いたものだけが使われる）
+    "preview": {
+      "name": "edtc-dashboard-preview",
+      "account_id": "f63f9ebc5db7b049a6e98a155a3d219d",
+      // PRごとのURL（pr-<番号>-edtc-dashboard-preview.<subdomain>.workers.dev）だけを公開する
+      "workers_dev": false,
+      "preview_urls": true,
+      "assets": {
+        "directory": "../client/build/client",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*"]
+      },
+      // database_id の仮値は CI がPRごとに作ったD1のIDに置き換える。こちらはマイグレーション・シード（wrangler d1 ... --env preview）用
+      "d1_databases": [
+        { "binding": "DB", "database_id": "PREVIEW_DB_ID", "migrations_dir": "drizzle" }
+      ],
+      "previews": {
+        "vars": {
+          "BLOG_REPO": "KAIT-EDTC/EDTCHP_v2",
+          "BLOG_CONTENT_DIR": "content/blog",
+          // シードのダミーユーザーでログインできるようにする（features/auth/dev-login.ts）。FRONTEND_URL は CI が --var で渡す
+          "DEV_LOGIN": "preview"
+        },
+        "d1_databases": [{ "binding": "DB", "database_id": "PREVIEW_DB_ID" }]
+      }
     }
   }
 }
