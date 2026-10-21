@@ -6,7 +6,7 @@ import { ButtonLink } from '~/components/ui/Button'
 import { EditIcon } from '~/components/ui/Icons'
 import { useCurrentUser } from '~/features/auth/use-current-user'
 import { MyPostsCard } from '~/features/blog/MyPostsCard'
-import { MyItemsCard, UpcomingEventsCard } from '~/features/events/HomeCards'
+import { MyItemsCard, MyShiftsCard, UpcomingEventsCard } from '~/features/events/HomeCards'
 import { MemberBadges } from '~/features/members/MemberBadges'
 import { HomeReportsCard, HomeReviewCard } from '~/features/reports/HomeReportsCard'
 import { api, unwrap } from '~/lib/api'
@@ -16,14 +16,15 @@ export const meta: Route.MetaFunction = () => [{ title: 'ホーム | EDTC ダッ
 
 export async function clientLoader() {
   // 承認待ちは承認する立場でなければ空
-  const [{ events }, { items }, { posts }, { targets, summaries }, { reports: review }] = await Promise.all([
+  const [{ events }, { items }, { shifts }, { posts }, { targets, summaries }, { reports: review }] = await Promise.all([
     unwrap(api.events.$get({ query: { scope: 'upcoming' } })),
     unwrap(api.events['my-items'].$get()),
+    unwrap(api.events['my-shifts'].$get()),
     unwrap(api.blog.posts.$get({ query: { scope: 'mine' } })),
     unwrap(api.reports.targets.$get()),
     unwrap(api.reports.review.$get()),
   ])
-  return { events, items, posts, targets, summaries, review }
+  return { events, items, shifts, posts, targets, summaries, review }
 }
 
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
@@ -59,6 +60,7 @@ export default function HomePage({ loaderData }: Route.ComponentProps) {
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
           <HomeReportsCard targets={loaderData.targets} summaries={loaderData.summaries} />
           {isLeader(me) && <HomeReviewCard reports={loaderData.review} />}
+          <MyShiftsCard shifts={loaderData.shifts} />
           <MyItemsCard items={loaderData.items} />
           <MyPostsCard posts={loaderData.posts} />
         </div>

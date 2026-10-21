@@ -10,10 +10,11 @@ import { EventInfo } from '~/features/events/EventInfo'
 import { bringerToFields, ItemList } from '~/features/events/ItemList'
 import { ParticipantList } from '~/features/events/ParticipantList'
 import { RsvpPanel } from '~/features/events/RsvpPanel'
+import { ShiftList } from '~/features/events/ShiftList'
 import { EventNotices, EventReports } from '~/features/reports/EventReports'
 import { EventSummary, SummaryButton } from '~/features/reports/EventSummary'
 import { api, unwrap } from '~/lib/api'
-import { catchApiError, text, type FormErrors } from '~/lib/form'
+import { catchApiError, text, texts, type FormErrors } from '~/lib/form'
 import type { Route } from './+types/detail'
 
 export const meta: Route.MetaFunction = ({ data }) => [{ title: `${data?.event.title ?? 'イベント'} | EDTC ダッシュボード` }]
@@ -26,7 +27,7 @@ const bool = (value: string) => (value === '' ? undefined : value === 'true')
 const oneOf = <T extends string>(values: readonly T[], value: string, fallback: T): T =>
   (values as readonly string[]).includes(value) ? (value as T) : fallback
 
-/** 出欠・持ち物・参加者の記録は、このページの各パネルから intent 付きで送られてくる */
+/** 出欠・持ち物・シフト・参加者の記録は、このページの各パネルから intent 付きで送られてくる */
 export async function clientAction({ request, params }: Route.ClientActionArgs): Promise<FormErrors | { ok: true }> {
   const form = await request.formData()
   const id = params.eventId
@@ -64,6 +65,10 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
             },
           }),
         )
+      case 'availability':
+        return unwrap(api.events[':id'].shifts.availability.$put({ param: { id }, json: { unavailable: texts(form, 'unavailable') } }))
+      case 'join-shift':
+        return unwrap(api.events[':id'].shifts[':shiftId'].me.$put({ param: { id, shiftId: text(form, 'shiftId') }, json: { joined: text(form, 'joined') === 'true' } }))
       case 'summary-writer':
         return unwrap(api.events[':id']['summary-writer'].$put({ param: { id }, json: { userId: text(form, 'userId') || null } }))
       case 'delete-item':
@@ -139,6 +144,7 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
           {/* 報告書を書かない種類のイベントには出さない（書かない設定にする前の承認済みの報告書は残す） */}
           {event.hasReport && <EventSummary event={event} summary={summary} canManage={canManage} started={started} />}
           {started && (event.hasReport || reports.length > 0) && <EventReports event={event} reports={reports} />}
+          <ShiftList event={event} userId={me.id} />
           <ItemList event={event} userId={me.id} canManage={canManage} />
         </div>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>

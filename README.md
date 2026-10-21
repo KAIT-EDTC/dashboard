@@ -25,13 +25,13 @@ npm workspaces のモノレポ。client は server の `AppType` を型として
 ```
 app.ts                 # ルーティングの組み立て・CORS/CSRF・エラーハンドリング。AppType を export
 env.ts                 # Bindings（環境変数）とセッションの型
-db/schema.ts           # テーブル定義（users, user_divisions, events, event_participants, event_items, activity_reports(+_reviews, _comments), blog_posts, blog_images）
+db/schema.ts           # テーブル定義（users, user_divisions, events, event_participants, event_items, event_shifts(+_members), activity_reports(+_reviews, _comments), blog_posts, blog_images）
 middleware/auth.ts     # requireAuth（ロールは毎回DBから読む）と権限チェック
 lib/                   # discord（OAuth・Bot通知）、github（App認証・Webhook署名検証）など外部サービス
 features/
   auth/                # OAuth・新規登録・セッションCookie
   members/             # 名簿・プロフィール
-  events/              # イベント・出欠・持ち物
+  events/              # イベント・出欠・持ち物・シフト
   reports/             # 活動報告書・まとめ報告書（下書き・提出・承認/修正依頼・範囲コメント・提出状況・Excel書き出し）
   blog/                # 下書き・画像・提出（publisher.ts）・GitHub Webhook
 ```
@@ -79,6 +79,17 @@ theme/ (client直下)     # Panda のトークン・グローバルCSS
 - 部署は指定だけを保存し、表示のたびにその部署の今のメンバーを対象として数える（あとから部署に入った人も対象になる）
 - イベント詳細の参加者欄に、対象者のうち未回答の人が並ぶ
 - 作成時のDiscord通知で対象者（作成者以外）にメンションする
+
+### シフト
+
+文化祭の店番など、時間帯ごとに誰が出るかを決める。
+
+- イベントの作成・編集の「シフト」で「シフトを組む」にし、開始・終了時刻（1時間単位）と午前・午後の区切りを決める。イベントの日（開始日〜終了日、7日まで）ごとに「午前」「午後」の枠ができる（区切らなければ1日1枠）。枠の人数は決めない
+- 枠はイベントの設定だけで決まり、イベントページでは追加・編集しない。時間帯を変えると枠は作り直され、入っていた人は同じ日の同じ枠（午前・午後）に移る。「シフトを組む」を外すと枠は消える
+- 参加・未定と回答した人は、枠の「入る」で自分で入り、「外れる」で外れる
+- 枠に入った人は、イベントページのそのシフトの下に出る「出られない時間」で、シフトの中で抜ける時間を1時間ごとに選ぶ（指やマウスでなぞると範囲をまとめて選べる。もう一度なぞると戻る）。入っていないシフトには出てこない。抜ける時間は枠の一覧で名前の横に「11〜12時 不在」のように出る
+- 1人が同じ時間帯の2つの枠には入れない。不参加にすると入っていた枠から外れる
+- ホームの「自分のシフト」に、これから入るシフトが出る
 
 ### 活動報告書の承認
 
@@ -188,7 +199,7 @@ npm run dev                        # client: http://localhost:5173 / server: htt
 | `npm run lint` | client の ESLint |
 | `npm run build` | client のビルド（`client/build/client` に静的ファイル） |
 | `npm run db:generate` | `server/src/db/schema.ts` からマイグレーションを生成 |
-| `npm run db:seed` | ローカルD1にダミーのメンバー20人とイベント（出欠・持ち物つき）、役職者と活動報告書（承認済み・承認待ち・修正依頼・下書き）、まとめ報告書（承認済み・下書き）を入れる。何度実行しても同じ状態になる |
+| `npm run db:seed` | ローカルD1にダミーのメンバー20人とイベント（出欠・持ち物つき。オープンキャンパスにはシフトと出られない時間）、役職者と活動報告書（承認済み・承認待ち・修正依頼・下書き）、まとめ報告書（承認済み・下書き）を入れる。何度実行しても同じ状態になる |
 | `npm run db:seed:clear` | ダミーデータだけを消す |
 
 ダミーデータ（`server/seed/`）はIDが `seed-` で始まり、自分のユーザーやデータには触らない。学年とイベントの日付は実行した日を基準に計算する。ダミーメンバーは実在のDiscordユーザーではないので、Discordのメンションは届かない。`--local` 固定のため本番のD1には入らない。
@@ -270,3 +281,11 @@ npm run deploy    # client をビルドして wrangler deploy --env production
 ```
 
 スキーマを変えた回は、デプロイの前に `npm run db:generate` でマイグレーションを作り、`npm run db:migrate:remote` を実行する。
+
+### PRプレビュー
+
+- PRを開くと Actions が `https://pr-<番号>-edtc-dashboard-preview.<サブドメイン>.workers.dev` を作る。PRの「View deployment」から開ける
+- ログイン画面でダミーユーザーを選んで入る。pushのたびにDBはシードの状態に作り直される。PRを閉じると消える
+- 初回のみ: GitHub の Settings → Environments で `preview` を作り、secret `CLOUDFLARE_API_TOKEN`（本番と同じトークンでよい）を登録する
+- 注意: Discordログイン・ブログ提出・通知はプレビューでは動かない（secrets を渡さないため）。forkからのPRでは作らない
+- 注意: D1 は Free プランだとアカウントあたり10個までなので、開いたままのPRが多いと作れない（`npx wrangler d1 list` で確認・削除）。Worker Previews は open beta
