@@ -28,7 +28,7 @@ export default function MembersPage({ loaderData }: Route.ComponentProps) {
   return (
     <>
       <PageHeader title="メンバー" description={`EDTCのメンバー ${loaderData.members.length}人。プロフィールから気になる人を探してみましょう。`} />
-      <MemberFilters filter={filter} grades={grades} />
+      <MemberFilters value={filter} grades={grades} />
       {groups.length === 0 ? (
         <EmptyState icon={<UsersIcon size={32} />} title="該当するメンバーがいません" />
       ) : (

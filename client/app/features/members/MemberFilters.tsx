@@ -5,7 +5,7 @@ import { inputStyle } from '~/components/ui/Field'
 
 export type MemberFilter = { q: string; division: string; grade: string }
 
-export function MemberFilters({ filter, grades }: { filter: MemberFilter; grades: number[] }) {
+export function MemberFilters({ value, grades }: { value: MemberFilter; grades: number[] }) {
   const submit = useSubmit()
   return (
     <Form
@@ -16,12 +16,12 @@ export function MemberFilters({ filter, grades }: { filter: MemberFilter; grades
       <input
         type="search"
         name="q"
-        defaultValue={filter.q}
+        defaultValue={value.q}
         placeholder="名前・フリガナ・趣味で検索"
         aria-label="検索"
         className={inputStyle}
       />
-      <select name="division" defaultValue={filter.division} aria-label="部署" className={inputStyle}>
+      <select name="division" defaultValue={value.division} aria-label="部署" className={inputStyle}>
         <option value="">すべての部署</option>
         {DIVISIONS.map((division) => (
           <option key={division} value={division}>
@@ -29,7 +29,7 @@ export function MemberFilters({ filter, grades }: { filter: MemberFilter; grades
           </option>
         ))}
       </select>
-      <select name="grade" defaultValue={filter.grade} aria-label="学年" className={inputStyle}>
+      <select name="grade" defaultValue={value.grade} aria-label="学年" className={inputStyle}>
         <option value="">すべての学年</option>
         {grades.map((grade) => (
           <option key={grade} value={grade}>

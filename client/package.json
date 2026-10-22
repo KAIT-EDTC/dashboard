@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prepare": "panda codegen",
+    "prepare": "panda codegen --clean",
     "dev": "react-router dev",
     "build": "react-router build",
     "typecheck": "react-router typegen && tsc",
@@ -25,7 +25,9 @@
   "devDependencies": {
     "@edtc/server": "*",
     "@eslint/js": "^10.0.1",
-    "@pandacss/dev": "^2.2.0",
+    "@pandacss/dev": "^2.3.0",
+    "@pandacss/preset-base": "^2.3.0",
+    "@pandacss/preset-panda": "^2.3.0",
     "@react-router/dev": "^8.4.0",
     "@types/node": "^22.19.0",
     "@types/react": "^19.2.14",
