@@ -76,9 +76,9 @@ export function EventCalendar({ month, events, monthHref }: { month: string; eve
               )}
             >
               <span
-                className={cx(
-                  css({ fontSize: 'xs', fontWeight: '600', w: '22px', h: '22px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'full', color: inMonth ? 'fg' : 'fg.subtle' }),
-                  day === today && css({ bg: 'accent', color: 'fg.inverted' }),
+                className={css(
+                  { fontSize: 'xs', fontWeight: '600', w: '22px', h: '22px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'full', color: inMonth ? 'fg' : 'fg.subtle' },
+                  day === today && { bg: 'accent', color: 'fg.inverted' },
                 )}
               >
                 {Number(day.slice(8))}
