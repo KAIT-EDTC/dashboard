@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
-import { css, cx } from 'styled-system/css'
+import { css } from 'styled-system/css'
 
-const tabStyle = css({
+const tabStyle = css.raw({
   px: 'md',
   h: '34px',
   display: 'inline-flex',
@@ -14,7 +14,7 @@ const tabStyle = css({
   flexShrink: 0,
   _hover: { color: 'fg' },
 })
-const activeStyle = css({ bg: 'surface', color: 'fg', shadow: 'card', _hover: { color: 'fg' } })
+const activeStyle = css.raw({ bg: 'surface', color: 'fg', shadow: 'card', _hover: { color: 'fg' } })
 
 /** URL（クエリ）で切り替えるタブ */
 export function TabLinks({ items }: { items: { to: string; label: string; active: boolean }[] }) {
@@ -27,7 +27,7 @@ export function TabLinks({ items }: { items: { to: string; label: string; active
           replace
           preventScrollReset
           aria-current={item.active ? 'page' : undefined}
-          className={cx(tabStyle, item.active && activeStyle)}
+          className={css(tabStyle, item.active && activeStyle)}
         >
           {item.label}
         </Link>

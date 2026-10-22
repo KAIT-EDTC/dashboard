@@ -18,11 +18,14 @@ updates:
       # 本体と dev ツールの版がずれると壊れるので、major も含めて必ず一緒に上げる
       react-router:
         patterns: ["react-router", "@react-router/*"]
+      # 本体とプリセットの版を揃える必要がある
+      pandacss:
+        patterns: ["@pandacss/*"]
       # minor / patch は週1本のPRにまとめる。それ以外の major は1件ずつ別PRで来る
       minor-and-patch:
         update-types: [minor, patch]
         # 両方の group に当てはまると minor-and-patch 側に取られるので外す
-        exclude-patterns: ["react-router", "@react-router/*"]
+        exclude-patterns: ["react-router", "@react-router/*", "@pandacss/*"]
 
   - package-ecosystem: github-actions
     directory: /

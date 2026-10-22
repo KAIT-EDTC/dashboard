@@ -1,7 +1,8 @@
 import { useId, type ComponentProps, type ReactNode } from 'react'
 import { css, cx } from 'styled-system/css'
 
-export const inputStyle = css({
+/** 幅などを上書きしたいときは css(inputStyleRaw, {...}) で合成する（cx だと CSS の出力順でどちらが勝つか決まる） */
+export const inputStyleRaw = css.raw({
   w: 'full',
   px: '12px',
   py: '8px',
@@ -18,6 +19,7 @@ export const inputStyle = css({
   _disabled: { opacity: 0.6, cursor: 'not-allowed' },
   '&[aria-invalid=true]': { borderColor: 'danger' },
 })
+export const inputStyle = css(inputStyleRaw)
 
 type FieldProps = {
   label: ReactNode

@@ -4,6 +4,7 @@ import { keyframes } from './theme/keyframes'
 import { semanticTokens, tokens } from './theme/tokens'
 
 export default defineConfig({
+  presets: ['@pandacss/preset-base', '@pandacss/preset-panda'],
   preflight: true,
   jsxFramework: 'react',
   include: ['./app/**/*.{ts,tsx}'],

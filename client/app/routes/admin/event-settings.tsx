@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Navigate } from 'react-router'
 import { css } from 'styled-system/css'
 import { Badge } from '~/components/ui/Badge'
-import { Checkbox, inputStyle } from '~/components/ui/Field'
+import { Checkbox, inputStyleRaw } from '~/components/ui/Field'
 import { PageHeader } from '~/components/ui/PageHeader'
 import { ListEditor, UnsavedAlert, useUnsavedGuard } from '~/features/admin/ListEditor'
 import { useCurrentUser } from '~/features/auth/use-current-user'
@@ -65,7 +65,7 @@ function EventSettingsView({ categories }: { categories: Category[] }) {
                 aria-label={`${row.label || '新しい種類'}の色`}
                 value={row.tone}
                 onChange={(e) => patch({ tone: e.currentTarget.value as CategoryTone })}
-                className={css({ w: '72px' }) + ' ' + inputStyle}
+                className={css(inputStyleRaw, { w: '72px' })}
               >
                 {CATEGORY_TONES.map((tone) => (
                   <option key={tone} value={tone}>
