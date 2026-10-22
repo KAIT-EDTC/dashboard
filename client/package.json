@@ -25,7 +25,7 @@
   "devDependencies": {
     "@edtc/server": "*",
     "@eslint/js": "^10.0.1",
-    "@pandacss/dev": "^1.11.4",
+    "@pandacss/dev": "^2.2.0",
     "@react-router/dev": "^8.4.0",
     "@types/node": "^22.19.0",
     "@types/react": "^19.2.14",
