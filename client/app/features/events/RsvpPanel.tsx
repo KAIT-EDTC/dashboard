@@ -26,11 +26,30 @@ const optionStyle = css({
   '&:has(input:focus-visible)': { shadow: 'focus' },
 })
 
-export function RsvpPanel({ event, userId, canManage, isTarget }: { event: EventDetail; userId: string; canManage: boolean; isTarget: boolean }) {
+type Props = {
+  event: EventDetail
+  userId: string
+  canManage: boolean
+  isTarget: boolean
+  /** 参加を限定したイベントで、対象者・参加できる人でなければ false */
+  canJoin: boolean
+}
+
+export function RsvpPanel({ event, userId, canManage, isTarget, canJoin }: Props) {
   const fetcher = useFetcher<FormErrors | { ok: true }>()
   const mine = event.participants.find((p) => p.userId === userId)
   const closed = !!event.rsvpDeadline && nowInJst() > event.rsvpDeadline && !canManage
   const error = fetcher.data && 'error' in fetcher.data ? fetcher.data.error : undefined
+
+  if (!canJoin) {
+    return (
+      <Card title="出欠">
+        <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
+          このイベントは対象者と指定されたメンバーだけが参加できます。参加したい場合は主催者に連絡してください。
+        </p>
+      </Card>
+    )
+  }
 
   return (
     <Card title="出欠">

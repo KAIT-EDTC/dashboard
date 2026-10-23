@@ -23,6 +23,13 @@ export const eventInputSchema = z
     targetDivisions: z.array(z.enum(DIVISIONS)).max(DIVISIONS.length).default([]),
     targetUserIds: z.array(z.string().min(1)).max(100, '対象者は100人までにしてください').default([]),
     /**
+     * 参加できる人を限定するか。限定すると、対象者と下の部署・個人だけが出欠を回答できる（主催者・管理者は除く）。
+     * 対象の指定が無ければ全員が対象なので、限定しない扱いにする
+     */
+    joinRestricted: z.boolean().default(false),
+    joinDivisions: z.array(z.enum(DIVISIONS)).max(DIVISIONS.length).default([]),
+    joinUserIds: z.array(z.string().min(1)).max(100, '参加できる人は100人までにしてください').default([]),
+    /**
      * シフト（文化祭の店番など）。ありにすると、開始〜終了の時間帯を区切りで午前・午後に分けた枠を日ごとに作る。
      * 区切りが無ければ1日1枠。枠に入った人は、その中で出られない時間を1時間ごとに指定する
      */

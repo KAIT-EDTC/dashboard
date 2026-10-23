@@ -85,6 +85,13 @@
       "when": 1792255562126,
       "tag": "0011_event_shifts",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1792750898299,
+      "tag": "0012_event_join",
+      "breakpoints": true
     }
   ]
 }
