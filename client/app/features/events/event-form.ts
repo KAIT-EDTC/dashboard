@@ -14,6 +14,10 @@ export function parseEventForm(form: FormData) {
     fee: optionalInt(form, 'fee'),
     targetDivisions: texts(form, 'targetDivisions'),
     targetUserIds: texts(form, 'targetUserIds'),
+    // 限定しないときは参加できる人を保存しない
+    ...(text(form, 'joinRestricted') === 'true'
+      ? { joinRestricted: true, joinDivisions: texts(form, 'joinDivisions'), joinUserIds: texts(form, 'joinUserIds') }
+      : { joinRestricted: false, joinDivisions: [], joinUserIds: [] }),
     // シフトなしのときは時間帯を保存しない
     ...(text(form, 'hasShifts') === 'true'
       ? {

@@ -84,11 +84,78 @@ function ShiftSettings({ defaultValue, errors }: { defaultValue: Partial<EventIn
   )
 }
 
+type JoinSettingsProps = {
+  defaultValue: Partial<EventInput>
+  members: MemberListItem[]
+  errors: Record<string, string>
+  /** 対象を指定しているか。全員向けなら全員が参加できるので限定できない */
+  targeted: boolean
+  /** 対象者の人数（参加できる人数の表示に使う） */
+  isTargetMember: (member: MemberListItem) => boolean
+}
+
+/** 参加できる人。限定すると、対象者とここで指定した部署・メンバーだけが出欠を回答できる */
+function JoinSettings({ defaultValue, members, errors, targeted, isTargetMember }: JoinSettingsProps) {
+  const [restricted, setRestricted] = useState(defaultValue.joinRestricted ?? false)
+  const [joinDivisions, setJoinDivisions] = useState<Division[]>(defaultValue.joinDivisions ?? [])
+  const [joinUserIds, setJoinUserIds] = useState<string[]>(defaultValue.joinUserIds ?? [])
+  const active = restricted && targeted
+  const joinCount = members.filter((m) => isTargetMember(m) || joinUserIds.includes(m.id) || m.divisions.some((d) => joinDivisions.includes(d))).length
+
+  return (
+    <Card
+      title="参加できる人"
+      action={
+        <span className={css({ fontSize: 'sm', fontWeight: '600', color: active ? 'accent.fg' : 'fg.subtle' })}>
+          {active ? `${joinCount}人` : '誰でも'}
+        </span>
+      }
+    >
+      <div className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
+        <Checkbox
+          label="対象者と、指定したメンバーだけが参加できるようにする"
+          name="joinRestricted"
+          value="true"
+          checked={active}
+          disabled={!targeted}
+          onChange={(e) => setRestricted(e.currentTarget.checked)}
+        />
+        {!targeted ? (
+          <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>対象を指定すると、参加できる人を限定できます。</p>
+        ) : (
+          active && (
+            <>
+              <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
+                対象者のほかに参加できる部署・メンバーを指定してください。指定しなければ対象者だけが参加できます。ここで指定した人には未回答の催促は届きません。主催者と管理者はいつでも出欠を変更できます。
+              </p>
+              <DivisionPicker
+                name="joinDivisions"
+                label="部署"
+                hint="選んだ部署のメンバー全員が参加できる"
+                required={false}
+                defaultValue={joinDivisions}
+                onChange={setJoinDivisions}
+                error={errors.joinDivisions}
+              />
+              <MemberPicker members={members} value={joinUserIds} onChange={setJoinUserIds} label="個人で追加" />
+              {joinUserIds.map((id) => (
+                <input key={id} type="hidden" name="joinUserIds" value={id} />
+              ))}
+              {errors.joinUserIds && <p className={css({ fontSize: 'xs', color: 'danger.fg' })}>{errors.joinUserIds}</p>}
+            </>
+          )
+        )}
+      </div>
+    </Card>
+  )
+}
+
 export function EventForm({ defaultValue = {}, categories, members, errors, submitting, submitLabel, secondaryActions }: EventFormProps) {
   const e = errors?.fieldErrors ?? {}
   const [targetDivisions, setTargetDivisions] = useState<Division[]>(defaultValue.targetDivisions ?? [])
   const [targetUserIds, setTargetUserIds] = useState<string[]>(defaultValue.targetUserIds ?? [])
-  const targetCount = members.filter((m) => targetUserIds.includes(m.id) || m.divisions.some((d) => targetDivisions.includes(d))).length
+  const isTargetMember = (m: MemberListItem) => targetUserIds.includes(m.id) || m.divisions.some((d) => targetDivisions.includes(d))
+  const targetCount = members.filter(isTargetMember).length
   const targeted = targetDivisions.length > 0 || targetUserIds.length > 0
   const grid = css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: '1fr 1fr' }, gap: 'md' })
   return (
@@ -133,7 +200,7 @@ export function EventForm({ defaultValue = {}, categories, members, errors, subm
       >
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
           <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
-            部署のミーティングなど、一部のメンバー向けのイベントは対象を指定してください。対象者だけに未回答の催促とDiscordのメンションが届きます（対象外の人も参加は回答できます）。部署で指定すると、あとからその部署に入った人も対象になります。
+            部署のミーティングなど、一部のメンバー向けのイベントは対象を指定してください。対象者だけに未回答の催促とDiscordのメンションが届きます（「参加できる人」を限定しなければ、対象外の人も参加を回答できます）。部署で指定すると、あとからその部署に入った人も対象になります。
           </p>
           <DivisionPicker
             name="targetDivisions"
@@ -151,6 +218,8 @@ export function EventForm({ defaultValue = {}, categories, members, errors, subm
           {e.targetUserIds && <p className={css({ fontSize: 'xs', color: 'danger.fg' })}>{e.targetUserIds}</p>}
         </div>
       </Card>
+
+      <JoinSettings defaultValue={defaultValue} members={members} errors={e} targeted={targeted} isTargetMember={isTargetMember} />
 
       <div className={css({ display: 'flex', justifyContent: 'flex-end', gap: 'sm' })}>
         {secondaryActions}

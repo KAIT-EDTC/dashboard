@@ -94,7 +94,7 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
 
 export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
-  const { event, canManage, isTarget, pending, reports, myReport, canWriteReport, summary } = loaderData
+  const { event, canManage, isTarget, canJoin, pending, reports, myReport, canWriteReport, summary } = loaderData
   const me = useCurrentUser()
   const started = event.startsAt <= nowInJst()
 
@@ -148,7 +148,7 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
           <ItemList event={event} userId={me.id} canManage={canManage} />
         </div>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
-          <RsvpPanel event={event} userId={me.id} canManage={canManage} isTarget={isTarget} />
+          <RsvpPanel event={event} userId={me.id} canManage={canManage} isTarget={isTarget} canJoin={canJoin} />
           <ParticipantList event={event} pending={pending} canManage={canManage} summary={summary} />
         </div>
       </div>

@@ -41,6 +41,11 @@ export function EventInfo({ event }: { event: EventDetail }) {
             ? '全員'
             : [...event.targetDivisions, ...event.targetUsers.map((user) => fullName(user))].join('、')}
         </Row>
+        <Row icon={<UsersIcon size={16} />} label="参加できる人">
+          {event.joinRestricted
+            ? ['対象者', ...event.joinDivisions, ...event.joinUsers.map((user) => fullName(user))].join('、')
+            : '誰でも'}
+        </Row>
       </dl>
       {event.description && <p className={css({ mt: 'lg', whiteSpace: 'pre-wrap', lineHeight: '1.8' })}>{event.description}</p>}
       <div className={css({ mt: 'lg', display: 'flex', alignItems: 'center', gap: 'sm', fontSize: 'sm', color: 'fg.muted' })}>

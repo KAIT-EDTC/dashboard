@@ -213,6 +213,8 @@ export const events = sqliteTable(
     shiftEndHour: integer('shift_end_hour'),
     /** 午前と午後の区切り（時）。無ければ1日1枠 */
     shiftSplitHour: integer('shift_split_hour'),
+    /** 参加できる人を対象者と event_join_* の人に限定するか（主催者・管理者はいつでも回答できる） */
+    joinRestricted: integer('join_restricted', { mode: 'boolean' }).notNull().default(false),
     /** まとめ報告書の担当者（主催者が指名する）。未指名なら講師が担当 */
     summaryWriterId: text('summary_writer_id').references(() => users.id, { onDelete: 'set null' }),
     ...timestamps,
@@ -323,6 +325,31 @@ export const eventTargetUsers = sqliteTable(
       .references(() => users.id, { onDelete: 'cascade' }),
   },
   (t) => [primaryKey({ columns: [t.eventId, t.userId] }), index('event_target_users_user_idx').on(t.userId)],
+)
+
+/** 参加できる人を限定したイベントで、対象者のほかに参加できる部署と個人 */
+export const eventJoinDivisions = sqliteTable(
+  'event_join_divisions',
+  {
+    eventId: text('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    division: text('division').$type<Division>().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.division] })],
+)
+
+export const eventJoinUsers = sqliteTable(
+  'event_join_users',
+  {
+    eventId: text('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.userId] }), index('event_join_users_user_idx').on(t.userId)],
 )
 
 // ---------------------------------------------------------------------------
@@ -450,6 +477,8 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   shifts: many(eventShifts),
   targetDivisions: many(eventTargetDivisions),
   targetUsers: many(eventTargetUsers),
+  joinDivisions: many(eventJoinDivisions),
+  joinUsers: many(eventJoinUsers),
   reports: many(activityReports),
 }))
 
@@ -460,6 +489,15 @@ export const eventTargetDivisionsRelations = relations(eventTargetDivisions, ({ 
 export const eventTargetUsersRelations = relations(eventTargetUsers, ({ one }) => ({
   event: one(events, { fields: [eventTargetUsers.eventId], references: [events.id] }),
   user: one(users, { fields: [eventTargetUsers.userId], references: [users.id] }),
+}))
+
+export const eventJoinDivisionsRelations = relations(eventJoinDivisions, ({ one }) => ({
+  event: one(events, { fields: [eventJoinDivisions.eventId], references: [events.id] }),
+}))
+
+export const eventJoinUsersRelations = relations(eventJoinUsers, ({ one }) => ({
+  event: one(events, { fields: [eventJoinUsers.eventId], references: [events.id] }),
+  user: one(users, { fields: [eventJoinUsers.userId], references: [users.id] }),
 }))
 
 export const eventParticipantsRelations = relations(eventParticipants, ({ one }) => ({

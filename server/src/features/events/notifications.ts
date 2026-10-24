@@ -14,13 +14,13 @@ type EventSummary = {
 
 const formatDateTime = (value: string) => value.replace('T', ' ')
 
-/** target.label が null なら全員向け（メンションしない） */
+/** target.label が null なら全員向け（メンションしない）。target.joinLabel は参加を限定したときの参加できる人 */
 export function notifyEventCreated(
   env: Bindings,
   db: Db,
   event: EventSummary,
   organizerName: string,
-  target: { label: string | null; mentionIds: string[] },
+  target: { label: string | null; joinLabel: string | null; mentionIds: string[] },
 ) {
   return notify(env, db, 'eventCreated', {
     content: [
@@ -42,6 +42,7 @@ export function notifyEventCreated(
           ...(event.rsvpDeadline ? [{ name: '出欠締切', value: formatDateTime(event.rsvpDeadline), inline: true }] : []),
           { name: '主催', value: organizerName, inline: true },
           ...(target.label ? [{ name: '対象', value: target.label, inline: true }] : []),
+          ...(target.joinLabel ? [{ name: '参加できる人', value: target.joinLabel, inline: true }] : []),
         ],
       },
     ],

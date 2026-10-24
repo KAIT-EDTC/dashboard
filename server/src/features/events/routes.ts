@@ -19,6 +19,8 @@ import {
   activityReports,
   eventCategories,
   eventItems,
+  eventJoinDivisions,
+  eventJoinUsers,
   eventParticipants,
   events,
   eventShiftMembers,
@@ -68,17 +70,35 @@ async function findEvent(db: Db, id: string) {
 
 const td = eventTargetDivisions
 const tu = eventTargetUsers
+const jd = eventJoinDivisions
+const ju = eventJoinUsers
 
 /** 部署は表示順（DIVISIONS の順）にそろえる */
 const sortDivisions = (divisions: string[]) => DIVISIONS.filter((division) => divisions.includes(division))
+
+/** そのユーザーが、イベントの部署・個人の指定（対象者か、参加できる人）に入っているか */
+const inAudience = (divisions: typeof td | typeof jd, people: typeof tu | typeof ju, userId: string) =>
+  sql`(
+    exists (select 1 from ${people} where ${people.eventId} = ${events.id} and ${people.userId} = ${userId})
+    or exists (select 1 from ${divisions} inner join ${userDivisions} on ${userDivisions.division} = ${divisions.division} where ${divisions.eventId} = ${events.id} and ${userDivisions.userId} = ${userId})
+  )`
 
 /** 一覧で、そのユーザーがイベントの対象か（対象の指定が無ければ全員が対象） */
 const isTargetOf = (userId: string) =>
   sql<boolean>`(
     (not exists (select 1 from ${td} where ${td.eventId} = ${events.id}) and not exists (select 1 from ${tu} where ${tu.eventId} = ${events.id}))
-    or exists (select 1 from ${tu} where ${tu.eventId} = ${events.id} and ${tu.userId} = ${userId})
-    or exists (select 1 from ${td} inner join ${userDivisions} on ${userDivisions.division} = ${td.division} where ${td.eventId} = ${events.id} and ${userDivisions.userId} = ${userId})
+    or ${inAudience(td, tu, userId)}
   )`.mapWith(Boolean)
+
+/** 参加を限定したイベントで、そのユーザーが対象者か参加できる人に入っているか */
+async function isJoinable(db: Db, eventId: string, userId: string) {
+  const found = await db
+    .select({ id: events.id })
+    .from(events)
+    .where(and(eq(events.id, eventId), or(inAudience(td, tu, userId), inAudience(jd, ju, userId))))
+    .get()
+  return !!found
+}
 
 /** 対象の個人と、対象の部署に今所属している人。対象の指定が無ければ空 */
 function findTargetMembers(db: Db, eventId: string) {
@@ -107,7 +127,7 @@ function findTargetMembers(db: Db, eventId: string) {
     .orderBy(asc(users.enrollmentYear), asc(users.lastNameKana), asc(users.firstNameKana))
 }
 
-/** 通知などに使う対象の表記（例: 広報部・企画部 ＋ 2人）。全員向けなら null */
+/** 通知などに使う対象・参加できる人の表記（例: 広報部・企画部 ＋ 2人）。指定が無ければ null */
 function targetLabel(divisions: Division[], userCount: number): string | null {
   const parts = [divisions.join('・'), userCount > 0 ? `${userCount}人` : ''].filter(Boolean)
   return parts.length > 0 ? parts.join(' ＋ ') : null
@@ -130,13 +150,36 @@ async function assertUsersExist(db: Db, userIds: string[]) {
   if (found.length !== userIds.length) throw badRequest('対象のメンバーが見つかりません。画面を読み込み直してください')
 }
 
-/** 対象の指定を送られた内容に置き換える文（イベントの保存と同じ batch で実行する） */
-function replaceTargets(db: Db, eventId: string, divisions: Division[], userIds: string[]) {
+type Audience = { targetDivisions: Division[]; targetUserIds: string[]; joinDivisions: Division[]; joinUserIds: string[] }
+
+/**
+ * 送られた内容を events の列と、対象・参加できる人の指定に分ける。
+ * 対象の指定が無ければ全員が対象なので、参加は限定しない（参加できる人の指定も捨てる）
+ */
+function splitAudience({ targetDivisions, targetUserIds, joinDivisions, joinUserIds, ...input }: z.output<typeof eventInputSchema>) {
+  const targeted = targetDivisions.length > 0 || targetUserIds.length > 0
+  const joinRestricted = input.joinRestricted && targeted
+  const audience: Audience = {
+    targetDivisions,
+    targetUserIds: [...new Set(targetUserIds)],
+    joinDivisions: joinRestricted ? joinDivisions : [],
+    joinUserIds: joinRestricted ? [...new Set(joinUserIds)] : [],
+  }
+  return { input: { ...input, joinRestricted }, audience }
+}
+
+/** 対象・参加できる人の指定を送られた内容に置き換える文（イベントの保存と同じ batch で実行する） */
+function replaceAudience(db: Db, eventId: string, audience: Audience) {
+  const { targetDivisions, targetUserIds, joinDivisions, joinUserIds } = audience
   return [
     db.delete(td).where(eq(td.eventId, eventId)),
     db.delete(tu).where(eq(tu.eventId, eventId)),
-    ...(divisions.length > 0 ? [db.insert(td).values(divisions.map((division) => ({ eventId, division })))] : []),
-    ...(userIds.length > 0 ? [db.insert(tu).values(userIds.map((userId) => ({ eventId, userId })))] : []),
+    db.delete(jd).where(eq(jd.eventId, eventId)),
+    db.delete(ju).where(eq(ju.eventId, eventId)),
+    ...(targetDivisions.length > 0 ? [db.insert(td).values(targetDivisions.map((division) => ({ eventId, division })))] : []),
+    ...(targetUserIds.length > 0 ? [db.insert(tu).values(targetUserIds.map((userId) => ({ eventId, userId })))] : []),
+    ...(joinDivisions.length > 0 ? [db.insert(jd).values(joinDivisions.map((division) => ({ eventId, division })))] : []),
+    ...(joinUserIds.length > 0 ? [db.insert(ju).values(joinUserIds.map((userId) => ({ eventId, userId })))] : []),
   ]
 }
 
@@ -217,19 +260,19 @@ export const eventsRoute = new Hono<AppEnv>()
   })
 
   .post('/', validate('json', eventInputSchema), async (c) => {
-    const { targetDivisions, targetUserIds: rawUserIds, ...input } = c.req.valid('json')
-    const targetUserIds = [...new Set(rawUserIds)]
+    const { input, audience } = splitAudience(c.req.valid('json'))
+    const { targetDivisions, targetUserIds } = audience
     const { userId } = c.get('session')
     const db = createDb(c.env)
     const id = crypto.randomUUID()
     const category = await findCategory(db, input.category)
-    await assertUsersExist(db, targetUserIds)
+    await assertUsersExist(db, [...new Set([...targetUserIds, ...audience.joinUserIds])])
 
     // 作成者は主催者として参加扱いにする
     await db.batch([
       db.insert(events).values({ ...input, id, createdBy: userId }),
       db.insert(eventParticipants).values({ eventId: id, userId, status: 'going' }),
-      ...replaceTargets(db, id, targetDivisions, targetUserIds),
+      ...replaceAudience(db, id, audience),
       ...(await syncShifts(db, id, input, null)),
     ])
 
@@ -240,10 +283,12 @@ export const eventsRoute = new Hono<AppEnv>()
       .get()
     const label = targetLabel(targetDivisions, targetUserIds.length)
     const mentionIds = label ? (await findTargetMembers(db, id)).map((m) => m.id).filter((memberId) => memberId !== userId) : []
+    const joinLabel = input.joinRestricted ? ['対象者', targetLabel(audience.joinDivisions, audience.joinUserIds.length)].filter(Boolean).join(' ＋ ') : null
     runInBackground(
       c,
       notifyEventCreated(c.env, db, { id, ...input, categoryLabel: category.label }, organizer ? `${organizer.lastName} ${organizer.firstName}` : '', {
         label,
+        joinLabel,
         mentionIds,
       }),
     )
@@ -259,6 +304,8 @@ export const eventsRoute = new Hono<AppEnv>()
       with: {
         targetDivisions: { columns: { division: true } },
         targetUsers: { with: { user: { columns: memberSummaryColumns } } },
+        joinDivisions: { columns: { division: true } },
+        joinUsers: { with: { user: { columns: memberSummaryColumns } } },
         creator: { columns: memberSummaryColumns },
         participants: {
           with: { user: { columns: memberSummaryColumns } },
@@ -282,14 +329,16 @@ export const eventsRoute = new Hono<AppEnv>()
     })
     if (!found) throw notFound('イベントが見つかりません')
 
-    const { targetDivisions, targetUsers, ...event } = found
-    const [category, reports, myReport, summary, summaryMembers, defaultWriterId] = await Promise.all([
+    const { targetDivisions, targetUsers, joinDivisions, joinUsers, ...event } = found
+    const mine = event.participants.find((p) => p.userId === userId)
+    const [category, reports, myReport, summary, summaryMembers, defaultWriterId, joinable] = await Promise.all([
       db.select().from(eventCategories).where(eq(eventCategories.id, event.category)).get(),
       approvedReportsOf(db, event.id),
       myReportOf(db, event.id, userId),
       summaryReportOf(db, event.id),
       summaryMembersOf(db, event.id),
       summaryWriterIdOf(db, found),
+      event.joinRestricted && !mine && !canManage(c.get('session'), event.createdBy) ? isJoinable(db, event.id, userId) : true,
     ])
     // まとめ報告書の担当者: 書き始めた人。まだなら講師（講師を置かない種類は指名された人）
     const writerId = summary?.authorId ?? defaultWriterId
@@ -297,7 +346,6 @@ export const eventsRoute = new Hono<AppEnv>()
     const targeted = targetDivisions.length > 0 || targetUsers.length > 0
     const targetMembers = targeted ? await findTargetMembers(db, event.id) : []
     const answered = new Set(event.participants.map((p) => p.userId))
-    const mine = event.participants.find((p) => p.userId === userId)
     return c.json({
       event: {
         ...event,
@@ -308,10 +356,14 @@ export const eventsRoute = new Hono<AppEnv>()
         hasReport: category?.hasReport ?? true,
         targetDivisions: sortDivisions(targetDivisions.map((t) => t.division)),
         targetUsers: targetUsers.map((t) => t.user),
+        joinDivisions: sortDivisions(joinDivisions.map((j) => j.division)),
+        joinUsers: joinUsers.map((j) => j.user),
       },
       canManage: canManage(c.get('session'), event.createdBy),
       /** 自分が対象か（全員向けなら常に true） */
       isTarget: !targeted || targetMembers.some((m) => m.id === userId),
+      /** 出欠を回答できるか（参加を限定したイベントで、対象者・参加できる人・回答済みの人・主催者と管理者のどれでもなければ false） */
+      canJoin: joinable,
       /** 対象者のうち、まだ出欠を回答していない人 */
       pending: targetMembers.filter((m) => !answered.has(m.id)),
       /** 承認済みの活動報告書と、自分の報告書の状態 */
@@ -339,15 +391,14 @@ export const eventsRoute = new Hono<AppEnv>()
     const db = createDb(c.env)
     const event = await findEvent(db, c.req.param('id'))
     assertCanManage(c.get('session'), event.createdBy)
-    const { targetDivisions, targetUserIds: rawUserIds, ...input } = c.req.valid('json')
-    const targetUserIds = [...new Set(rawUserIds)]
+    const { input, audience } = splitAudience(c.req.valid('json'))
     const category = await findCategory(db, input.category)
-    await assertUsersExist(db, targetUserIds)
+    await assertUsersExist(db, [...new Set([...audience.targetUserIds, ...audience.joinUserIds])])
     await db.batch([
       db.update(events).set(input).where(eq(events.id, event.id)),
       // 講師を置かない種類に変えたら、講師の役割を外す
       ...(category.hasLecturer ? [] : dropLecturers(db, eq(events.id, event.id))),
-      ...replaceTargets(db, event.id, targetDivisions, targetUserIds),
+      ...replaceAudience(db, event.id, audience),
       ...(await syncShifts(db, event.id, input, event)),
     ])
     return c.json({ id: event.id })
@@ -371,6 +422,15 @@ export const eventsRoute = new Hono<AppEnv>()
 
     if (event.rsvpDeadline && nowInJst() > event.rsvpDeadline && !canManage(session, event.createdBy)) {
       throw badRequest('出欠の回答期限を過ぎています。主催者に連絡してください。')
+    }
+    // 参加を限定したイベントは、対象者と参加できる人だけが新しく回答できる（回答済みの人は変更できる）
+    if (event.joinRestricted && !canManage(session, event.createdBy)) {
+      const answered = await db
+        .select({ userId: eventParticipants.userId })
+        .from(eventParticipants)
+        .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, session.userId)))
+        .get()
+      if (!answered && !(await isJoinable(db, event.id, session.userId))) throw forbidden('このイベントは対象者と指定されたメンバーだけが参加できます')
     }
     if (status === 'going' && event.capacity) {
       const others = await db
