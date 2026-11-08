@@ -1,4 +1,5 @@
 -- 開発用のダミーデータ（IDが seed- で始まるもの）を消す。自分のデータには触らない
--- 出欠・持ち物・シフト・活動報告書はイベントの削除で、部署・出欠・活動報告書はユーザーの削除で一緒に消える（持ち物の担当者は外れる）
+-- 出欠・持ち物・シフト・活動報告書・簡易報告書はイベントの削除で、部署・出欠・活動報告書・簡易報告書はユーザーの削除で一緒に消える（持ち物の担当者は外れる）
 DELETE FROM events WHERE id LIKE 'seed-%';
 DELETE FROM users WHERE id LIKE 'seed-%';
+DELETE FROM event_categories WHERE id LIKE 'seed-%';
