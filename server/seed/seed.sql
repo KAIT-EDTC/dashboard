@@ -89,6 +89,10 @@ INSERT INTO user_divisions (user_id, division) VALUES
 -- イベント（日付は今日から何日後か。マイナスは過去）
 -- ---------------------------------------------------------------------------
 
+-- 簡易報告書ありのダミーの種類（ほかの種類はマイグレーションの初期値を使う）
+INSERT INTO event_categories (id, label, tone, has_lecturer, has_report, has_light_report, sort_order) VALUES
+  ('seed-cat-study', '勉強会', 'success', 0, 0, 1, 100);
+
 WITH
   e(id, title, category, description, location, start_day, start_time, end_time, deadline_day, deadline_time, capacity, fee, created_by) AS (VALUES
     ('seed-ev-01', '第4回 遊行塾 電子工作入門', 'activity', 'LEDを光らせる回路を作ります。初心者歓迎！', 'E棟 3階 工作室', -21, '13:00', '17:00', -24, '23:59', NULL, 500, 'seed-03'),
@@ -99,7 +103,8 @@ WITH
     ('seed-ev-06', 'BBQ大会', 'social', '出欠の締切は過ぎていますが、変更は主催者に連絡してください。', '相模川河川敷', 20, '11:00', '15:00', -1, '23:59', NULL, 1500, 'seed-08'),
     ('seed-ev-07', '地域の小学校でプログラミング教室', 'outreach', 'Scratchを使った授業のサポートです。', '厚木市立〇〇小学校', 30, '10:00', '12:00', 21, '23:59', 6, NULL, 'seed-07'),
     ('seed-ev-08', '部室の大掃除', 'other', '終わるまでやります。軍手は各自で。', '部室', 6, '15:00', NULL, NULL, NULL, NULL, NULL, 'seed-09'),
-    ('seed-ev-09', '第3回 遊行塾 Arduino入門', 'activity', 'Arduinoでブザーを鳴らします。', 'E棟 3階 工作室', -35, '13:00', '16:30', -38, '23:59', NULL, 500, 'seed-07')
+    ('seed-ev-09', '第3回 遊行塾 Arduino入門', 'activity', 'Arduinoでブザーを鳴らします。', 'E棟 3階 工作室', -35, '13:00', '16:30', -38, '23:59', NULL, 500, 'seed-07'),
+    ('seed-ev-10', 'もくもく勉強会 Git入門', 'seed-cat-study', 'Gitの基本操作を、みんなで手を動かしながら覚えます。ノートパソコンを持ってきてください。', '部室', -5, '17:00', '19:00', NULL, NULL, NULL, NULL, 'seed-11')
   )
 INSERT INTO events (id, title, category, description, location, starts_at, ends_at, rsvp_deadline, capacity, fee, created_by)
 SELECT
@@ -194,7 +199,16 @@ INSERT INTO event_participants (event_id, user_id, status, comment, attended, pa
   ('seed-ev-09', 'seed-15', 'going', '', 1, 1),
   ('seed-ev-09', 'seed-19', 'going', '', 1, 1),
   ('seed-ev-09', 'seed-05', 'going', '', 1, 1),
-  ('seed-ev-09', 'seed-01', 'going', '', 1, 1);
+  ('seed-ev-09', 'seed-01', 'going', '', 1, 1),
+  -- 過去: 勉強会（簡易報告書あり）
+  ('seed-ev-10', 'seed-11', 'going', '', 1, 0),
+  ('seed-ev-10', 'seed-04', 'going', '', 1, 0),
+  ('seed-ev-10', 'seed-13', 'going', '', 1, 0),
+  ('seed-ev-10', 'seed-02', 'going', '', 1, 0),
+  ('seed-ev-10', 'seed-01', 'going', '', 1, 0),
+  ('seed-ev-10', 'seed-10', 'going', '', 1, 0),
+  ('seed-ev-10', 'seed-16', 'maybe', '', 0, 0),
+  ('seed-ev-10', 'seed-14', 'declined', '', 0, 0);
 
 -- 持ち物（shared は担当者あり／なし、準備完了／未完了を混ぜる）
 INSERT INTO event_items (id, event_id, name, kind, quantity, note, assignee_id, prepared) VALUES
@@ -372,3 +386,36 @@ INSERT INTO activity_report_comments (id, review_id, field, start, "end", quote,
 SELECT c.id, c.review_id, c.field, instr(p.reflection, c.quote) - 1, instr(p.reflection, c.quote) - 1 + length(c.quote), c.quote, c.body, c.suggestion
 FROM c
 JOIN activity_reports p ON p.id = c.report_id;
+
+-- ---------------------------------------------------------------------------
+-- 簡易報告書（事後報告だけ・文字数の上限なし・承認なし）。勉強会の参加者のうち4人が書いた
+-- 佐藤さん・加藤さんはまだ書いていない（イベントページに書くフォームが出る）。鈴木さんの分はあとから直したもの
+-- 時刻は今から何時間前か（イベントが終わった後になるよう、98時間前より後にする）
+-- ---------------------------------------------------------------------------
+
+WITH
+  l(event_id, user_id, body, created_hours, updated_hours) AS (VALUES
+    ('seed-ev-10', 'seed-11', '主催として、Gitの基本（commit・branch・merge）の説明と、つまずいた人のサポートをした。
+
+よかったこと
+・最初に「なぜGitを使うのか」を5分で話したので、初めての人も目的をつかんでから手を動かせた
+・ペアで同じリポジトリに push し合う練習をしたら、全員が一度はコンフリクトを体験できた
+
+うまくいかなかったこと
+・Windowsのパソコンで改行コードの警告が出て、説明に15分ほど使ってしまった。設定のコマンドを事前に配っておけばよかった
+・GitHubのアカウントを作っていない人が2人いて、待ち時間ができた
+
+次回
+・rebase と pull request の回をやりたい。告知に「GitHubのアカウントを作っておく」と書く
+・資料は部のドライブに置いたので、来られなかった人も見てください', -97, -97),
+    ('seed-ev-10', 'seed-04', 'ブランチを切って作業する流れが、やっと腑に落ちた。今までは main に直接コミットしていたので、Webサイトの作業でも今日からブランチを使う。コンフリクトの直し方は、もう一回くらい練習したい。', -95, -95),
+    ('seed-ev-10', 'seed-13', 'はじめてGitを触りました。思っていたより簡単でした！', -90, -90),
+    ('seed-ev-10', 'seed-02', 'SNS用の画像の管理にもGitが使えそうだと思った。大きいファイルは Git LFS を使うとよいと教えてもらったので、広報部の素材フォルダで試してみる。
+（追記）試したところ、無料枠の容量に気をつける必要がありそう。詳しい人がいたら教えてください。', -88, -40)
+  )
+INSERT INTO event_light_reports (event_id, user_id, body, created_at, updated_at)
+SELECT
+  event_id, user_id, body,
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now', created_hours || ' hours'),
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now', updated_hours || ' hours')
+FROM l;

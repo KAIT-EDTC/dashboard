@@ -130,6 +130,8 @@ export const eventCategories = sqliteTable('event_categories', {
   hasLecturer: integer('has_lecturer', { mode: 'boolean' }).notNull().default(true),
   /** 活動報告書・まとめ報告書を書くか。書かない種類（ミーティングなど）のイベントは報告書の対象にならない */
   hasReport: integer('has_report', { mode: 'boolean' }).notNull().default(true),
+  /** 簡易報告書（事後報告だけ・承認なし）を書くか。報告書（hasReport）とはどちらか一方 */
+  hasLightReport: integer('has_light_report', { mode: 'boolean' }).notNull().default(false),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamps.createdAt,
 })
@@ -426,6 +428,26 @@ export const activityReportComments = sqliteTable(
   (t) => [index('activity_report_comments_review_idx').on(t.reviewId)],
 )
 
+/**
+ * 簡易報告書（事後報告だけ。文字数の上限も承認もない）。1イベントにつき1人1件で、書くとすぐイベントページに載る。
+ * 書けるかはイベントの種類（event_categories.has_light_report）で決まる
+ */
+export const eventLightReports = sqliteTable(
+  'event_light_reports',
+  {
+    eventId: text('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** 事後報告 */
+    body: text('body').notNull(),
+    ...timestamps,
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.userId] }), index('event_light_reports_user_idx').on(t.userId)],
+)
+
 // ---------------------------------------------------------------------------
 // Relations（db.query で使う）
 // ---------------------------------------------------------------------------
@@ -451,6 +473,12 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   targetDivisions: many(eventTargetDivisions),
   targetUsers: many(eventTargetUsers),
   reports: many(activityReports),
+  lightReports: many(eventLightReports),
+}))
+
+export const eventLightReportsRelations = relations(eventLightReports, ({ one }) => ({
+  event: one(events, { fields: [eventLightReports.eventId], references: [events.id] }),
+  user: one(users, { fields: [eventLightReports.userId], references: [users.id] }),
 }))
 
 export const eventTargetDivisionsRelations = relations(eventTargetDivisions, ({ one }) => ({

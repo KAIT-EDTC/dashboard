@@ -92,6 +92,12 @@ export const eventCategoriesSaveSchema = z.object({
         hasLecturer: z.boolean().default(true),
         /** 報告書を書くか。書かない種類のイベントは活動報告書・まとめ報告書の対象にならない */
         hasReport: z.boolean().default(true),
+        /** 簡易報告書（事後報告だけ・承認なし）を書くか。報告書とはどちらか一方 */
+        hasLightReport: z.boolean().default(false),
+      })
+      .refine((v) => !(v.hasReport && v.hasLightReport), {
+        path: ['hasLightReport'],
+        message: '報告書と簡易報告書は、どちらか一方だけにしてください',
       }),
     )
     .min(1, '種類は1つ以上必要です')

@@ -45,6 +45,7 @@ import {
 } from '../reports/queries'
 import { eventCategoriesRoute } from './categories'
 import { dropLecturers } from './category-rules'
+import { eventLightReportsRoute, lightReportBlocker, lightReportsOf } from './light-reports'
 import { notifyEventCreated } from './notifications'
 import { eventShiftsRoute, leaveAllShifts, myUpcomingShifts, syncShifts } from './shifts'
 
@@ -283,9 +284,10 @@ export const eventsRoute = new Hono<AppEnv>()
     if (!found) throw notFound('イベントが見つかりません')
 
     const { targetDivisions, targetUsers, ...event } = found
-    const [category, reports, myReport, summary, summaryMembers, defaultWriterId] = await Promise.all([
+    const [category, reports, lightReports, myReport, summary, summaryMembers, defaultWriterId] = await Promise.all([
       db.select().from(eventCategories).where(eq(eventCategories.id, event.category)).get(),
       approvedReportsOf(db, event.id),
+      lightReportsOf(db, event.id),
       myReportOf(db, event.id, userId),
       summaryReportOf(db, event.id),
       summaryMembersOf(db, event.id),
@@ -306,6 +308,8 @@ export const eventsRoute = new Hono<AppEnv>()
         /** 講師を置くか・報告書を書くか（種類の設定） */
         hasLecturer: category?.hasLecturer ?? true,
         hasReport: category?.hasReport ?? true,
+        /** 簡易報告書を書くか（種類の設定） */
+        hasLightReport: category?.hasLightReport ?? false,
         targetDivisions: sortDivisions(targetDivisions.map((t) => t.division)),
         targetUsers: targetUsers.map((t) => t.user),
       },
@@ -319,6 +323,9 @@ export const eventsRoute = new Hono<AppEnv>()
       myReport: myReport ?? null,
       /** 参加した人は、イベントが始まったら報告書を書ける（報告書を書かない種類は除く。まとめ報告書の担当者は書かなくてよい） */
       canWriteReport: (category?.hasReport ?? true) && !!mine && isReportTarget(mine) && event.startsAt <= nowInJst() && writerId !== userId,
+      /** 簡易報告書（承認なし。書いた人の名前付きで全員に見せる）と、自分が書けるか */
+      lightReports,
+      canWriteLightReport: lightReportBlocker(event, category?.hasLightReport ?? false, mine) === null,
       /** まとめ報告書。下書きは担当者にだけ見せる */
       summary: {
         writer,
@@ -471,6 +478,10 @@ export const eventsRoute = new Hono<AppEnv>()
   // --- シフト ---------------------------------------------------------------
 
   .route('/:id/shifts', eventShiftsRoute)
+
+  // --- 簡易報告書 -----------------------------------------------------------
+
+  .route('/:id/light-report', eventLightReportsRoute)
 
   // --- 持ち物 ---------------------------------------------------------------
 

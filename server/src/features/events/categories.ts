@@ -13,7 +13,14 @@ import { dropLecturers } from './category-rules'
 export const eventCategoriesRoute = new Hono<AppEnv>()
   .get('/', async (c) => {
     const categories = await createDb(c.env)
-      .select({ id: eventCategories.id, label: eventCategories.label, tone: eventCategories.tone, hasLecturer: eventCategories.hasLecturer, hasReport: eventCategories.hasReport })
+      .select({
+        id: eventCategories.id,
+        label: eventCategories.label,
+        tone: eventCategories.tone,
+        hasLecturer: eventCategories.hasLecturer,
+        hasReport: eventCategories.hasReport,
+        hasLightReport: eventCategories.hasLightReport,
+      })
       .from(eventCategories)
       .orderBy(asc(eventCategories.sortOrder), asc(eventCategories.createdAt))
     return c.json({ categories })
@@ -55,6 +62,13 @@ export const eventCategoriesRoute = new Hono<AppEnv>()
     // 講師を置かない設定にした種類は、そのイベントの講師を外す
     const lecturerDropped = next.flatMap((category) => (category.id && currentById.get(category.id)?.hasLecturer && !category.hasLecturer ? [category.id] : []))
 
+    // 名前以外の設定（色・講師・報告書・簡易報告書）
+    const rules = (category: (typeof next)[number]) => ({
+      tone: category.tone,
+      hasLecturer: category.hasLecturer,
+      hasReport: category.hasReport,
+      hasLightReport: category.hasLightReport,
+    })
     // 名前の入れ替えなどでも一意制約に当たらないよう、先に仮の名前へ退避してから確定させる
     const statements = [
       ...[...renamed].map((id) => db.update(eventCategories).set({ label: `__renaming__${id}` }).where(eq(eventCategories.id, id))),
@@ -63,9 +77,9 @@ export const eventCategoriesRoute = new Hono<AppEnv>()
         category.id
           ? db
               .update(eventCategories)
-              .set({ label: category.label, tone: category.tone, hasLecturer: category.hasLecturer, hasReport: category.hasReport, sortOrder: index })
+              .set({ label: category.label, ...rules(category), sortOrder: index })
               .where(eq(eventCategories.id, category.id))
-          : db.insert(eventCategories).values({ id: crypto.randomUUID(), label: category.label, tone: category.tone, hasLecturer: category.hasLecturer, hasReport: category.hasReport, sortOrder: index }),
+          : db.insert(eventCategories).values({ id: crypto.randomUUID(), label: category.label, ...rules(category), sortOrder: index }),
       ),
       ...(lecturerDropped.length > 0 ? dropLecturers(db, inArray(events.category, lecturerDropped)) : []),
     ]
