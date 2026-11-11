@@ -269,8 +269,9 @@ npx wrangler d1 create edtc-dashboard
 #   → 出力された database_id を wrangler.jsonc の env.production.d1_databases に貼る
 #   （wrangler の d1 create が認証エラーになる場合は、ダッシュボードのD1画面から作ってもよい）
 npm run db:migrate:remote                                # テーブルを作る
-# イベントの添付ファイルの置き場所（無いとデプロイが失敗する）。アカウントが複数あると選べないので、団体のアカウントIDを渡す
-CLOUDFLARE_ACCOUNT_ID=f63f9ebc5db7b049a6e98a155a3d219d npx wrangler r2 bucket create edtc-dashboard-attachments
+# アップロードされたファイルの置き場所（FILES。無いとデプロイが失敗する）。アカウントが複数あると選べないので、団体のアカウントIDを渡す
+CLOUDFLARE_ACCOUNT_ID=f63f9ebc5db7b049a6e98a155a3d219d npx wrangler r2 bucket create edtc-dashboard-files
+CLOUDFLARE_ACCOUNT_ID=f63f9ebc5db7b049a6e98a155a3d219d npx wrangler r2 bucket create edtc-dashboard-preview-files  # PRプレビュー用
 
 # 秘密情報（値を聞かれる）。GitHub App の鍵は  < your-app.pem  でファイルから渡す
 npx wrangler secret put JWT_SECRET --env production                  # openssl rand -hex 32

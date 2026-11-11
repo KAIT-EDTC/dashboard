@@ -4,8 +4,8 @@ import type { Division, Officer } from '@edtc/shared'
 // クライアントが AppType を型importする際にも解決できるよう、グローバル型に頼らず明示的にimportする
 export type Bindings = {
   DB: D1Database
-  /** イベントの添付ファイルの置き場所 */
-  ATTACHMENTS: R2Bucket
+  /** アップロードされたファイルの置き場所（events/<イベントID>/ にイベントの添付ファイル） */
+  FILES: R2Bucket
 
   FRONTEND_URL: string
   COOKIE_DOMAIN?: string

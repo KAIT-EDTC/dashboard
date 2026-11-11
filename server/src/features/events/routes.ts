@@ -1,9 +1,8 @@
-import { and, asc, count, desc, eq, getTableColumns, gte, inArray, lte, ne, or, sql, sum, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, getTableColumns, gte, inArray, lte, ne, or, sql, type SQL } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import {
   ATTACHMENT_MAX_COUNT,
-  ATTACHMENT_TOTAL_MAX_BYTES,
   attachmentUploadSchema,
   DIVISIONS,
   eventInputSchema,
@@ -35,6 +34,7 @@ import {
 import type { AppEnv } from '../../env'
 import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
+import { assertStorageAvailable } from '../../lib/storage'
 import { validate } from '../../lib/validator'
 import { assertCanManage, canManage, requireAuth } from '../../middleware/auth'
 import {
@@ -375,7 +375,7 @@ export const eventsRoute = new Hono<AppEnv>()
     const files = await db.select({ r2Key: eventAttachments.r2Key }).from(eventAttachments).where(eq(eventAttachments.eventId, event.id))
     await db.delete(events).where(eq(events.id, event.id))
     // 行は先に消えているので、R2の削除に失敗しても画面上は残らない（実体だけが残る）
-    if (files.length > 0) await c.env.ATTACHMENTS.delete(files.map((f) => f.r2Key))
+    if (files.length > 0) await c.env.FILES.delete(files.map((f) => f.r2Key))
     return c.json({ ok: true })
   })
 
@@ -392,13 +392,12 @@ export const eventsRoute = new Hono<AppEnv>()
     const existing = await db.select({ n: count() }).from(eventAttachments).where(eq(eventAttachments.eventId, event.id)).get()
     if ((existing?.n ?? 0) >= ATTACHMENT_MAX_COUNT) throw badRequest(`添付ファイルは1イベントにつき${ATTACHMENT_MAX_COUNT}個までです`)
 
-    const total = await db.select({ n: sum(eventAttachments.size) }).from(eventAttachments).get()
-    if (Number(total?.n ?? 0) + file.size > ATTACHMENT_TOTAL_MAX_BYTES) throw badRequest('ストレージの上限に達しているため、これ以上ファイルを追加できません')
+    await assertStorageAvailable(db, file.size)
 
     const id = crypto.randomUUID()
     const r2Key = `events/${event.id}/${id}`
     const contentType = file.type || 'application/octet-stream'
-    await c.env.ATTACHMENTS.put(r2Key, await file.arrayBuffer(), { httpMetadata: { contentType } })
+    await c.env.FILES.put(r2Key, await file.arrayBuffer(), { httpMetadata: { contentType } })
     try {
       await db.insert(eventAttachments).values({
         id,
@@ -410,7 +409,7 @@ export const eventsRoute = new Hono<AppEnv>()
         uploadedBy: session.userId,
       })
     } catch (error) {
-      await c.env.ATTACHMENTS.delete(r2Key)
+      await c.env.FILES.delete(r2Key)
       throw error
     }
     return c.json({ id }, 201)
@@ -423,7 +422,7 @@ export const eventsRoute = new Hono<AppEnv>()
       .from(eventAttachments)
       .where(and(eq(eventAttachments.id, c.req.param('attachmentId')), eq(eventAttachments.eventId, c.req.param('id'))))
       .get()
-    const object = attachment && (await c.env.ATTACHMENTS.get(attachment.r2Key))
+    const object = attachment && (await c.env.FILES.get(attachment.r2Key))
     if (!attachment || !object) throw notFound('ファイルが見つかりません')
 
     // アプリと同じオリジンで配信するため、HTMLなどがその場で開かれないよう常にダウンロードとして返す
@@ -450,7 +449,7 @@ export const eventsRoute = new Hono<AppEnv>()
       .get()
     if (!attachment) throw notFound('ファイルが見つかりません')
     await db.delete(eventAttachments).where(eq(eventAttachments.id, attachment.id))
-    await c.env.ATTACHMENTS.delete(attachment.r2Key)
+    await c.env.FILES.delete(attachment.r2Key)
     return c.json({ ok: true })
   })
 
