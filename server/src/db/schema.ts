@@ -265,6 +265,24 @@ export const eventItems = sqliteTable(
   (t) => [index('event_items_event_idx').on(t.eventId), index('event_items_assignee_idx').on(t.assigneeId)],
 )
 
+/** イベントの添付ファイル。実体は R2（r2Key）にあり、ここにはメタデータだけを持つ */
+export const eventAttachments = sqliteTable(
+  'event_attachments',
+  {
+    id: text('id').primaryKey(),
+    eventId: text('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    size: integer('size').notNull(),
+    contentType: text('content_type').notNull(),
+    r2Key: text('r2_key').notNull(),
+    uploadedBy: text('uploaded_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [index('event_attachments_event_idx').on(t.eventId)],
+)
+
 /** シフト（文化祭の店番など）。時間帯と持ち場ごとに、入る人を決める */
 export const eventShifts = sqliteTable(
   'event_shifts',
@@ -469,6 +487,7 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   creator: one(users, { fields: [events.createdBy], references: [users.id] }),
   participants: many(eventParticipants),
   items: many(eventItems),
+  attachments: many(eventAttachments),
   shifts: many(eventShifts),
   targetDivisions: many(eventTargetDivisions),
   targetUsers: many(eventTargetUsers),
@@ -493,6 +512,10 @@ export const eventTargetUsersRelations = relations(eventTargetUsers, ({ one }) =
 export const eventParticipantsRelations = relations(eventParticipants, ({ one }) => ({
   event: one(events, { fields: [eventParticipants.eventId], references: [events.id] }),
   user: one(users, { fields: [eventParticipants.userId], references: [users.id] }),
+}))
+
+export const eventAttachmentsRelations = relations(eventAttachments, ({ one }) => ({
+  event: one(events, { fields: [eventAttachments.eventId], references: [events.id] }),
 }))
 
 export const eventItemsRelations = relations(eventItems, ({ one }) => ({

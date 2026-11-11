@@ -22,6 +22,8 @@
       "migrations_dir": "drizzle"
     }
   ],
+  // アップロードされたファイル（イベントの添付ファイルなど）。ローカルでは wrangler がバケットを擬似的に用意するので作成不要
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "edtc-dashboard-files" }],
 
   // ---- 本番（wrangler deploy --env production） ---------------------------
   // 1つのWorkerで静的ファイル(client)と /api/* を同じオリジンから配信する
@@ -53,7 +55,11 @@
           "database_id": "175e78a2-449f-42e7-8f5b-5d07892684e8",
           "migrations_dir": "drizzle"
         }
-      ]
+      ],
+      // 本番のバケットは先に作っておく（README の「本番デプロイ」）
+      "r2_buckets": [{ "binding": "FILES", "bucket_name": "edtc-dashboard-files" }],
+      // 毎日 3:00（日本時間）に、アップロードから2年経ったファイルを消す（src/index.ts の scheduled）
+      "triggers": { "crons": ["0 18 * * *"] }
     },
 
     // ---- PRプレビュー（.github/workflows/preview.yml が wrangler preview --env preview で作る） ----
@@ -73,6 +79,8 @@
       "d1_databases": [
         { "binding": "DB", "database_id": "PREVIEW_DB_ID", "migrations_dir": "drizzle" }
       ],
+      // 全PRのプレビューで1つのバケットを使う（本番のファイルには触らない）
+      "r2_buckets": [{ "binding": "FILES", "bucket_name": "edtc-dashboard-preview-files" }],
       "previews": {
         "vars": {
           "BLOG_REPO": "KAIT-EDTC/EDTCHP_v2",
@@ -80,7 +88,8 @@
           // シードのダミーユーザーでログインできるようにする（features/auth/dev-login.ts）。FRONTEND_URL は CI が --var で渡す
           "DEV_LOGIN": "preview"
         },
-        "d1_databases": [{ "binding": "DB", "database_id": "PREVIEW_DB_ID" }]
+        "d1_databases": [{ "binding": "DB", "database_id": "PREVIEW_DB_ID" }],
+        "r2_buckets": [{ "binding": "FILES", "bucket_name": "edtc-dashboard-preview-files" }]
       }
     }
   }

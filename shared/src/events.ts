@@ -81,3 +81,7 @@ export function shiftHours(range: { startsAt: string; endsAt: string }): string[
   }
   return slots
 }
+
+/** イベントに添付できるファイルの上限（1ファイルあたりのバイト数と、1イベントあたりの個数） */
+export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
+export const ATTACHMENT_MAX_COUNT = 10
