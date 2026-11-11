@@ -6,6 +6,7 @@ import { createDb, memberSummaryColumns, type Db } from '../../db'
 import { activityReports, events, reportPhotos, userDivisions, users } from '../../db/schema'
 import type { AppEnv, Session } from '../../env'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
+import { assertStorageAvailable } from '../../lib/storage'
 import { validate } from '../../lib/validator'
 import { rulesOf } from '../events/category-rules'
 import { canView, isApprover } from './access'
@@ -238,6 +239,7 @@ export const summariesRoute = new Hono<AppEnv>()
     if ((await photosOf(db, report.id)).length >= SUMMARY_LIMITS.photos.max) {
       throw badRequest(`写真は${SUMMARY_LIMITS.photos.max}枚までです`)
     }
+    await assertStorageAvailable(db, bytes.length)
     const fileName = newPhotoFileName()
     await c.env.FILES.put(photoKey(report.id, fileName), bytes, { httpMetadata: { contentType: 'image/jpeg' } })
     await db.insert(reportPhotos).values({ reportId: report.id, fileName, size: bytes.length })
