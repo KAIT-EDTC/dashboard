@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router'
-import { css, cx } from 'styled-system/css'
+import { css } from 'styled-system/css'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
@@ -29,7 +29,7 @@ type ShellUser = {
   role: 'member' | 'admin'
 }
 
-const navLinkStyle = css({
+const navLinkStyle = css.raw({
   display: 'flex',
   alignItems: 'center',
   gap: 'sm',
@@ -42,7 +42,7 @@ const navLinkStyle = css({
   color: 'fg.muted',
   _hover: { bg: 'surface.hover', color: 'fg' },
 })
-const navLinkActiveStyle = css({
+const navLinkActiveStyle = css.raw({
   bg: 'surface.selected',
   color: 'accent.fg',
   fontWeight: '600',
@@ -52,7 +52,7 @@ const navLinkActiveStyle = css({
 /** 管理者だけが開けるメニューの見出し */
 const adminHeadingStyle = css({ px: 'md', pt: 'sm', pb: 'xs', fontSize: 'xs', fontWeight: '600', color: 'fg.subtle' })
 
-const tabStyle = css({
+const tabStyle = css.raw({
   flex: 1,
   minW: 0,
   display: 'flex',
@@ -68,7 +68,7 @@ const tabStyle = css({
   cursor: 'pointer',
   _hover: { color: 'fg' },
 })
-const tabActiveStyle = css({ color: 'accent.fg', fontWeight: '600' })
+const tabActiveStyle = css.raw({ color: 'accent.fg', fontWeight: '600' })
 
 /** スマホ幅の下部タブバー（管理者メニューは「管理」から開く） */
 function MobileTabBar({ isAdmin }: { isAdmin: boolean }) {
@@ -109,7 +109,7 @@ function MobileTabBar({ isAdmin }: { isAdmin: boolean }) {
                 key={to}
                 to={to}
                 onClick={() => setOpen(false)}
-                className={({ isActive }) => cx(navLinkStyle, css({ py: 'md' }), isActive && navLinkActiveStyle)}
+                className={({ isActive }) => css(navLinkStyle, { py: 'md' }, isActive && navLinkActiveStyle)}
               >
                 <Icon size={18} />
                 {label}
@@ -123,7 +123,7 @@ function MobileTabBar({ isAdmin }: { isAdmin: boolean }) {
         className={css({ display: 'flex', bg: 'sidebar', borderTopWidth: '1px', pb: 'env(safe-area-inset-bottom)' })}
       >
         {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
-          <NavLink key={to} to={to} end={end} className={({ isActive }) => cx(tabStyle, isActive && tabActiveStyle)}>
+          <NavLink key={to} to={to} end={end} className={({ isActive }) => css(tabStyle, isActive && tabActiveStyle)}>
             <Icon size={22} />
             {label}
           </NavLink>
@@ -133,7 +133,7 @@ function MobileTabBar({ isAdmin }: { isAdmin: boolean }) {
             type="button"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
-            className={cx(tabStyle, (open || adminActive) && tabActiveStyle)}
+            className={css(tabStyle, (open || adminActive) && tabActiveStyle)}
           >
             <SlidersIcon size={22} />
             管理
@@ -209,7 +209,7 @@ export function AppShell({ user, onLogout, children }: { user: ShellUser; onLogo
             })}
           >
             {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
-              <NavLink key={to} to={to} end={end} className={({ isActive }) => cx(navLinkStyle, isActive && navLinkActiveStyle)}>
+              <NavLink key={to} to={to} end={end} className={({ isActive }) => css(navLinkStyle, isActive && navLinkActiveStyle)}>
                 <Icon size={18} />
                 {label}
               </NavLink>
@@ -219,7 +219,7 @@ export function AppShell({ user, onLogout, children }: { user: ShellUser; onLogo
                 <div className={css({ mt: 'sm', borderTopWidth: '1px' })} />
                 <p className={adminHeadingStyle}>管理者メニュー</p>
                 {ADMIN_NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
-                  <NavLink key={to} to={to} end={end} className={({ isActive }) => cx(navLinkStyle, isActive && navLinkActiveStyle)}>
+                  <NavLink key={to} to={to} end={end} className={({ isActive }) => css(navLinkStyle, isActive && navLinkActiveStyle)}>
                     <Icon size={18} />
                     {label}
                   </NavLink>

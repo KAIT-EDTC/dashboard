@@ -4,7 +4,7 @@ import { eventCategories, eventParticipants, events } from '../../db/schema'
 
 /**
  * イベントの種類ごとの決まり（「イベント設定」で管理者が変える）。
- * 講師を置くか・報告書を書くか。種類が見つからなければどちらも「する」とみなす
+ * 講師を置くか・報告書を書くか・簡易報告書を書くか。種類が見つからなければ講師と報告書は「する」、簡易報告書は「しない」とみなす
  */
 
 /** イベント（events を from/join しているクエリ）が講師を置くか */
@@ -21,13 +21,13 @@ export async function lecturerByCategory(db: Db): Promise<(category: string) => 
 }
 
 /** 1つの種類の決まり */
-export async function rulesOf(db: Db, category: string): Promise<{ hasLecturer: boolean; hasReport: boolean }> {
+export async function rulesOf(db: Db, category: string): Promise<{ hasLecturer: boolean; hasReport: boolean; hasLightReport: boolean }> {
   const row = await db
-    .select({ hasLecturer: eventCategories.hasLecturer, hasReport: eventCategories.hasReport })
+    .select({ hasLecturer: eventCategories.hasLecturer, hasReport: eventCategories.hasReport, hasLightReport: eventCategories.hasLightReport })
     .from(eventCategories)
     .where(eq(eventCategories.id, category))
     .get()
-  return row ?? { hasLecturer: true, hasReport: true }
+  return row ?? { hasLecturer: true, hasReport: true, hasLightReport: false }
 }
 
 /**

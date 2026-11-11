@@ -58,7 +58,7 @@ const TOOLS: { title: string; content: ReactNode; build: (value: string, start: 
   { title: 'リンク', content: <LinkIcon size={15} />, build: (v, s, e) => wrap(v, s, e, '[', '](https://)', 'リンクの文字') },
 ]
 
-const toolButton = css({
+const toolButton = css.raw({
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -127,12 +127,12 @@ export function MarkdownEditor({ postId, value, onChange }: Props) {
         className={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '2px', p: '4px', bg: 'surface.muted', borderRadius: 'md' })}
       >
         {TOOLS.map((tool) => (
-          <button key={tool.title} type="button" title={tool.title} aria-label={tool.title} className={toolButton} onClick={() => run(tool.build)}>
+          <button key={tool.title} type="button" title={tool.title} aria-label={tool.title} className={css(toolButton)} onClick={() => run(tool.build)}>
             {tool.content}
           </button>
         ))}
         <span className={css({ w: '1px', h: '18px', bg: 'border.strong', mx: '4px' })} />
-        <button type="button" className={cx(toolButton, css({ gap: '4px', fontWeight: '600' }))} onClick={() => fileRef.current?.click()}>
+        <button type="button" className={css(toolButton, { gap: '4px', fontWeight: '600' })} onClick={() => fileRef.current?.click()}>
           {uploading > 0 ? <Spinner size="sm" /> : <ImageIcon size={15} />}
           画像
         </button>

@@ -7,7 +7,7 @@ import { api, unwrap } from '~/lib/api'
 import { fullName } from '~/lib/format'
 import type { Route } from './+types/detail'
 
-export const meta: Route.MetaFunction = ({ data }) => [
+export const meta: Route.MetaFunction = ({ loaderData: data }) => [
   { title: `${data ? fullName(data.member) : 'メンバー'} | EDTC ダッシュボード` },
 ]
 

@@ -1,7 +1,7 @@
 import { shiftHours } from '@edtc/shared'
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { useFetcher } from 'react-router'
-import { css, cx } from 'styled-system/css'
+import { css } from 'styled-system/css'
 import type { FormErrors } from '~/lib/form'
 import type { EventShift } from './types'
 
@@ -120,8 +120,8 @@ export function AvailabilityGrid({ shift, unavailable }: Props) {
                 aria-selected={isOff}
                 aria-label={`${hour}時台 ${isOff ? '出られない' : '出られる'}`}
                 onKeyDown={(e) => onKeyDown(e, slot)}
-                className={cx(
-                  css({
+                className={css(
+                  {
                     minW: '40px',
                     h: '26px',
                     display: 'flex',
@@ -138,8 +138,8 @@ export function AvailabilityGrid({ shift, unavailable }: Props) {
                     cursor: 'pointer',
                     outline: 'none',
                     _focusVisible: { shadow: 'focus' },
-                  }),
-                  isOff && css({ bg: 'danger.subtle', color: 'danger.fg', borderColor: 'danger.fg', textDecoration: 'line-through' }),
+                  },
+                  isOff && { bg: 'danger.subtle', color: 'danger.fg', borderColor: 'danger.fg', textDecoration: 'line-through' },
                 )}
               >
                 {hour}時

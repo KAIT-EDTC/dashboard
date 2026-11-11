@@ -15,11 +15,12 @@ import { RsvpPanel } from '~/features/events/RsvpPanel'
 import { ShiftList } from '~/features/events/ShiftList'
 import { EventNotices, EventReports } from '~/features/reports/EventReports'
 import { EventSummary, SummaryButton } from '~/features/reports/EventSummary'
+import { LightReports } from '~/features/reports/LightReports'
 import { ApiError, api, unwrap } from '~/lib/api'
 import { catchApiError, text, texts, type FormErrors } from '~/lib/form'
 import type { Route } from './+types/detail'
 
-export const meta: Route.MetaFunction = ({ data }) => [{ title: `${data?.event.title ?? 'イベント'} | EDTC ダッシュボード` }]
+export const meta: Route.MetaFunction = ({ loaderData: data }) => [{ title: `${data?.event.title ?? 'イベント'} | EDTC ダッシュボード` }]
 
 export async function clientLoader({ params }: Route.ClientLoaderArgs) {
   return unwrap(api.events[':id'].$get({ param: { id: params.eventId } }))
@@ -71,6 +72,10 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
         return unwrap(api.events[':id'].shifts.availability.$put({ param: { id }, json: { unavailable: texts(form, 'unavailable') } }))
       case 'join-shift':
         return unwrap(api.events[':id'].shifts[':shiftId'].me.$put({ param: { id, shiftId: text(form, 'shiftId') }, json: { joined: text(form, 'joined') === 'true' } }))
+      case 'light-report':
+        return unwrap(api.events[':id']['light-report'].$put({ param: { id }, json: { body: text(form, 'body') } }))
+      case 'delete-light-report':
+        return unwrap(api.events[':id']['light-report'].$delete({ param: { id } }))
       case 'summary-writer':
         return unwrap(api.events[':id']['summary-writer'].$put({ param: { id }, json: { userId: text(form, 'userId') || null } }))
       case 'delete-item':
@@ -105,7 +110,7 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
 
 export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
-  const { event, canManage, isTarget, pending, reports, myReport, canWriteReport, summary } = loaderData
+  const { event, canManage, isTarget, pending, reports, myReport, canWriteReport, summary, lightReports, canWriteLightReport } = loaderData
   const me = useCurrentUser()
   const [params] = useSearchParams()
   const attachFailed = Number(params.get('attachFailed')) || 0
@@ -162,6 +167,10 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
           {/* 報告書を書かない種類のイベントには出さない（書かない設定にする前の承認済みの報告書は残す） */}
           {event.hasReport && <EventSummary event={event} summary={summary} canManage={canManage} started={started} />}
           {started && (event.hasReport || reports.length > 0) && <EventReports event={event} reports={reports} />}
+          {/* 簡易報告書は事後報告だけで承認がなく、書いた人の名前付きで載る（書かない設定にする前のものは残す） */}
+          {started && (event.hasLightReport || lightReports.length > 0) && (
+            <LightReports reports={lightReports} userId={me.id} canWrite={canWriteLightReport} />
+          )}
           <ShiftList event={event} userId={me.id} />
           <ItemList event={event} userId={me.id} canManage={canManage} />
         </div>

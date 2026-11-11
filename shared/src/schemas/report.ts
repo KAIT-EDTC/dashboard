@@ -1,6 +1,17 @@
 import { z } from 'zod'
 import { DIVISIONS } from '../divisions'
-import { COMMENTABLE_FIELDS, countChars, HOSTINGS, RATING_MAX, RATING_MIN, REPORT_FIELD_LABELS, REPORT_LIMITS, SUMMARY_FIELD_LABELS, SUMMARY_LIMITS } from '../reports'
+import {
+  COMMENTABLE_FIELDS,
+  countChars,
+  HOSTINGS,
+  LIGHT_REPORT_MAX,
+  RATING_MAX,
+  RATING_MIN,
+  REPORT_FIELD_LABELS,
+  REPORT_LIMITS,
+  SUMMARY_FIELD_LABELS,
+  SUMMARY_LIMITS,
+} from '../reports'
 
 const maxText = (label: string, max: number) =>
   z
@@ -75,6 +86,14 @@ export const summaryCreateSchema = summaryDraftSchema.extend({ eventId: z.string
 
 /** まとめ報告書の担当者の指名。null で講師に戻す */
 export const summaryWriterSchema = z.object({ userId: z.string().min(1).nullable() })
+
+// --- 簡易報告書 -----------------------------------------------------------------
+
+/** 簡易報告書（事後報告だけ。承認なし）。文字数の上限は設けない（LIGHT_REPORT_MAX は保存できる大きさの歯止め） */
+export const lightReportSchema = z.object({
+  body: z.string().trim().min(1, '事後報告を入力してください').max(LIGHT_REPORT_MAX, '事後報告が長すぎます'),
+})
+export type LightReportInput = z.input<typeof lightReportSchema>
 
 // --- 確認 -----------------------------------------------------------------------
 
