@@ -57,7 +57,9 @@
         }
       ],
       // 本番のバケットは先に作っておく（README の「本番デプロイ」）
-      "r2_buckets": [{ "binding": "FILES", "bucket_name": "edtc-dashboard-files" }]
+      "r2_buckets": [{ "binding": "FILES", "bucket_name": "edtc-dashboard-files" }],
+      // 毎日 3:00（日本時間）に、アップロードから2年経ったファイルを消す（src/index.ts の scheduled）
+      "triggers": { "crons": ["0 18 * * *"] }
     },
 
     // ---- PRプレビュー（.github/workflows/preview.yml が wrangler preview --env preview で作る） ----
