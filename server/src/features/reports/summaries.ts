@@ -6,7 +6,7 @@ import { createDb, memberSummaryColumns, type Db } from '../../db'
 import { activityReports, events, reportPhotos, userDivisions, users } from '../../db/schema'
 import type { AppEnv, Session } from '../../env'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
-import { assertStorageAvailable } from '../../lib/storage'
+import { assertStorageAvailable, photoKey } from '../../lib/storage'
 import { validate } from '../../lib/validator'
 import { rulesOf } from '../events/category-rules'
 import { canView, isApprover } from './access'
@@ -59,9 +59,6 @@ function newPhotoFileName(): string {
   const random = crypto.getRandomValues(new Uint8Array(8))
   return `photo-${[...random].map((b) => (b % 36).toString(36)).join('')}.jpg`
 }
-
-/** R2 での写真の置き場所 */
-export const photoKey = (reportId: string, fileName: string) => `reports/${reportId}/${fileName}`
 
 /** まとめ報告書の写真のファイル名（追加した順） */
 export async function photosOf(db: Db, reportId: string): Promise<string[]> {

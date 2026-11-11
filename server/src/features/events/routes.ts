@@ -35,7 +35,7 @@ import {
 import type { AppEnv } from '../../env'
 import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
-import { assertStorageAvailable } from '../../lib/storage'
+import { assertStorageAvailable, photoKey } from '../../lib/storage'
 import { validate } from '../../lib/validator'
 import { assertCanManage, canManage, requireAuth } from '../../middleware/auth'
 import {
@@ -48,7 +48,6 @@ import {
   summaryReportOf,
   summaryWriterIdOf,
 } from '../reports/queries'
-import { photoKey } from '../reports/summaries'
 import { eventCategoriesRoute } from './categories'
 import { dropLecturers } from './category-rules'
 import { eventLightReportsRoute, lightReportBlocker, lightReportsOf } from './light-reports'

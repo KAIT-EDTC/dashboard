@@ -1,139 +1,96 @@
 {
-	"$schema": "../node_modules/wrangler/config-schema.json",
-	"name": "edtc-dashboard",
-	"main": "src/index.ts",
-	"compatibility_date": "2026-09-01",
-	"compatibility_flags": [
-		"nodejs_compat"
-	],
-	// ---- ローカル開発（wrangler dev）用 ------------------------------------
-	// FRONTEND_URL などの値は server/.dev.vars で上書きできる
-	"vars": {
-		// フロントエンドのURL（CORS許可・OAuth後のリダイレクト先）
-		"FRONTEND_URL": "http://localhost:5173",
-		// ブログ記事のPR先リポジトリと、記事フォルダを置くディレクトリ
-		"BLOG_REPO": "KAIT-EDTC/EDTCHP_v2",
-		"BLOG_CONTENT_DIR": "content/blog"
-	},
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "edtc-dashboard",
-			"database_id": "local-dev-db",
-			"migrations_dir": "drizzle"
-		}
-	],
-	// アップロードされたファイル（イベントの添付ファイル・まとめ報告書の写真）。ローカルでは wrangler がバケットを擬似的に用意するので作成不要
-	"r2_buckets": [
-		{
-			"binding": "FILES",
-			"bucket_name": "edtc-dashboard-files"
-		},
-		{
-			"bucket_name": "edtc-dashboard-files",
-			"binding": "edtc_dashboard_files"
-		},
-		{
-			"bucket_name": "edtc-dashboard-preview-files",
-			"binding": "edtc_dashboard_preview_files"
-		}
-	],
-	// ---- 本番（wrangler deploy --env production） ---------------------------
-	// 1つのWorkerで静的ファイル(client)と /api/* を同じオリジンから配信する
-	"env": {
-		"production": {
-			"name": "edtc-dashboard",
-			// 団体(Kait.edtc)のCloudflareアカウント。個人アカウントへ誤ってデプロイしないよう固定する
-			"account_id": "f63f9ebc5db7b049a6e98a155a3d219d",
-			// kaitedtc.com のDNSはCloudflareにあるので、独自ドメインで公開する（workers.dev は無効）
-			"workers_dev": false,
-			"routes": [
-				{
-					"pattern": "dashboard.kaitedtc.com",
-					"custom_domain": true
-				}
-			],
-			"preview_urls": false,
-			"assets": {
-				"directory": "../client/build/client",
-				"not_found_handling": "single-page-application",
-				"run_worker_first": [
-					"/api/*"
-				]
-			},
-			"vars": {
-				// OAuthのリダイレクトURI(DISCORD_REDIRECT_URI)など、公開URLに依存する設定もこのURLに合わせる
-				"FRONTEND_URL": "https://dashboard.kaitedtc.com",
-				"BLOG_REPO": "KAIT-EDTC/EDTCHP_v2",
-				"BLOG_CONTENT_DIR": "content/blog",
-				"BLOG_SITE_URL": "https://kaitedtc.com"
-			},
-			"d1_databases": [
-				{
-					"binding": "DB",
-					"database_name": "edtc-dashboard",
-					"database_id": "175e78a2-449f-42e7-8f5b-5d07892684e8",
-					"migrations_dir": "drizzle"
-				}
-			],
-			// 本番のバケットは先に作っておく（README の「本番デプロイ」）
-			"r2_buckets": [
-				{
-					"binding": "FILES",
-					"bucket_name": "edtc-dashboard-files"
-				}
-			]
-		},
-		// ---- PRプレビュー（.github/workflows/preview.yml が wrangler preview --env preview で作る） ----
-		// 本番とは別のWorker。本番の vars・secrets・D1 は使わない（previews に書いたものだけが使われる）
-		"preview": {
-			"name": "edtc-dashboard-preview",
-			"account_id": "f63f9ebc5db7b049a6e98a155a3d219d",
-			// PRごとのURL（pr-<番号>-edtc-dashboard-preview.<subdomain>.workers.dev）だけを公開する
-			"workers_dev": false,
-			"preview_urls": true,
-			"assets": {
-				"directory": "../client/build/client",
-				"not_found_handling": "single-page-application",
-				"run_worker_first": [
-					"/api/*"
-				]
-			},
-			// database_id の仮値は CI がPRごとに作ったD1のIDに置き換える。こちらはマイグレーション・シード（wrangler d1 ... --env preview）用
-			"d1_databases": [
-				{
-					"binding": "DB",
-					"database_id": "PREVIEW_DB_ID",
-					"migrations_dir": "drizzle"
-				}
-			],
-			// 全PRのプレビューで1つのバケットを使う（本番のファイルには触らない）
-			"r2_buckets": [
-				{
-					"binding": "FILES",
-					"bucket_name": "edtc-dashboard-preview-files"
-				}
-			],
-			"previews": {
-				"vars": {
-					"BLOG_REPO": "KAIT-EDTC/EDTCHP_v2",
-					"BLOG_CONTENT_DIR": "content/blog",
-					// シードのダミーユーザーでログインできるようにする（features/auth/dev-login.ts）。FRONTEND_URL は CI が --var で渡す
-					"DEV_LOGIN": "preview"
-				},
-				"d1_databases": [
-					{
-						"binding": "DB",
-						"database_id": "PREVIEW_DB_ID"
-					}
-				],
-				"r2_buckets": [
-					{
-						"binding": "FILES",
-						"bucket_name": "edtc-dashboard-preview-files"
-					}
-				]
-			}
-		}
-	}
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "edtc-dashboard",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // ---- ローカル開発（wrangler dev）用 ------------------------------------
+  // FRONTEND_URL などの値は server/.dev.vars で上書きできる
+  "vars": {
+    // フロントエンドのURL（CORS許可・OAuth後のリダイレクト先）
+    "FRONTEND_URL": "http://localhost:5173",
+    // ブログ記事のPR先リポジトリと、記事フォルダを置くディレクトリ
+    "BLOG_REPO": "KAIT-EDTC/EDTCHP_v2",
+    "BLOG_CONTENT_DIR": "content/blog"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "edtc-dashboard",
+      "database_id": "local-dev-db",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  // アップロードされたファイル（イベントの添付ファイル・まとめ報告書の写真）。ローカルでは wrangler がバケットを擬似的に用意するので作成不要
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "edtc-dashboard-files" }],
+
+  // ---- 本番（wrangler deploy --env production） ---------------------------
+  // 1つのWorkerで静的ファイル(client)と /api/* を同じオリジンから配信する
+  "env": {
+    "production": {
+      "name": "edtc-dashboard",
+      // 団体(Kait.edtc)のCloudflareアカウント。個人アカウントへ誤ってデプロイしないよう固定する
+      "account_id": "f63f9ebc5db7b049a6e98a155a3d219d",
+      // kaitedtc.com のDNSはCloudflareにあるので、独自ドメインで公開する（workers.dev は無効）
+      "workers_dev": false,
+      "routes": [{ "pattern": "dashboard.kaitedtc.com", "custom_domain": true }],
+      "preview_urls": false,
+      "assets": {
+        "directory": "../client/build/client",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*"]
+      },
+      "vars": {
+        // OAuthのリダイレクトURI(DISCORD_REDIRECT_URI)など、公開URLに依存する設定もこのURLに合わせる
+        "FRONTEND_URL": "https://dashboard.kaitedtc.com",
+        "BLOG_REPO": "KAIT-EDTC/EDTCHP_v2",
+        "BLOG_CONTENT_DIR": "content/blog",
+        "BLOG_SITE_URL": "https://kaitedtc.com"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "edtc-dashboard",
+          "database_id": "175e78a2-449f-42e7-8f5b-5d07892684e8",
+          "migrations_dir": "drizzle"
+        }
+      ],
+      // 本番のバケットは先に作っておく（README の「本番デプロイ」）
+      "r2_buckets": [{ "binding": "FILES", "bucket_name": "edtc-dashboard-files" }],
+      // 毎日 3:00（日本時間）に、アップロードから2年経ったファイルを消す（src/index.ts の scheduled）
+      "triggers": { "crons": ["0 18 * * *"] }
+    },
+
+    // ---- PRプレビュー（.github/workflows/preview.yml が wrangler preview --env preview で作る） ----
+    // 本番とは別のWorker。本番の vars・secrets・D1 は使わない（previews に書いたものだけが使われる）
+    "preview": {
+      "name": "edtc-dashboard-preview",
+      "account_id": "f63f9ebc5db7b049a6e98a155a3d219d",
+      // PRごとのURL（pr-<番号>-edtc-dashboard-preview.<subdomain>.workers.dev）だけを公開する
+      "workers_dev": false,
+      "preview_urls": true,
+      "assets": {
+        "directory": "../client/build/client",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*"]
+      },
+      // database_id の仮値は CI がPRごとに作ったD1のIDに置き換える。こちらはマイグレーション・シード（wrangler d1 ... --env preview）用
+      "d1_databases": [
+        { "binding": "DB", "database_id": "PREVIEW_DB_ID", "migrations_dir": "drizzle" }
+      ],
+      // 全PRのプレビューで1つのバケットを使う（本番のファイルには触らない）
+      "r2_buckets": [{ "binding": "FILES", "bucket_name": "edtc-dashboard-preview-files" }],
+      "previews": {
+        "vars": {
+          "BLOG_REPO": "KAIT-EDTC/EDTCHP_v2",
+          "BLOG_CONTENT_DIR": "content/blog",
+          // シードのダミーユーザーでログインできるようにする（features/auth/dev-login.ts）。FRONTEND_URL は CI が --var で渡す
+          "DEV_LOGIN": "preview"
+        },
+        "d1_databases": [{ "binding": "DB", "database_id": "PREVIEW_DB_ID" }],
+        "r2_buckets": [{ "binding": "FILES", "bucket_name": "edtc-dashboard-preview-files" }]
+      }
+    }
+  }
 }

@@ -271,8 +271,11 @@ npx wrangler d1 create edtc-dashboard
 #   （wrangler の d1 create が認証エラーになる場合は、ダッシュボードのD1画面から作ってもよい）
 npm run db:migrate:remote                                # テーブルを作る
 # アップロードされたファイルの置き場所（FILES。無いとデプロイが失敗する）。アカウントが複数あると選べないので、団体のアカウントIDを渡す
+# 本番のファイルはアップロードから2年で消える（毎日のCronが R2 と D1 から一緒に消す。src/lib/storage.ts）
 CLOUDFLARE_ACCOUNT_ID=f63f9ebc5db7b049a6e98a155a3d219d npx wrangler r2 bucket create edtc-dashboard-files
-CLOUDFLARE_ACCOUNT_ID=f63f9ebc5db7b049a6e98a155a3d219d npx wrangler r2 bucket create edtc-dashboard-preview-files  # PRプレビュー用
+# PRプレビュー用。D1はpushのたびに作り直すので、残ったファイルは7日で消す
+CLOUDFLARE_ACCOUNT_ID=f63f9ebc5db7b049a6e98a155a3d219d npx wrangler r2 bucket create edtc-dashboard-preview-files
+CLOUDFLARE_ACCOUNT_ID=f63f9ebc5db7b049a6e98a155a3d219d npx wrangler r2 bucket lifecycle add edtc-dashboard-preview-files expire-7d --expire-days 7
 
 # 秘密情報（値を聞かれる）。GitHub App の鍵は  < your-app.pem  でファイルから渡す
 npx wrangler secret put JWT_SECRET --env production                  # openssl rand -hex 32

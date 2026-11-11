@@ -26,6 +26,7 @@ import {
 import type { AppEnv } from '../../env'
 import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
+import { photoKey } from '../../lib/storage'
 import { validate } from '../../lib/validator'
 import { requireAuth } from '../../middleware/auth'
 import { eventHasLecturer, eventHasReport, lecturerByCategory } from '../events/category-rules'
@@ -33,7 +34,7 @@ import { canReviewNow, canView, isApprover } from './access'
 import { assertApprover, assertEditable, assertOwnDivision, findReport, nameOf, submitReport, summaryOf, updateIfUnchanged } from './common'
 import { notifyApproved, notifyAwaitingReview, notifyRejected } from './notifications'
 import { approverCandidatesFor, isTargetParticipant, myReportOf, submissionProgress, summaryMembersOf } from './queries'
-import { photoKey, photosOf, summariesRoute, visibleMembers } from './summaries'
+import { photosOf, summariesRoute, visibleMembers } from './summaries'
 
 /** 報告書の一覧に出すイベントの情報 */
 const eventColumns = {
