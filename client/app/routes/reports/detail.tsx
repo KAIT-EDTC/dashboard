@@ -87,7 +87,7 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
 
 export default function ReportPage({ loaderData }: Route.ComponentProps) {
-  const { report, authorRole, members, canEdit, canDelete, canReview, canWithdraw, approvers } = loaderData
+  const { report, authorRole, members, photos, canEdit, canDelete, canReview, canWithdraw, approvers } = loaderData
   const me = useCurrentUser()
   const isAuthor = report.authorId === me.id
   const isSummary = report.kind === 'summary'
@@ -130,6 +130,8 @@ export default function ReportPage({ loaderData }: Route.ComponentProps) {
             context={context}
             initial={summaryContentOf(report)}
             members={members}
+            photos={photos}
+            reportId={report.id}
             autosave={autosaveSummary}
             {...formProps}
           />
@@ -137,9 +139,9 @@ export default function ReportPage({ loaderData }: Route.ComponentProps) {
           <ReportForm key={report.updatedAt} context={context} initial={contentOf(report)} autosave={autosave} {...formProps} />
         )
       ) : canReview ? (
-        <ReviewWorkspace key={`${report.id}-${report.currentStep}`} report={report} authorRole={authorRole} members={members} />
+        <ReviewWorkspace key={`${report.id}-${report.currentStep}`} report={report} authorRole={authorRole} members={members} photos={photos} />
       ) : isSummary ? (
-        <SummaryView report={report} members={members} aside={<ReviewStatus report={report} canWithdraw={canWithdraw} />} />
+        <SummaryView report={report} members={members} photos={photos} aside={<ReviewStatus report={report} canWithdraw={canWithdraw} />} />
       ) : (
         <ReportView report={report} authorRole={authorRole} aside={<ReviewStatus report={report} canWithdraw={canWithdraw} />} />
       )}

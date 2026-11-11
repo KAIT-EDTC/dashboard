@@ -26,7 +26,7 @@ npm workspaces のモノレポ。client は server の `AppType` を型として
 ```
 app.ts                 # ルーティングの組み立て・CORS/CSRF・エラーハンドリング。AppType を export
 env.ts                 # Bindings（環境変数）とセッションの型
-db/schema.ts           # テーブル定義（users, user_divisions, events, event_participants, event_items, event_shifts(+_members), event_light_reports, event_attachments, activity_reports(+_reviews, _comments), blog_posts, blog_images）
+db/schema.ts           # テーブル定義（users, user_divisions, events, event_participants, event_items, event_shifts(+_members), event_light_reports, event_attachments, activity_reports(+_reviews, _comments), report_photos, blog_posts, blog_images）
 middleware/auth.ts     # requireAuth（ロールは毎回DBから読む）と権限チェック
 lib/                   # discord（OAuth・Bot通知）、github（App認証・Webhook署名検証）など外部サービス
 features/
@@ -137,7 +137,8 @@ theme/ (client直下)     # Panda のトークン・グローバルCSS
    - ファイル名は「イベントの実施日 + 担当者のローマ字名 + _まとめ」（例: `20260912TanakaTaro_まとめ.xlsx`）
    - 参加者の評価ごとの人数は「追加記入欄」に入り、図2（参加者の自己評価）に反映される
    - 様式の欄（参加者8人・自己分析7人）に収まらない人は「追加記入欄」の下に書き足す
-   - 活動写真は入らない（Excelで貼る）
+   - 担当者が追加した活動写真（最大3枚）は、「図1. 活動写真」の枠に横一列で、縦横比を保って貼られる
+7. 活動写真は書いている間（下書き・修正依頼）に「活動写真」から追加・削除できる。JPEGに縮小してCloudflare R2（`FILES` の `reports/<報告書ID>/`）に保存する。SNS使用許可の出ている写真だけを使う
 
 ## 簡易報告書
 

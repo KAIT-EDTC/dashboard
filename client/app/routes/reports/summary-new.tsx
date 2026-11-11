@@ -56,6 +56,8 @@ export default function NewSummaryPage({ loaderData }: Route.ComponentProps) {
         context={{ event, author, authorRole: null, submittedAt: null, kind: 'summary' }}
         initial={{ division, content: '', hosting: null, analyses, overview: '', impressions: '', rating: null, notes: '', approverId: null }}
         members={members}
+        photos={[]}
+        reportId={null}
         status="draft"
         divisions={me.divisions}
         canDelete={false}

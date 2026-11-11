@@ -11,6 +11,7 @@ import { CommentableText } from './CommentableText'
 import { RatingMeter } from './Rating'
 import { ReportInfo } from './ReportInfo'
 import { ReportStatusBadge } from './ReportStatusBadge'
+import { SummaryPhotos } from './SummaryPhotos'
 import type { ReportDetail, SummaryMember } from './types'
 
 function Section({ field, children, after }: { field: SummaryField; children: ReactNode; after?: ReactNode }) {
@@ -29,6 +30,8 @@ const EMPTY_TEXT: Record<SummaryTextField, string> = { content: '—', overview:
 type Props = {
   report: ReportDetail
   members: SummaryMember[]
+  /** 活動写真のファイル名 */
+  photos: string[]
   aside?: ReactNode
   /** 確認する人向け: 本文の表示を差し替える（範囲選択とハイライト） */
   renderText?: (field: CommentableField, text: string) => ReactNode
@@ -37,7 +40,7 @@ type Props = {
 }
 
 /** まとめ報告書の読み取り表示（Excel様式の本書と同じ並び） */
-export function SummaryView({ report, members, aside, renderText, renderAfter }: Props) {
+export function SummaryView({ report, members, photos, aside, renderText, renderAfter }: Props) {
   const text = (field: SummaryTextField) => {
     const value = report[field]
     if (!value) return EMPTY_TEXT[field]
@@ -95,6 +98,8 @@ export function SummaryView({ report, members, aside, renderText, renderAfter }:
             </ul>
           )}
         </Card>
+
+        <SummaryPhotos reportId={report.id} photos={photos} editable={false} />
 
         <Card title="評価">
           <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>

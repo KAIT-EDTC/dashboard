@@ -22,7 +22,7 @@
       "migrations_dir": "drizzle"
     }
   ],
-  // アップロードされたファイル（イベントの添付ファイルなど）。ローカルでは wrangler がバケットを擬似的に用意するので作成不要
+  // アップロードされたファイル（イベントの添付ファイル・まとめ報告書の写真）。ローカルでは wrangler がバケットを擬似的に用意するので作成不要
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "edtc-dashboard-files" }],
 
   // ---- 本番（wrangler deploy --env production） ---------------------------

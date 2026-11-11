@@ -86,6 +86,8 @@ export const SUMMARY_LIMITS = {
   overview: { max: 314 },
   impressions: { max: 611 },
   notes: { max: 300 },
+  /** 活動写真（様式の「図1. 活動写真」の枠に横一列で並べる） */
+  photos: { max: 3, maxBytes: 1_500_000 },
 } as const
 
 /** 活動評価（1: 悪 〜 5: 良） */

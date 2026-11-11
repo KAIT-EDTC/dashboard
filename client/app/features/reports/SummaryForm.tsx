@@ -14,6 +14,7 @@ import { CharCount } from './CharCount'
 import { sameContent, type SummaryContent } from './content'
 import { DivisionApproverFields, FormAlerts, SubmitCard, useAutosaveOnLeave, useRevisionRequests, type ReportIntent } from './form-parts'
 import { choiceStyle, RatingInput, RatingMeter } from './Rating'
+import { SummaryPhotos } from './SummaryPhotos'
 import type { ReportActionData } from './ReportForm'
 import { ReportInfo } from './ReportInfo'
 import { ReportStatusBadge } from './ReportStatusBadge'
@@ -27,6 +28,9 @@ type Props = {
   initial: SummaryContent
   /** 参加者と、それぞれの活動報告書の提出状況・評価・事後報告 */
   members: SummaryMember[]
+  /** 活動写真のファイル名。作成ページでは reportId が null で、まだ追加できない */
+  photos: string[]
+  reportId: string | null
   /** 作成ページではまだないので draft 扱い */
   status: ReportStatus
   divisions: Division[]
@@ -95,7 +99,7 @@ function AnalysisInput({
   )
 }
 
-export function SummaryForm({ context, initial: rawInitial, members, status, divisions, canDelete, rejection, aside, isLeader, approvers, autosave }: Props) {
+export function SummaryForm({ context, initial: rawInitial, members, photos, reportId, status, divisions, canDelete, rejection, aside, isLeader, approvers, autosave }: Props) {
   const [initial] = useState(() => withMembers(rawInitial, members))
   const [content, setContent] = useState<SummaryContent>(initial)
   const fetcher = useFetcher<ReportActionData>()
@@ -213,6 +217,8 @@ export function SummaryForm({ context, initial: rawInitial, members, status, div
               </ul>
             )}
           </Card>
+
+          <SummaryPhotos reportId={reportId} photos={photos} editable />
 
           <Card title="評価">
             <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>

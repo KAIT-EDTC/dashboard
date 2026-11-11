@@ -28,13 +28,14 @@ import {
   eventShifts,
   eventTargetDivisions,
   eventTargetUsers,
+  reportPhotos,
   userDivisions,
   users,
 } from '../../db/schema'
 import type { AppEnv } from '../../env'
 import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
-import { assertStorageAvailable } from '../../lib/storage'
+import { assertStorageAvailable, photoKey } from '../../lib/storage'
 import { validate } from '../../lib/validator'
 import { assertCanManage, canManage, requireAuth } from '../../middleware/auth'
 import {
@@ -372,10 +373,19 @@ export const eventsRoute = new Hono<AppEnv>()
     const db = createDb(c.env)
     const event = await findEvent(db, c.req.param('id'))
     assertCanManage(c.get('session'), event.createdBy)
-    const files = await db.select({ r2Key: eventAttachments.r2Key }).from(eventAttachments).where(eq(eventAttachments.eventId, event.id))
+    // 添付ファイルとまとめ報告書の写真は、D1の行はイベントと一緒に消えるので、R2の実体を先に集めておく
+    const [files, photos] = await Promise.all([
+      db.select({ r2Key: eventAttachments.r2Key }).from(eventAttachments).where(eq(eventAttachments.eventId, event.id)),
+      db
+        .select({ reportId: reportPhotos.reportId, fileName: reportPhotos.fileName })
+        .from(reportPhotos)
+        .innerJoin(activityReports, eq(activityReports.id, reportPhotos.reportId))
+        .where(eq(activityReports.eventId, event.id)),
+    ])
     await db.delete(events).where(eq(events.id, event.id))
     // 行は先に消えているので、R2の削除に失敗しても画面上は残らない（実体だけが残る）
-    if (files.length > 0) await c.env.FILES.delete(files.map((f) => f.r2Key))
+    const keys = [...files.map((f) => f.r2Key), ...photos.map((p) => photoKey(p.reportId, p.fileName))]
+    if (keys.length > 0) await c.env.FILES.delete(keys)
     return c.json({ ok: true })
   })
 
