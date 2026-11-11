@@ -275,7 +275,7 @@ export const eventsRoute = new Hono<AppEnv>()
           orderBy: [asc(eventItems.kind), asc(eventItems.createdAt)],
         },
         attachments: {
-          columns: { id: true, name: true, size: true, contentType: true, createdAt: true },
+          columns: { id: true, name: true, size: true, contentType: true, uploadedBy: true, createdAt: true },
           orderBy: asc(eventAttachments.createdAt),
         },
         shifts: {
@@ -390,12 +390,12 @@ export const eventsRoute = new Hono<AppEnv>()
   })
 
   // --- 添付ファイル -----------------------------------------------------------
+  // 追加はメンバーなら誰でもできる。削除は追加した本人か、イベントの作成者・管理者
 
   .post('/:id/attachments', validate('form', attachmentUploadSchema), async (c) => {
     const db = createDb(c.env)
     const event = await findEvent(db, c.req.param('id'))
     const session = c.get('session')
-    assertCanManage(session, event.createdBy)
     // zod の File 型は Workers の型と合わないため、実行時の実体（Workers の File）として扱う
     const file = c.req.valid('form').file as unknown as File
 
@@ -451,13 +451,14 @@ export const eventsRoute = new Hono<AppEnv>()
   .delete('/:id/attachments/:attachmentId', async (c) => {
     const db = createDb(c.env)
     const event = await findEvent(db, c.req.param('id'))
-    assertCanManage(c.get('session'), event.createdBy)
+    const session = c.get('session')
     const attachment = await db
       .select()
       .from(eventAttachments)
       .where(and(eq(eventAttachments.id, c.req.param('attachmentId')), eq(eventAttachments.eventId, event.id)))
       .get()
     if (!attachment) throw notFound('ファイルが見つかりません')
+    if (attachment.uploadedBy !== session.userId) assertCanManage(session, event.createdBy)
     await db.delete(eventAttachments).where(eq(eventAttachments.id, attachment.id))
     await c.env.FILES.delete(attachment.r2Key)
     return c.json({ ok: true })

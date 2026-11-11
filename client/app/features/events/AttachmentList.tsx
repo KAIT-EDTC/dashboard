@@ -23,7 +23,7 @@ export function AttachmentLink({ attachment, eventId }: { attachment: EventAttac
   )
 }
 
-function AttachmentRow({ attachment, eventId, canManage }: { attachment: EventAttachment; eventId: string; canManage: boolean }) {
+function AttachmentRow({ attachment, eventId, canDelete }: { attachment: EventAttachment; eventId: string; canDelete: boolean }) {
   const fetcher = useFetcher<FormErrors>()
 
   return (
@@ -34,7 +34,7 @@ function AttachmentRow({ attachment, eventId, canManage }: { attachment: EventAt
         <span className={css({ ml: 'sm', fontSize: 'xs', color: 'fg.muted' })}>{formatFileSize(attachment.size)}</span>
         {fetcher.data?.error && <p className={css({ fontSize: 'xs', color: 'danger.fg' })}>{fetcher.data.error}</p>}
       </div>
-      {canManage && (
+      {canDelete && (
         <Button
           size="sm"
           variant="ghost"
@@ -49,7 +49,7 @@ function AttachmentRow({ attachment, eventId, canManage }: { attachment: EventAt
   )
 }
 
-/** 詳細ページで管理側がファイルを足す欄。選んだ（ドロップした）ファイルはその場でアップロードする */
+/** 詳細ページでファイルを足す欄（メンバーなら誰でも）。選んだ（ドロップした）ファイルはその場でアップロードする */
 function UploadZone({ count }: { count: number }) {
   const fetcher = useFetcher<FormErrors | { ok: true }>()
   const [pickError, setPickError] = useState<string>()
@@ -77,21 +77,19 @@ function UploadZone({ count }: { count: number }) {
   )
 }
 
-/** 詳細ページの「概要」に置く添付ファイルの一覧。閲覧だけの人には、添付が無ければ何も出さない */
-export function AttachmentList({ event, canManage }: { event: EventDetail; canManage: boolean }) {
-  if (event.attachments.length === 0 && !canManage) return null
-
+/** 詳細ページの「概要」に置く添付ファイルの一覧。削除できるのは追加した本人と、イベントの作成者・管理者 */
+export function AttachmentList({ event, userId, canManage }: { event: EventDetail; userId: string; canManage: boolean }) {
   return (
     <section className={css({ mt: 'lg' })}>
       <h3 className={css({ fontSize: 'xs', fontWeight: '700', color: 'fg.subtle', mb: 'xs' })}>添付ファイル</h3>
       {event.attachments.length > 0 && (
         <ul>
           {event.attachments.map((attachment) => (
-            <AttachmentRow key={attachment.id} attachment={attachment} eventId={event.id} canManage={canManage} />
+            <AttachmentRow key={attachment.id} attachment={attachment} eventId={event.id} canDelete={canManage || attachment.uploadedBy === userId} />
           ))}
         </ul>
       )}
-      {canManage && <UploadZone count={event.attachments.length} />}
+      <UploadZone count={event.attachments.length} />
     </section>
   )
 }
