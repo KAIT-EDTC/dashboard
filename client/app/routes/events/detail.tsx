@@ -162,7 +162,7 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
       )}
       <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', lg: '3fr 2fr' }, gap: 'lg', alignItems: 'start' })}>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
-          <EventInfo event={event} canManage={canManage} />
+          <EventInfo event={event} userId={me.id} canManage={canManage} />
           <EventNotices reports={reports} />
           {/* 報告書を書かない種類のイベントには出さない（書かない設定にする前の承認済みの報告書は残す） */}
           {event.hasReport && <EventSummary event={event} summary={summary} canManage={canManage} started={started} />}

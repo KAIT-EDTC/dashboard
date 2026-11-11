@@ -19,7 +19,7 @@ function Row({ icon, label, children }: { icon: ReactNode; label: string; childr
   )
 }
 
-export function EventInfo({ event, canManage }: { event: EventDetail; canManage: boolean }) {
+export function EventInfo({ event, userId, canManage }: { event: EventDetail; userId: string; canManage: boolean }) {
   const goingCount = event.participants.filter((p) => p.status === 'going').length
   return (
     <Card title="概要">
@@ -44,7 +44,7 @@ export function EventInfo({ event, canManage }: { event: EventDetail; canManage:
         </Row>
       </dl>
       {event.description && <p className={css({ mt: 'lg', whiteSpace: 'pre-wrap', lineHeight: '1.8' })}>{event.description}</p>}
-      <AttachmentList event={event} canManage={canManage} />
+      <AttachmentList event={event} userId={userId} canManage={canManage} />
       <div className={css({ mt: 'lg', display: 'flex', alignItems: 'center', gap: 'sm', fontSize: 'sm', color: 'fg.muted' })}>
         <Avatar user={event.creator} size={24} />
         主催: {fullName(event.creator)}
