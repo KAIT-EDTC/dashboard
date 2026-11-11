@@ -1,0 +1,3 @@
+#!/bin/sh
+# ステージ済みファイルだけをシークレット検査する（設定: .secretlintrc.json / .secretlintignore）
+git diff --cached --name-only --diff-filter=ACMR -z | xargs -0 -r npx --no-install secretlint --no-glob

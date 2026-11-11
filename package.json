@@ -20,10 +20,13 @@
     "db:seed": "npm run db:seed -w server",
     "db:seed:clear": "npm run db:seed:clear -w server",
     "deploy": "npm run build && npm run deploy -w server",
-    "db:migrate:remote": "npm run db:migrate:remote -w server"
+    "db:migrate:remote": "npm run db:migrate:remote -w server",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
+    "@secretlint/secretlint-rule-preset-recommend": "^13.1.0",
     "concurrently": "^10.0.6",
+    "secretlint": "^13.1.0",
     "typescript": "~6.0.3"
   }
 }
