@@ -4,8 +4,8 @@ import type { Division, Officer } from '@edtc/shared'
 // クライアントが AppType を型importする際にも解決できるよう、グローバル型に頼らず明示的にimportする
 export type Bindings = {
   DB: D1Database
-  /** まとめ報告書の活動写真（JPEG） */
-  REPORT_PHOTOS: R2Bucket
+  /** アップロードされたファイルの置き場所（events/<イベントID>/ にイベントの添付ファイル、reports/<報告書ID>/ にまとめ報告書の写真） */
+  FILES: R2Bucket
 
   FRONTEND_URL: string
   COOKIE_DOMAIN?: string
@@ -15,9 +15,7 @@ export type Bindings = {
   DISCORD_CLIENT_SECRET: string
   DISCORD_REDIRECT_URI: string
   DISCORD_GUILD_ID: string
-  /** 通知用Webhook URL。未設定なら通知しない */
-  DISCORD_WEBHOOK_URL?: string
-  /** 活動報告書の通知を関係者だけにDMで送るためのBotトークン。未設定ならDMを送らない */
+  /** 通知（チャンネル・DM）を送るBotのトークン。未設定なら通知を送らない */
   DISCORD_BOT_TOKEN?: string
 
   /** ブログ記事のPR先 (owner/repo) */
@@ -30,7 +28,7 @@ export type Bindings = {
   GITHUB_APP_PRIVATE_KEY?: string
   GITHUB_WEBHOOK_SECRET?: string
 
-  /** "true" のとき、ログイン画面からシードのダミーユーザーを選んでログインできる（ローカル開発専用） */
+  /** ログイン画面からシードのダミーユーザーを選んでログインできる。"true" はローカル開発、"preview" はPRプレビュー（workers.dev）専用 */
   DEV_LOGIN?: string
 }
 

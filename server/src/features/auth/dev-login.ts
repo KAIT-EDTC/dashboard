@@ -13,16 +13,21 @@ const SEED_PREFIX = 'seed-'
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]']
 
 /**
- * 開発用ログインを使えるか。.dev.vars に DEV_LOGIN=true があり、画面もAPIもローカルで動いているときだけ。
- * 本番は DEV_LOGIN を設定しないうえ FRONTEND_URL が https なので、どちらの条件でも弾かれる
+ * 開発用ログインを使えるか。次のどちらかのときだけ。
+ * - ローカル: .dev.vars に DEV_LOGIN=true があり、画面もAPIもローカルで動いている
+ * - PRプレビュー: DEV_LOGIN=preview で、workers.dev で配信している
+ * 本番は DEV_LOGIN を設定しないうえ FRONTEND_URL が https で独自ドメインなので、どちらの条件でも弾かれる
  */
 function devLoginEnabled(env: Bindings, requestUrl: string): boolean {
+  // PRプレビュー: wrangler.jsonc の env.preview.previews だけが "preview" を設定する。
+  // 本番は独自ドメインで配信しているので、workers.dev の条件で必ず弾かれる
+  if (env.DEV_LOGIN === 'preview') return new URL(requestUrl).hostname.endsWith('.workers.dev')
   if (env.DEV_LOGIN !== 'true') return false
   const frontend = new URL(env.FRONTEND_URL)
   return frontend.protocol === 'http:' && LOCAL_HOSTS.includes(frontend.hostname) && LOCAL_HOSTS.includes(new URL(requestUrl).hostname)
 }
 
-/** Discordを通さず、シードのダミーユーザーとしてログインする（ローカル開発専用） */
+/** Discordを通さず、シードのダミーユーザーとしてログインする（ローカル開発とPRプレビュー専用） */
 export const devLoginRoute = new Hono<AppEnv>()
   .use((c, next) => {
     // 無効なときはエンドポイントがないのと同じに見せる

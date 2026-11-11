@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "fc05b405-57da-4f0e-9177-5c103d3588ec",
+  "id": "e4542912-3e72-4c20-b7ab-affd0f2eb7e4",
   "prevId": "16d018f0-22bd-4e4b-8120-1041ba33ed50",
   "tables": {
     "activity_report_comments": {
@@ -1332,13 +1332,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "webhook_url": {
-          "name": "webhook_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "on_event_created": {
           "name": "on_event_created",
           "type": "integer",
@@ -1407,67 +1400,6 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "report_photos": {
-      "name": "report_photos",
-      "columns": {
-        "report_id": {
-          "name": "report_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "file_name": {
-          "name": "file_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "size": {
-          "name": "size",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "report_photos_report_id_activity_reports_id_fk": {
-          "name": "report_photos_report_id_activity_reports_id_fk",
-          "tableFrom": "report_photos",
-          "tableTo": "activity_reports",
-          "columnsFrom": [
-            "report_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "report_photos_report_id_file_name_pk": {
-          "columns": [
-            "report_id",
-            "file_name"
-          ],
-          "name": "report_photos_report_id_file_name_pk"
-        }
-      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },

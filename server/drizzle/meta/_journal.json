@@ -68,8 +68,43 @@
     {
       "idx": 9,
       "version": "6",
-      "when": 1791481881215,
-      "tag": "0009_report_photos",
+      "when": 1792042554076,
+      "tag": "0009_drop_notification_webhook_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1792247683244,
+      "tag": "0010_marvelous_maginty",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1792255562126,
+      "tag": "0011_event_shifts",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1794124003939,
+      "tag": "0012_light_reports",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1794381652528,
+      "tag": "0013_event_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1794381842303,
+      "tag": "0014_report_photos",
       "breakpoints": true
     }
   ]

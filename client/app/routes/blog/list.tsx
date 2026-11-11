@@ -34,7 +34,7 @@ export default function BlogPage({ loaderData }: Route.ComponentProps) {
     <>
       <PageHeader
         title="ブログ"
-        description="活動のレポートを書いて、サイト（EDTCHP）に公開しましょう。提出するとレビュー用のPRが自動で作られます。"
+        description="ブログ一覧です。ブログを書くときは、イベントのページにある「ブログを書く」からも始められます。"
         actions={
           <Form method="post">
             <Button type="submit" variant="primary" loading={navigation.state === 'submitting'}>

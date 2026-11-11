@@ -19,7 +19,7 @@ export async function loadDevLoginUsers(): Promise<DevLoginUser[] | null> {
   return res?.ok ? (await res.json()).users : null
 }
 
-/** ローカル開発用: ダミーユーザーを選んでログインする */
+/** ローカル開発とPRプレビュー用: ダミーユーザーを選んでログインする */
 export function DevLogin({ users }: { users: DevLoginUser[] }) {
   const navigate = useNavigate()
   const [pending, setPending] = useState<string | null>(null)
@@ -41,7 +41,7 @@ export function DevLogin({ users }: { users: DevLoginUser[] }) {
     <section className={css({ mt: 'xl', pt: 'lg', borderTopWidth: '1px', borderColor: 'border', borderStyle: 'dashed' })}>
       <h2 className={css({ fontSize: 'sm', fontWeight: '700', mb: 'sm', display: 'flex', alignItems: 'center', gap: 'xs' })}>
         開発用ログイン
-        <Badge tone="warning">ローカルのみ</Badge>
+        <Badge tone="warning">テスト用</Badge>
       </h2>
       {error && (
         <div className={css({ mb: 'sm' })}>

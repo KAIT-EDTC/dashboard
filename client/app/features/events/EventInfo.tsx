@@ -4,6 +4,7 @@ import { Avatar } from '~/components/ui/Avatar'
 import { Card } from '~/components/ui/Card'
 import { ClockIcon, MapPinIcon, UserIcon, UsersIcon, WalletIcon } from '~/components/ui/Icons'
 import { formatDateTime, formatRange, formatYen, fullName } from '~/lib/format'
+import { AttachmentList } from './AttachmentList'
 import type { EventDetail } from './types'
 
 function Row({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
@@ -18,7 +19,7 @@ function Row({ icon, label, children }: { icon: ReactNode; label: string; childr
   )
 }
 
-export function EventInfo({ event }: { event: EventDetail }) {
+export function EventInfo({ event, canManage }: { event: EventDetail; canManage: boolean }) {
   const goingCount = event.participants.filter((p) => p.status === 'going').length
   return (
     <Card title="概要">
@@ -43,6 +44,7 @@ export function EventInfo({ event }: { event: EventDetail }) {
         </Row>
       </dl>
       {event.description && <p className={css({ mt: 'lg', whiteSpace: 'pre-wrap', lineHeight: '1.8' })}>{event.description}</p>}
+      <AttachmentList event={event} canManage={canManage} />
       <div className={css({ mt: 'lg', display: 'flex', alignItems: 'center', gap: 'sm', fontSize: 'sm', color: 'fg.muted' })}>
         <Avatar user={event.creator} size={24} />
         主催: {fullName(event.creator)}

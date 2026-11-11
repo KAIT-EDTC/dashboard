@@ -8,6 +8,8 @@ import './app.css'
 export const meta: Route.MetaFunction = () => [
   { title: 'EDTC ダッシュボード' },
   { name: 'description', content: 'EDTCメンバー専用ダッシュボード。イベント・ブログ・メンバー交流をひとつに。' },
+  { name: 'theme-color', content: '#3b82f6' },
+  { name: 'apple-mobile-web-app-title', content: 'EDTC' },
 ]
 
 export const links: Route.LinksFunction = () => [
@@ -15,6 +17,8 @@ export const links: Route.LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },
   { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap' },
   { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+  { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+  { rel: 'manifest', href: '/manifest.webmanifest' },
 ]
 
 export function Layout({ children }: { children: ReactNode }) {

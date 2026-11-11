@@ -130,6 +130,8 @@ export const eventCategories = sqliteTable('event_categories', {
   hasLecturer: integer('has_lecturer', { mode: 'boolean' }).notNull().default(true),
   /** 活動報告書・まとめ報告書を書くか。書かない種類（ミーティングなど）のイベントは報告書の対象にならない */
   hasReport: integer('has_report', { mode: 'boolean' }).notNull().default(true),
+  /** 簡易報告書（事後報告だけ・承認なし）を書くか。報告書（hasReport）とはどちらか一方 */
+  hasLightReport: integer('has_light_report', { mode: 'boolean' }).notNull().default(false),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamps.createdAt,
 })
@@ -144,18 +146,21 @@ export const blogReviewers = sqliteTable('blog_reviewers', {
 })
 
 /**
- * Discord通知の設定（1行だけ。id は常に 1）。行が無ければ「通知先なし・すべてオン」として扱う。
- * webhook_url は管理者が「通知設定」で入力する。画面には返さず、末尾だけ見せる
+ * Discord通知の種類ごとのオン/オフと送り先チャンネル（1行だけ。id は常に 1）。行が無ければ「すべてオン・送り先なし」として扱う。
+ * チャンネルはBotが送る（管理者が「通知設定」でサーバーのチャンネルから選ぶ）。null の通知は送らない
  */
 export const notificationSettings = sqliteTable('notification_settings', {
   id: integer('id').primaryKey(),
-  webhookUrl: text('webhook_url'),
+  /** イベントの通知を送るチャンネルのID */
+  eventChannelId: text('event_channel_id'),
+  /** ブログの通知を送るチャンネルのID */
+  blogChannelId: text('blog_channel_id'),
   onEventCreated: integer('on_event_created', { mode: 'boolean' }).notNull().default(true),
   onBlogSubmitted: integer('on_blog_submitted', { mode: 'boolean' }).notNull().default(true),
   onBlogPublished: integer('on_blog_published', { mode: 'boolean' }).notNull().default(true),
   onBlogClosed: integer('on_blog_closed', { mode: 'boolean' }).notNull().default(true),
   onBlogFeedback: integer('on_blog_feedback', { mode: 'boolean' }).notNull().default(true),
-  /** 活動報告書の通知（Webhookではなく、関係者へのDM） */
+  /** 活動報告書の通知（チャンネルではなく、関係者へのDM） */
   onReportReviewRequested: integer('on_report_review_requested', { mode: 'boolean' }).notNull().default(true),
   onReportReviewed: integer('on_report_reviewed', { mode: 'boolean' }).notNull().default(true),
   updatedAt: timestamps.updatedAt,
@@ -204,6 +209,12 @@ export const events = sqliteTable(
     createdBy: text('created_by')
       .notNull()
       .references(() => users.id),
+    /** シフトを組むか。組むときは開始〜終了（時）を区切りで午前・午後に分けた枠を、イベントの日ごとに作る */
+    hasShifts: integer('has_shifts', { mode: 'boolean' }).notNull().default(false),
+    shiftStartHour: integer('shift_start_hour'),
+    shiftEndHour: integer('shift_end_hour'),
+    /** 午前と午後の区切り（時）。無ければ1日1枠 */
+    shiftSplitHour: integer('shift_split_hour'),
     /** まとめ報告書の担当者（主催者が指名する）。未指名なら講師が担当 */
     summaryWriterId: text('summary_writer_id').references(() => users.id, { onDelete: 'set null' }),
     ...timestamps,
@@ -228,6 +239,8 @@ export const eventParticipants = sqliteTable(
     attended: integer('attended', { mode: 'boolean' }).notNull().default(false),
     /** 参加費の支払い（主催者が記録） */
     paid: integer('paid', { mode: 'boolean' }).notNull().default(false),
+    /** 入っているシフトの中で出られない時間（1時間ごとの枠の開始 YYYY-MM-DDTHH:00）。本人が指定する */
+    unavailable: text('unavailable', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
     ...timestamps,
   },
   (t) => [primaryKey({ columns: [t.eventId, t.userId] }), index('event_participants_user_idx').on(t.userId)],
@@ -244,12 +257,64 @@ export const eventItems = sqliteTable(
     kind: text('kind', { enum: ITEM_KINDS }).notNull(),
     quantity: integer('quantity').notNull().default(1),
     note: text('note').notNull().default(''),
-    /** 共有の持ち物を用意する人 */
+    /** 持ってくる人（未定なら null。全員が持ってくるものは常に null） */
     assigneeId: text('assignee_id').references(() => users.id, { onDelete: 'set null' }),
     prepared: integer('prepared', { mode: 'boolean' }).notNull().default(false),
     createdAt: timestamps.createdAt,
   },
   (t) => [index('event_items_event_idx').on(t.eventId), index('event_items_assignee_idx').on(t.assigneeId)],
+)
+
+/** イベントの添付ファイル。実体は R2（r2Key）にあり、ここにはメタデータだけを持つ */
+export const eventAttachments = sqliteTable(
+  'event_attachments',
+  {
+    id: text('id').primaryKey(),
+    eventId: text('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    size: integer('size').notNull(),
+    contentType: text('content_type').notNull(),
+    r2Key: text('r2_key').notNull(),
+    uploadedBy: text('uploaded_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [index('event_attachments_event_idx').on(t.eventId)],
+)
+
+/** シフト（文化祭の店番など）。時間帯と持ち場ごとに、入る人を決める */
+export const eventShifts = sqliteTable(
+  'event_shifts',
+  {
+    id: text('id').primaryKey(),
+    eventId: text('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    /** 持ち場・担当（例: 受付） */
+    label: text('label').notNull(),
+    /** 日本時間 YYYY-MM-DDTHH:mm */
+    startsAt: text('starts_at').notNull(),
+    endsAt: text('ends_at').notNull(),
+    note: text('note').notNull().default(''),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [index('event_shifts_event_idx').on(t.eventId, t.startsAt)],
+)
+
+/** シフトに入る人。主催者が割り当てるか、参加者が自分で入る */
+export const eventShiftMembers = sqliteTable(
+  'event_shift_members',
+  {
+    shiftId: text('shift_id')
+      .notNull()
+      .references(() => eventShifts.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [primaryKey({ columns: [t.shiftId, t.userId] }), index('event_shift_members_user_idx').on(t.userId)],
 )
 
 /**
@@ -344,7 +409,7 @@ export const activityReports = sqliteTable(
 
 /**
  * まとめ報告書の活動写真（JPEG。Excelの様式の「図1. 活動写真」の枠に貼る）。
- * 中身はR2（REPORT_PHOTOS）の reports/<報告書ID>/<ファイル名> に置き、ここには並び順のための記録だけ持つ
+ * 中身はR2（FILES）の reports/<報告書ID>/<ファイル名> に置き、ここには並び順のための記録だけ持つ
  */
 export const reportPhotos = sqliteTable(
   'report_photos',
@@ -398,6 +463,26 @@ export const activityReportComments = sqliteTable(
   (t) => [index('activity_report_comments_review_idx').on(t.reviewId)],
 )
 
+/**
+ * 簡易報告書（事後報告だけ。文字数の上限も承認もない）。1イベントにつき1人1件で、書くとすぐイベントページに載る。
+ * 書けるかはイベントの種類（event_categories.has_light_report）で決まる
+ */
+export const eventLightReports = sqliteTable(
+  'event_light_reports',
+  {
+    eventId: text('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** 事後報告 */
+    body: text('body').notNull(),
+    ...timestamps,
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.userId] }), index('event_light_reports_user_idx').on(t.userId)],
+)
+
 // ---------------------------------------------------------------------------
 // Relations（db.query で使う）
 // ---------------------------------------------------------------------------
@@ -419,9 +504,17 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   creator: one(users, { fields: [events.createdBy], references: [users.id] }),
   participants: many(eventParticipants),
   items: many(eventItems),
+  attachments: many(eventAttachments),
+  shifts: many(eventShifts),
   targetDivisions: many(eventTargetDivisions),
   targetUsers: many(eventTargetUsers),
   reports: many(activityReports),
+  lightReports: many(eventLightReports),
+}))
+
+export const eventLightReportsRelations = relations(eventLightReports, ({ one }) => ({
+  event: one(events, { fields: [eventLightReports.eventId], references: [events.id] }),
+  user: one(users, { fields: [eventLightReports.userId], references: [users.id] }),
 }))
 
 export const eventTargetDivisionsRelations = relations(eventTargetDivisions, ({ one }) => ({
@@ -438,9 +531,23 @@ export const eventParticipantsRelations = relations(eventParticipants, ({ one })
   user: one(users, { fields: [eventParticipants.userId], references: [users.id] }),
 }))
 
+export const eventAttachmentsRelations = relations(eventAttachments, ({ one }) => ({
+  event: one(events, { fields: [eventAttachments.eventId], references: [events.id] }),
+}))
+
 export const eventItemsRelations = relations(eventItems, ({ one }) => ({
   event: one(events, { fields: [eventItems.eventId], references: [events.id] }),
   assignee: one(users, { fields: [eventItems.assigneeId], references: [users.id] }),
+}))
+
+export const eventShiftsRelations = relations(eventShifts, ({ one, many }) => ({
+  event: one(events, { fields: [eventShifts.eventId], references: [events.id] }),
+  members: many(eventShiftMembers),
+}))
+
+export const eventShiftMembersRelations = relations(eventShiftMembers, ({ one }) => ({
+  shift: one(eventShifts, { fields: [eventShiftMembers.shiftId], references: [eventShifts.id] }),
+  user: one(users, { fields: [eventShiftMembers.userId], references: [users.id] }),
 }))
 
 export const activityReportsRelations = relations(activityReports, ({ one, many }) => ({

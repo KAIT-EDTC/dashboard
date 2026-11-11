@@ -482,6 +482,6 @@ export const reportsRoute = new Hono<AppEnv>()
     // まとめ報告書の写真はR2から消す（D1の記録は報告書と一緒に消える）
     const photos = report.kind === 'summary' ? await photosOf(db, report.id) : []
     await db.delete(activityReports).where(and(eq(activityReports.id, report.id), eq(activityReports.status, 'draft')))
-    if (photos.length > 0) await c.env.REPORT_PHOTOS.delete(photos.map((fileName) => photoKey(report.id, fileName)))
+    if (photos.length > 0) await c.env.FILES.delete(photos.map((fileName) => photoKey(report.id, fileName)))
     return c.json({ ok: true })
   })

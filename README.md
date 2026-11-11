@@ -6,7 +6,8 @@ EDTCメンバー専用サイト。イベントの出欠・持ち物・集金、�
 - **イベント**: 出欠（参加/未定/不参加・コメント・定員・回答期限）、持ち物（各自持参／共有の担当者・準備状況）、参加費の集金と当日の出席記録、カレンダー表示。作成時にDiscordへ通知
 - **活動報告書**: 参加したイベントを選んで書く（活動日時・活動名・場所・役割はイベントから入る）。部員の分は所属部署の部署長、役職者の分は本人が選んだ承認者が確認し、承認するか、本文の範囲にコメント・書き直し案を付けて修正を依頼する。承認されるとイベントページに載り、伝言事項は「連絡事項」にまとまる
 - **まとめ報告書**: イベントごとに担当者1人（講師、または主催者が指名した人）が、参加者全員の活動報告書がそろってから書く。担当者自身は活動報告書を書かなくてよい。提出・承認の流れは活動報告書と同じ
-- **ブログ**: Markdownで書き（画像は貼り付け・ドラッグ＆ドロップ可）、提出するとGitHub App経由でEDTCHP_v2にPRを作成。レビューや公開はWebhookで追跡し、執筆者にDiscordで通知
+- **簡易報告書**: イベントの種類で「簡易報告書あり」にしたイベントは、参加者が事後報告だけを書く（文字数の上限・承認なし）。書くとすぐイベントページに名前付きで載る
+- **ブログ**: Markdownで書き（画像は貼り付け・ドラッグ＆ドロップ可）、提出するとGitHub App経由でEDTCHP_v2にPRを作成。レビューや公開はGitHubのWebhookで追跡し、執筆者にDiscordで通知
 - **メンバー**: 名簿（学年・部署・趣味で検索）とプロフィール（自己紹介・興味・リンク・書いた記事）
 
 ## 構成
@@ -25,13 +26,13 @@ npm workspaces のモノレポ。client は server の `AppType` を型として
 ```
 app.ts                 # ルーティングの組み立て・CORS/CSRF・エラーハンドリング。AppType を export
 env.ts                 # Bindings（環境変数）とセッションの型
-db/schema.ts           # テーブル定義（users, user_divisions, events, event_participants, event_items, activity_reports(+_reviews, _comments), blog_posts, blog_images）
+db/schema.ts           # テーブル定義（users, user_divisions, events, event_participants, event_items, event_shifts(+_members), event_light_reports, event_attachments, activity_reports(+_reviews, _comments), report_photos, blog_posts, blog_images）
 middleware/auth.ts     # requireAuth（ロールは毎回DBから読む）と権限チェック
-lib/                   # discord（OAuth・Webhook通知）、github（App認証・Webhook署名検証）など外部サービス
+lib/                   # discord（OAuth・Bot通知）、github（App認証・Webhook署名検証）など外部サービス
 features/
   auth/                # OAuth・新規登録・セッションCookie
   members/             # 名簿・プロフィール
-  events/              # イベント・出欠・持ち物
+  events/              # イベント・出欠・持ち物・シフト・簡易報告書・添付ファイル（実体はR2、メタデータはD1）
   reports/             # 活動報告書・まとめ報告書（下書き・提出・承認/修正依頼・範囲コメント・提出状況・Excel書き出し）
   blog/                # 下書き・画像・提出（publisher.ts）・GitHub Webhook
 ```
@@ -71,6 +72,8 @@ theme/ (client直下)     # Panda のトークン・グローバルCSS
 
 イベントの種類（活動・対外活動・ミーティング・親睦・その他が初期値）は、管理者が「イベント設定」で追加・名前変更・色の変更・並べ替え・削除する。イベントは種類をIDで持つので、名前を変えてもイベントはそのまま。使われている種類は削除できない。
 
+種類ごとに「講師あり」「報告書あり」「簡易報告書あり」をチェックボックスで決める。「報告書あり」（活動報告書・まとめ報告書）と「簡易報告書あり」はどちらか一方だけで、片方を付けるともう片方は外れる（初期値はどの種類も簡易報告書なし）。
+
 ### イベントの対象者
 
 イベントの作成・編集で、対象を部署（`DIVISIONS`）と個人で指定できる。何も指定しなければ全員向け。
@@ -79,6 +82,17 @@ theme/ (client直下)     # Panda のトークン・グローバルCSS
 - 部署は指定だけを保存し、表示のたびにその部署の今のメンバーを対象として数える（あとから部署に入った人も対象になる）
 - イベント詳細の参加者欄に、対象者のうち未回答の人が並ぶ
 - 作成時のDiscord通知で対象者（作成者以外）にメンションする
+
+### シフト
+
+文化祭の店番など、時間帯ごとに誰が出るかを決める。
+
+- イベントの作成・編集の「シフト」で「シフトを組む」にし、開始・終了時刻（1時間単位）と午前・午後の区切りを決める。イベントの日（開始日〜終了日、7日まで）ごとに「午前」「午後」の枠ができる（区切らなければ1日1枠）。枠の人数は決めない
+- 枠はイベントの設定だけで決まり、イベントページでは追加・編集しない。時間帯を変えると枠は作り直され、入っていた人は同じ日の同じ枠（午前・午後）に移る。「シフトを組む」を外すと枠は消える
+- 参加・未定と回答した人は、枠の「入る」で自分で入り、「外れる」で外れる
+- 枠に入った人は、イベントページのそのシフトの下に出る「出られない時間」で、シフトの中で抜ける時間を1時間ごとに選ぶ（指やマウスでなぞると範囲をまとめて選べる。もう一度なぞると戻る）。入っていないシフトには出てこない。抜ける時間は枠の一覧で名前の横に「11〜12時 不在」のように出る
+- 1人が同じ時間帯の2つの枠には入れない。不参加にすると入っていた枠から外れる
+- ホームの「自分のシフト」に、これから入るシフトが出る
 
 ### 活動報告書の承認
 
@@ -124,7 +138,17 @@ theme/ (client直下)     # Panda のトークン・グローバルCSS
    - 参加者の評価ごとの人数は「追加記入欄」に入り、図2（参加者の自己評価）に反映される
    - 様式の欄（参加者8人・自己分析7人）に収まらない人は「追加記入欄」の下に書き足す
    - 担当者が追加した活動写真（最大3枚）は、「図1. 活動写真」の枠に横一列で、縦横比を保って貼られる
-7. 活動写真は書いている間（下書き・修正依頼）に「活動写真」から追加・削除できる。JPEGに縮小してCloudflare R2（`REPORT_PHOTOS`）に保存する。SNS使用許可の出ている写真だけを使う
+7. 活動写真は書いている間（下書き・修正依頼）に「活動写真」から追加・削除できる。JPEGに縮小してCloudflare R2（`FILES` の `reports/<報告書ID>/`）に保存する。SNS使用許可の出ている写真だけを使う
+
+## 簡易報告書
+
+活動報告書より軽い報告。イベントの種類で「簡易報告書あり」にしたイベントで書く（ミーティング・親睦など、活動報告書までは要らないもの向け）。
+
+- 書くのは事後報告だけ。文字数の上限はない（保存できる大きさの歯止めとして5万字まで。画面には出さない）
+- 承認はない。イベントページの「簡易報告書」に書いて「投稿する」と、すぐに名前付きでメンバー全員に見える
+- 書けるのは参加と回答した人・出席した人で、イベントが始まってから。1イベントにつき1人1件で、本人はあとから直す・消すことができる（直したものには「編集済み」が付く）
+- 活動報告書の対象イベント・提出状況・ホームの「自分が出す報告書」には出ない。Discordへの通知もない
+- 種類を「簡易報告書あり」から外しても、書かれた簡易報告書はイベントページに残る（新しく書く・直すことはできなくなり、消すことはできる）
 
 ## ブログ
 
@@ -132,7 +156,7 @@ theme/ (client直下)     # Panda のトークン・グローバルCSS
 
 1. ダッシュボードで記事を書く（イベントページの「ブログを書く」からだとタイトルと日付を引き継ぐ）。画像はブラウザでWebP（最大1600px）に変換してから保存される
 2. 「提出する」で、記事フォルダ（`index.md` と画像）を1コミットにまとめたPRが EDTCHP_v2 に作られ、Discordに通知される。PRの「Files changed」で本文を画像つきで確認できる
-3. レビューコメント・修正依頼・承認・マージ・クローズはWebhookで受け取り、執筆者にメンションで通知。マージされると「公開済み」になる
+3. レビューコメント・修正依頼・承認・マージ・クローズはGitHubのWebhookで受け取り、執筆者にメンションで通知。マージされると「公開済み」になる
 4. 修正して再提出すると同じPRが更新される
 
 PRのブランチは提出のたびに「最新の main + 記事の1コミット」として作り直す。そのため **記事の正はダッシュボード** で、PR上で直接コミットした修正は次の再提出で上書きされる。
@@ -189,7 +213,7 @@ npm run dev                        # client: http://localhost:5173 / server: htt
 | `npm run lint` | client の ESLint |
 | `npm run build` | client のビルド（`client/build/client` に静的ファイル） |
 | `npm run db:generate` | `server/src/db/schema.ts` からマイグレーションを生成 |
-| `npm run db:seed` | ローカルD1にダミーのメンバー20人とイベント（出欠・持ち物つき）、役職者と活動報告書（承認済み・承認待ち・修正依頼・下書き）、まとめ報告書（承認済み・下書き）を入れる。何度実行しても同じ状態になる |
+| `npm run db:seed` | ローカルD1にダミーのメンバー20人とイベント（出欠・持ち物つき。オープンキャンパスにはシフトと出られない時間）、役職者と活動報告書（承認済み・承認待ち・修正依頼・下書き）、まとめ報告書（承認済み・下書き）、簡易報告書ありのダミーの種類「勉強会」と、その簡易報告書を入れる。何度実行しても同じ状態になる |
 | `npm run db:seed:clear` | ダミーデータだけを消す |
 
 ダミーデータ（`server/seed/`）はIDが `seed-` で始まり、自分のユーザーやデータには触らない。学年とイベントの日付は実行した日を基準に計算する。ダミーメンバーは実在のDiscordユーザーではないので、Discordのメンションは届かない。`--local` 固定のため本番のD1には入らない。
@@ -212,14 +236,14 @@ npm run dev                        # client: http://localhost:5173 / server: htt
 1. [Developer Portal](https://discord.com/developers/applications) でアプリを作り、OAuth2 の Redirects に `<APIのURL>/api/auth/callback` を登録
 2. `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` / `DISCORD_REDIRECT_URI` / `DISCORD_GUILD_ID` を設定
 3. スコープは `identify` と `guilds.members.read`（サーバー内のニックネームを本人のトークンで読むため、ログインにBotは不要）
-4. 通知したいチャンネルでWebhookを作り、ダッシュボードの「通知設定」に登録する（管理者のみ）。通知の種類ごとのオン/オフ、テスト送信、ブログ提出時にメンションする **レビュー担当**（メンバーのドロップダウンから選ぶ）も同じ画面で設定する
-   - Webhook URLは保存すると画面には末尾しか表示されない。Discordのウェブフック以外のURLは登録できない
-   - 環境変数 `DISCORD_WEBHOOK_URL` は、画面で設定するまでの代わりとして使われる（画面の設定が優先）
-5. 活動報告書の通知は、関係者だけに届くようBotのDMで送る（チャンネルには流さない）。Botは常駐させず、通知のときにREST APIを呼ぶだけ
+4. チャンネルへの通知（イベント・ブログ）も、次の5.のBotで送る。ダッシュボードの「通知設定」（管理者のみ）で、イベント用・ブログ用の通知先を **サーバーのチャンネル一覧から選び**（別のチャンネルにできる。「通知しない」を選ぶとその通知は送られない）、テスト送信、通知の種類ごとのオン/オフ、ブログ提出時にメンションする **レビュー担当**（メンバーのドロップダウンから選ぶ）を設定する
+   - 以前の環境変数（`DISCORD_EVENT_WEBHOOK_URL` / `DISCORD_BLOG_WEBHOOK_URL`）は使わない。移行後は管理者が「通知設定」でチャンネルを選び直す
+   - Botに、通知先チャンネルの「チャンネルを見る」「メッセージを送信」「埋め込みリンク」権限が必要（権限が足りないとテスト送信が失敗する）
+5. Botを使う。チャンネルへの通知（イベント・ブログ）に加え、活動報告書の通知は関係者だけに届くようBotのDMで送る（チャンネルには流さない）。Botは常駐させず、通知のときにREST APIを呼ぶだけ
    - Developer Portal のアプリの「Bot」で「Reset Token」を押してトークンを発行し、`DISCORD_BOT_TOKEN` に設定する（Privileged Gateway Intents はすべてオフでよい）
-   - 「OAuth2 → URL Generator」で scope に `bot` だけを選び（Bot Permissions は何も選ばない）、生成されたURLからEDTCのサーバーに招待する
+   - 「OAuth2 → URL Generator」で scope に `bot` を選び、Bot Permissions に「View Channels」「Send Messages」「Embed Links」を選んで、生成されたURLからEDTCのサーバーに招待する（DMだけなら Bot Permissions は不要）
    - DMはBotと同じサーバーにいて、サーバーメンバーからのDMを許可している人にだけ届く。確認依頼の送り先は「ユーザー管理」で指定した役職から決まる
-   - 「通知設定」の「活動報告書の確認依頼」「活動報告書の承認・修正依頼」をオフにするとDMを送らない（まとめ報告書も同じ設定に従う）。`DISCORD_BOT_TOKEN` が未設定でも送らない（報告書の機能自体は動く）
+   - 「通知設定」の「活動報告書の確認依頼」「活動報告書の承認・修正依頼」をオフにするとDMを送らない（まとめ報告書も同じ設定に従う）。`DISCORD_BOT_TOKEN` が未設定ならチャンネル通知もDMも送らない（各機能自体は動く）
 
 ### GitHub App（ブログ）
 
@@ -246,7 +270,9 @@ npx wrangler d1 create edtc-dashboard
 #   → 出力された database_id を wrangler.jsonc の env.production.d1_databases に貼る
 #   （wrangler の d1 create が認証エラーになる場合は、ダッシュボードのD1画面から作ってもよい）
 npm run db:migrate:remote                                # テーブルを作る
-npx wrangler r2 bucket create edtc-dashboard-report-photos  # まとめ報告書の活動写真の置き場所（REPORT_PHOTOS）
+# アップロードされたファイルの置き場所（FILES。無いとデプロイが失敗する）。アカウントが複数あると選べないので、団体のアカウントIDを渡す
+CLOUDFLARE_ACCOUNT_ID=f63f9ebc5db7b049a6e98a155a3d219d npx wrangler r2 bucket create edtc-dashboard-files
+CLOUDFLARE_ACCOUNT_ID=f63f9ebc5db7b049a6e98a155a3d219d npx wrangler r2 bucket create edtc-dashboard-preview-files  # PRプレビュー用
 
 # 秘密情報（値を聞かれる）。GitHub App の鍵は  < your-app.pem  でファイルから渡す
 npx wrangler secret put JWT_SECRET --env production                  # openssl rand -hex 32
@@ -254,8 +280,7 @@ npx wrangler secret put DISCORD_CLIENT_ID --env production
 npx wrangler secret put DISCORD_CLIENT_SECRET --env production
 npx wrangler secret put DISCORD_REDIRECT_URI --env production        # https://<公開URL>/api/auth/callback
 npx wrangler secret put DISCORD_GUILD_ID --env production
-npx wrangler secret put DISCORD_WEBHOOK_URL --env production   # 任意（「通知設定」で登録するなら不要）
-npx wrangler secret put DISCORD_BOT_TOKEN --env production              # 活動報告書のDM通知
+npx wrangler secret put DISCORD_BOT_TOKEN --env production              # チャンネル通知とDM通知（送り先は「通知設定」で選ぶ）
 npx wrangler secret put GITHUB_APP_ID --env production
 npx wrangler secret put GITHUB_APP_PRIVATE_KEY --env production < your-app.pem
 npx wrangler secret put GITHUB_WEBHOOK_SECRET --env production
@@ -273,3 +298,11 @@ npm run deploy    # client をビルドして wrangler deploy --env production
 ```
 
 スキーマを変えた回は、デプロイの前に `npm run db:generate` でマイグレーションを作り、`npm run db:migrate:remote` を実行する。
+
+### PRプレビュー
+
+- PRを開くと Actions が `https://pr-<番号>-edtc-dashboard-preview.<サブドメイン>.workers.dev` を作る。PRの「View deployment」から開ける
+- ログイン画面でダミーユーザーを選んで入る。pushのたびにDBはシードの状態に作り直される。PRを閉じると消える
+- 初回のみ: GitHub の Settings → Environments で `preview` を作り、secret `CLOUDFLARE_API_TOKEN`（本番と同じトークンでよい）を登録する
+- 注意: Discordログイン・ブログ提出・通知はプレビューでは動かない（secrets を渡さないため）。forkからのPRでは作らない
+- 注意: D1 は Free プランだとアカウントあたり10個までなので、開いたままのPRが多いと作れない（`npx wrangler d1 list` で確認・削除）。Worker Previews は open beta

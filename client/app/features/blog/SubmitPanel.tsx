@@ -29,29 +29,35 @@ export function SubmitPanel({ post, problems, hasUnsubmittedChanges, githubConfi
         {post.prUrl && (
           <a href={post.prUrl} target="_blank" rel="noopener noreferrer" className={css({ display: 'inline-flex', alignItems: 'center', gap: 'xs' })}>
             <ExternalLinkIcon size={14} />
-            GitHubのPR #{post.prNumber} を開く
+            GitHubでレビューの状況を見る（#{post.prNumber}）
           </a>
         )}
         {hasUnsubmittedChanges && <Alert tone="info">提出後に変更があります。反映するには再提出してください。</Alert>}
         <p className={css({ color: 'fg.muted' })}>
-          提出するとサイト（EDTCHP）へのPRが自動で作成され、Discordに通知されます。レビューでの指摘や公開もDiscordでお知らせします。
+          提出しても、すぐにホームページ（kaitedtc.com）に載るわけではありません。レビュー依頼が出され、確認が終わると公開されます。レビューでの指摘や公開はDiscordでお知らせします。
         </p>
         {!githubConfigured && <Alert tone="warning">GitHub連携が設定されていないため提出できません。管理者に連絡してください。</Alert>}
-        {problems.length > 0 && (
-          <div>
-            <p className={css({ fontWeight: '600', mb: 'xs' })}>提出前に必要なこと</p>
-            <ul className={css({ display: 'flex', flexDirection: 'column', gap: '2px', color: 'warning.fg', listStyle: 'disc', pl: 'lg' })}>
-              {problems.map((problem) => (
-                <li key={problem}>{problem}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <ProblemList title="提出前に必要なこと" problems={problems} />
         <Button variant="primary" onClick={onSubmit} loading={submitting} disabled={problems.length > 0 || !githubConfigured}>
           <SendIcon size={16} />
           {label}
         </Button>
       </div>
     </Card>
+  )
+}
+
+/** 提出前チェックで足りないものの一覧（なければ何も出さない） */
+export function ProblemList({ title, problems }: { title: string; problems: string[] }) {
+  if (problems.length === 0) return null
+  return (
+    <div className={css({ fontSize: 'sm' })}>
+      <p className={css({ fontWeight: '600', mb: 'xs' })}>{title}</p>
+      <ul className={css({ display: 'flex', flexDirection: 'column', gap: '2px', color: 'warning.fg', listStyle: 'disc', pl: 'lg' })}>
+        {problems.map((problem) => (
+          <li key={problem}>{problem}</li>
+        ))}
+      </ul>
+    </div>
   )
 }

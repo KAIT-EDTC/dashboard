@@ -95,6 +95,13 @@ export const RATING_MIN = 1
 export const RATING_MAX = 5
 export const RATING_LABELS = { min: '悪', max: '良' } as const
 
+/**
+ * 簡易報告書: 事後報告だけを書く軽い報告書。文字数の上限はなく、承認もない（書くとすぐイベントページに名前付きで載り、本人はいつでも直せる・消せる）。
+ * 書くかはイベントの種類ごとに「イベント設定」で決める（活動報告書・まとめ報告書とはどちらか一方）。
+ * これは文字数の上限ではなく、1行に保存できる大きさを超えないための歯止め（画面には出さない）
+ */
+export const LIGHT_REPORT_MAX = 50_000
+
 /** 文字数。サロゲートペア（絵文字など）も1文字と数え、前後の空白は数えない */
 export function countChars(value: string): number {
   return [...value.trim()].length

@@ -2,6 +2,8 @@ import { and, asc, count, desc, eq, getTableColumns, gte, inArray, lte, ne, or, 
 import { Hono } from 'hono'
 import { z } from 'zod'
 import {
+  ATTACHMENT_MAX_COUNT,
+  attachmentUploadSchema,
   DIVISIONS,
   eventInputSchema,
   itemInputSchema,
@@ -17,10 +19,13 @@ import {
 import { createDb, memberSummaryColumns, type Db } from '../../db'
 import {
   activityReports,
+  eventAttachments,
   eventCategories,
   eventItems,
   eventParticipants,
   events,
+  eventShiftMembers,
+  eventShifts,
   eventTargetDivisions,
   eventTargetUsers,
   userDivisions,
@@ -29,6 +34,7 @@ import {
 import type { AppEnv } from '../../env'
 import { runInBackground } from '../../lib/background'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors'
+import { assertStorageAvailable } from '../../lib/storage'
 import { validate } from '../../lib/validator'
 import { assertCanManage, canManage, requireAuth } from '../../middleware/auth'
 import {
@@ -43,7 +49,9 @@ import {
 } from '../reports/queries'
 import { eventCategoriesRoute } from './categories'
 import { dropLecturers } from './category-rules'
+import { eventLightReportsRoute, lightReportBlocker, lightReportsOf } from './light-reports'
 import { notifyEventCreated } from './notifications'
+import { eventShiftsRoute, leaveAllShifts, myUpcomingShifts, syncShifts } from './shifts'
 
 /** 終了日時が無いイベントは開始日の終わりまでを開催中とみなす */
 const effectiveEnd = sql`coalesce(${events.endsAt}, substr(${events.startsAt}, 1, 10) || 'T23:59')`
@@ -207,6 +215,12 @@ export const eventsRoute = new Hono<AppEnv>()
     return c.json({ items })
   })
 
+  // 自分が入っている、これからのシフト
+  .get('/my-shifts', async (c) => {
+    const shifts = await myUpcomingShifts(createDb(c.env), c.get('session').userId, nowInJst())
+    return c.json({ shifts })
+  })
+
   .post('/', validate('json', eventInputSchema), async (c) => {
     const { targetDivisions, targetUserIds: rawUserIds, ...input } = c.req.valid('json')
     const targetUserIds = [...new Set(rawUserIds)]
@@ -221,6 +235,7 @@ export const eventsRoute = new Hono<AppEnv>()
       db.insert(events).values({ ...input, id, createdBy: userId }),
       db.insert(eventParticipants).values({ eventId: id, userId, status: 'going' }),
       ...replaceTargets(db, id, targetDivisions, targetUserIds),
+      ...(await syncShifts(db, id, input, null)),
     ])
 
     const organizer = await db
@@ -258,14 +273,29 @@ export const eventsRoute = new Hono<AppEnv>()
           with: { assignee: { columns: memberSummaryColumns } },
           orderBy: [asc(eventItems.kind), asc(eventItems.createdAt)],
         },
+        attachments: {
+          columns: { id: true, name: true, size: true, contentType: true, createdAt: true },
+          orderBy: asc(eventAttachments.createdAt),
+        },
+        shifts: {
+          with: {
+            members: {
+              columns: { userId: true },
+              with: { user: { columns: memberSummaryColumns } },
+              orderBy: asc(eventShiftMembers.createdAt),
+            },
+          },
+          orderBy: [asc(eventShifts.startsAt), asc(eventShifts.endsAt), asc(eventShifts.label)],
+        },
       },
     })
     if (!found) throw notFound('イベントが見つかりません')
 
     const { targetDivisions, targetUsers, ...event } = found
-    const [category, reports, myReport, summary, summaryMembers, defaultWriterId] = await Promise.all([
+    const [category, reports, lightReports, myReport, summary, summaryMembers, defaultWriterId] = await Promise.all([
       db.select().from(eventCategories).where(eq(eventCategories.id, event.category)).get(),
       approvedReportsOf(db, event.id),
+      lightReportsOf(db, event.id),
       myReportOf(db, event.id, userId),
       summaryReportOf(db, event.id),
       summaryMembersOf(db, event.id),
@@ -286,6 +316,8 @@ export const eventsRoute = new Hono<AppEnv>()
         /** 講師を置くか・報告書を書くか（種類の設定） */
         hasLecturer: category?.hasLecturer ?? true,
         hasReport: category?.hasReport ?? true,
+        /** 簡易報告書を書くか（種類の設定） */
+        hasLightReport: category?.hasLightReport ?? false,
         targetDivisions: sortDivisions(targetDivisions.map((t) => t.division)),
         targetUsers: targetUsers.map((t) => t.user),
       },
@@ -299,6 +331,9 @@ export const eventsRoute = new Hono<AppEnv>()
       myReport: myReport ?? null,
       /** 参加した人は、イベントが始まったら報告書を書ける（報告書を書かない種類は除く。まとめ報告書の担当者は書かなくてよい） */
       canWriteReport: (category?.hasReport ?? true) && !!mine && isReportTarget(mine) && event.startsAt <= nowInJst() && writerId !== userId,
+      /** 簡易報告書（承認なし。書いた人の名前付きで全員に見せる）と、自分が書けるか */
+      lightReports,
+      canWriteLightReport: lightReportBlocker(event, category?.hasLightReport ?? false, mine) === null,
       /** まとめ報告書。下書きは担当者にだけ見せる */
       summary: {
         writer,
@@ -328,6 +363,7 @@ export const eventsRoute = new Hono<AppEnv>()
       // 講師を置かない種類に変えたら、講師の役割を外す
       ...(category.hasLecturer ? [] : dropLecturers(db, eq(events.id, event.id))),
       ...replaceTargets(db, event.id, targetDivisions, targetUserIds),
+      ...(await syncShifts(db, event.id, input, event)),
     ])
     return c.json({ id: event.id })
   })
@@ -336,7 +372,84 @@ export const eventsRoute = new Hono<AppEnv>()
     const db = createDb(c.env)
     const event = await findEvent(db, c.req.param('id'))
     assertCanManage(c.get('session'), event.createdBy)
+    const files = await db.select({ r2Key: eventAttachments.r2Key }).from(eventAttachments).where(eq(eventAttachments.eventId, event.id))
     await db.delete(events).where(eq(events.id, event.id))
+    // 行は先に消えているので、R2の削除に失敗しても画面上は残らない（実体だけが残る）
+    if (files.length > 0) await c.env.FILES.delete(files.map((f) => f.r2Key))
+    return c.json({ ok: true })
+  })
+
+  // --- 添付ファイル -----------------------------------------------------------
+
+  .post('/:id/attachments', validate('form', attachmentUploadSchema), async (c) => {
+    const db = createDb(c.env)
+    const event = await findEvent(db, c.req.param('id'))
+    const session = c.get('session')
+    assertCanManage(session, event.createdBy)
+    // zod の File 型は Workers の型と合わないため、実行時の実体（Workers の File）として扱う
+    const file = c.req.valid('form').file as unknown as File
+
+    const existing = await db.select({ n: count() }).from(eventAttachments).where(eq(eventAttachments.eventId, event.id)).get()
+    if ((existing?.n ?? 0) >= ATTACHMENT_MAX_COUNT) throw badRequest(`添付ファイルは1イベントにつき${ATTACHMENT_MAX_COUNT}個までです`)
+
+    await assertStorageAvailable(db, file.size)
+
+    const id = crypto.randomUUID()
+    const r2Key = `events/${event.id}/${id}`
+    const contentType = file.type || 'application/octet-stream'
+    await c.env.FILES.put(r2Key, await file.arrayBuffer(), { httpMetadata: { contentType } })
+    try {
+      await db.insert(eventAttachments).values({
+        id,
+        eventId: event.id,
+        name: file.name.trim().slice(0, 200) || 'ファイル',
+        size: file.size,
+        contentType,
+        r2Key,
+        uploadedBy: session.userId,
+      })
+    } catch (error) {
+      await c.env.FILES.delete(r2Key)
+      throw error
+    }
+    return c.json({ id }, 201)
+  })
+
+  .get('/:id/attachments/:attachmentId', async (c) => {
+    const db = createDb(c.env)
+    const attachment = await db
+      .select()
+      .from(eventAttachments)
+      .where(and(eq(eventAttachments.id, c.req.param('attachmentId')), eq(eventAttachments.eventId, c.req.param('id'))))
+      .get()
+    const object = attachment && (await c.env.FILES.get(attachment.r2Key))
+    if (!attachment || !object) throw notFound('ファイルが見つかりません')
+
+    // アプリと同じオリジンで配信するため、HTMLなどがその場で開かれないよう常にダウンロードとして返す
+    return new Response(object.body as unknown as ReadableStream, {
+      headers: {
+        'Content-Type': attachment.contentType,
+        'Content-Length': String(attachment.size),
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(attachment.name)}`,
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'; sandbox",
+        'Cache-Control': 'private, max-age=0, must-revalidate',
+      },
+    })
+  })
+
+  .delete('/:id/attachments/:attachmentId', async (c) => {
+    const db = createDb(c.env)
+    const event = await findEvent(db, c.req.param('id'))
+    assertCanManage(c.get('session'), event.createdBy)
+    const attachment = await db
+      .select()
+      .from(eventAttachments)
+      .where(and(eq(eventAttachments.id, c.req.param('attachmentId')), eq(eventAttachments.eventId, event.id)))
+      .get()
+    if (!attachment) throw notFound('ファイルが見つかりません')
+    await db.delete(eventAttachments).where(eq(eventAttachments.id, attachment.id))
+    await c.env.FILES.delete(attachment.r2Key)
     return c.json({ ok: true })
   })
 
@@ -375,7 +488,7 @@ export const eventsRoute = new Hono<AppEnv>()
         set: { status, comment, updatedAt: now },
       })
 
-    // 不参加にしたら担当していた持ち物と講師の役割を手放す
+    // 不参加にしたら担当していた持ち物・シフトと講師の役割を手放す
     if (status === 'declined') {
       await db.batch([
         db
@@ -386,6 +499,7 @@ export const eventsRoute = new Hono<AppEnv>()
           .update(eventParticipants)
           .set({ role: 'assistant' })
           .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, session.userId))),
+        leaveAllShifts(db, event.id, session.userId),
       ])
     }
     return c.json({ ok: true })
@@ -446,14 +560,28 @@ export const eventsRoute = new Hono<AppEnv>()
     return c.json({ ok: true })
   })
 
+  // --- シフト ---------------------------------------------------------------
+
+  .route('/:id/shifts', eventShiftsRoute)
+
+  // --- 簡易報告書 -----------------------------------------------------------
+
+  .route('/:id/light-report', eventLightReportsRoute)
+
   // --- 持ち物 ---------------------------------------------------------------
 
   .post('/:id/items', validate('json', itemInputSchema), async (c) => {
     const db = createDb(c.env)
     const event = await findEvent(db, c.req.param('id'))
     assertCanManage(c.get('session'), event.createdBy)
+    const input = c.req.valid('json')
+    if (input.kind === 'personal') input.assigneeId = null
+    else if (input.assigneeId) {
+      const assignee = await db.select({ id: users.id }).from(users).where(eq(users.id, input.assigneeId)).get()
+      if (!assignee) throw badRequest('担当者が見つかりません')
+    }
     const id = crypto.randomUUID()
-    await db.insert(eventItems).values({ ...c.req.valid('json'), id, eventId: event.id })
+    await db.insert(eventItems).values({ ...input, id, eventId: event.id })
     return c.json({ id }, 201)
   })
 
@@ -490,9 +618,15 @@ export const eventsRoute = new Hono<AppEnv>()
       if (!assignee) throw badRequest('担当者が見つかりません')
     }
 
+    // 全員が持ってくるものには担当者も準備済みもない（非主催者は kind を変えられない）
+    const toPersonal = canManage(session, event.createdBy) && (input.kind ?? item.kind) === 'personal'
     await db
       .update(eventItems)
-      .set({ ...input, ...(assigneeChanged && input.prepared === undefined && { prepared: false }) })
+      .set({
+        ...input,
+        ...(assigneeChanged && input.prepared === undefined && { prepared: false }),
+        ...(toPersonal && { assigneeId: null, prepared: false }),
+      })
       .where(eq(eventItems.id, item.id))
     return c.json({ ok: true })
   })

@@ -14,5 +14,14 @@ export function parseEventForm(form: FormData) {
     fee: optionalInt(form, 'fee'),
     targetDivisions: texts(form, 'targetDivisions'),
     targetUserIds: texts(form, 'targetUserIds'),
+    // シフトなしのときは時間帯を保存しない
+    ...(text(form, 'hasShifts') === 'true'
+      ? {
+          hasShifts: true,
+          shiftStartHour: optionalInt(form, 'shiftStartHour'),
+          shiftEndHour: optionalInt(form, 'shiftEndHour'),
+          shiftSplitHour: optionalInt(form, 'shiftSplitHour'),
+        }
+      : { hasShifts: false, shiftStartHour: null, shiftEndHour: null, shiftSplitHour: null }),
   })
 }

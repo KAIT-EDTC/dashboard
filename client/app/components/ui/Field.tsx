@@ -1,7 +1,8 @@
 import { useId, type ComponentProps, type ReactNode } from 'react'
 import { css, cx } from 'styled-system/css'
 
-export const inputStyle = css({
+/** 幅などを上書きしたいときは css(inputStyleRaw, {...}) で合成する（cx だと CSS の出力順でどちらが勝つか決まる） */
+export const inputStyleRaw = css.raw({
   w: 'full',
   px: '12px',
   py: '8px',
@@ -18,6 +19,7 @@ export const inputStyle = css({
   _disabled: { opacity: 0.6, cursor: 'not-allowed' },
   '&[aria-invalid=true]': { borderColor: 'danger' },
 })
+export const inputStyle = css(inputStyleRaw)
 
 type FieldProps = {
   label: ReactNode
@@ -83,6 +85,7 @@ export function ChipCheckbox({ label, ...props }: { label: ReactNode } & Omit<Co
   return (
     <label
       className={css({
+        position: 'relative', // 隠しinputの基準。無いとフォーカス時に画面枠(overflow:hidden)がスクロールして崩れる
         display: 'inline-flex',
         alignItems: 'center',
         gap: 'xs',
@@ -101,6 +104,7 @@ export function ChipCheckbox({ label, ...props }: { label: ReactNode } & Omit<Co
         _hover: { borderColor: 'border.strong' },
         '&:has(input:checked)': { bg: 'accent.subtle', borderColor: 'accent', color: 'accent.fg' },
         '&:has(input:focus-visible)': { shadow: 'focus' },
+        '&:has(input:disabled)': { opacity: 0.5, cursor: 'not-allowed', _hover: { borderColor: 'border' } },
       })}
     >
       <input type="checkbox" className={css({ srOnly: true })} {...props} />

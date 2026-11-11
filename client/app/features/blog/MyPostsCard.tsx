@@ -23,7 +23,7 @@ export function MyPostsCard({ posts }: { posts: PostListItem[] }) {
                 className={css({ display: 'flex', alignItems: 'center', gap: 'sm', px: 'lg', py: '12px', color: 'fg', borderTopWidth: '1px', _hover: { bg: 'surface.subtle', color: 'fg' } })}
               >
                 <PostStatusBadge status={post.status} />
-                <span className={css({ flex: 1, fontWeight: '500', truncate: true })}>{post.title || '無題の記事'}</span>
+                <span className={css({ flex: 1, minW: 0, fontWeight: '500', truncate: true })}>{post.title || '無題の記事'}</span>
                 <span className={css({ fontSize: 'xs', color: 'fg.subtle' })}>{formatTimestamp(post.updatedAt)}</span>
               </Link>
             </li>

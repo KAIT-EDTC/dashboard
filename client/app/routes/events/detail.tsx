@@ -1,22 +1,26 @@
-import { isEditableStatus, ITEM_KINDS, nowInJst, PARTICIPANT_ROLES, RSVP_STATUSES } from '@edtc/shared'
-import { Form } from 'react-router'
+import { isEditableStatus, nowInJst, PARTICIPANT_ROLES, RSVP_STATUSES } from '@edtc/shared'
+import { Form, useSearchParams } from 'react-router'
 import { css } from 'styled-system/css'
 import { Button, ButtonLink } from '~/components/ui/Button'
 import { EditIcon, FileTextIcon, PenIcon } from '~/components/ui/Icons'
 import { PageHeader } from '~/components/ui/PageHeader'
 import { useCurrentUser } from '~/features/auth/use-current-user'
 import { CategoryBadge } from '~/features/events/EventBadges'
+import { Alert } from '~/components/ui/Alert'
+import { filesFrom, uploadAttachments } from '~/features/events/attachments'
 import { EventInfo } from '~/features/events/EventInfo'
-import { ItemList } from '~/features/events/ItemList'
+import { bringerToFields, ItemList } from '~/features/events/ItemList'
 import { ParticipantList } from '~/features/events/ParticipantList'
 import { RsvpPanel } from '~/features/events/RsvpPanel'
+import { ShiftList } from '~/features/events/ShiftList'
 import { EventNotices, EventReports } from '~/features/reports/EventReports'
 import { EventSummary, SummaryButton } from '~/features/reports/EventSummary'
-import { api, unwrap } from '~/lib/api'
-import { catchApiError, text, type FormErrors } from '~/lib/form'
+import { LightReports } from '~/features/reports/LightReports'
+import { ApiError, api, unwrap } from '~/lib/api'
+import { catchApiError, text, texts, type FormErrors } from '~/lib/form'
 import type { Route } from './+types/detail'
 
-export const meta: Route.MetaFunction = ({ data }) => [{ title: `${data?.event.title ?? 'イベント'} | EDTC ダッシュボード` }]
+export const meta: Route.MetaFunction = ({ loaderData: data }) => [{ title: `${data?.event.title ?? 'イベント'} | EDTC ダッシュボード` }]
 
 export async function clientLoader({ params }: Route.ClientLoaderArgs) {
   return unwrap(api.events[':id'].$get({ param: { id: params.eventId } }))
@@ -26,7 +30,7 @@ const bool = (value: string) => (value === '' ? undefined : value === 'true')
 const oneOf = <T extends string>(values: readonly T[], value: string, fallback: T): T =>
   (values as readonly string[]).includes(value) ? (value as T) : fallback
 
-/** 出欠・持ち物・参加者の記録は、このページの各パネルから intent 付きで送られてくる */
+/** 出欠・持ち物・シフト・参加者の記録は、このページの各パネルから intent 付きで送られてくる */
 export async function clientAction({ request, params }: Route.ClientActionArgs): Promise<FormErrors | { ok: true }> {
   const form = await request.formData()
   const id = params.eventId
@@ -45,7 +49,7 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
             param: { id },
             json: {
               name: text(form, 'name'),
-              kind: oneOf(ITEM_KINDS, text(form, 'kind'), 'shared'),
+              ...bringerToFields(text(form, 'bringer')),
               quantity: Number(text(form, 'quantity') || 1),
               note: text(form, 'note'),
             },
@@ -56,15 +60,35 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
           api.events[':id'].items[':itemId'].$patch({
             param: { id, itemId: text(form, 'itemId') },
             json: {
+              // 編集モーダルは持ち物・数量・メモをまとめて送る
+              ...(form.has('name') && { name: text(form, 'name'), quantity: Number(text(form, 'quantity') || 1), note: text(form, 'note') }),
+              ...(form.has('bringer') && bringerToFields(text(form, 'bringer'))),
               ...(form.has('assigneeId') && { assigneeId: text(form, 'assigneeId') || null }),
               ...(form.has('prepared') && { prepared: bool(text(form, 'prepared')) }),
             },
           }),
         )
+      case 'availability':
+        return unwrap(api.events[':id'].shifts.availability.$put({ param: { id }, json: { unavailable: texts(form, 'unavailable') } }))
+      case 'join-shift':
+        return unwrap(api.events[':id'].shifts[':shiftId'].me.$put({ param: { id, shiftId: text(form, 'shiftId') }, json: { joined: text(form, 'joined') === 'true' } }))
+      case 'light-report':
+        return unwrap(api.events[':id']['light-report'].$put({ param: { id }, json: { body: text(form, 'body') } }))
+      case 'delete-light-report':
+        return unwrap(api.events[':id']['light-report'].$delete({ param: { id } }))
       case 'summary-writer':
         return unwrap(api.events[':id']['summary-writer'].$put({ param: { id }, json: { userId: text(form, 'userId') || null } }))
       case 'delete-item':
         return unwrap(api.events[':id'].items[':itemId'].$delete({ param: { id, itemId: text(form, 'itemId') } }))
+      case 'upload-attachment': {
+        const files = filesFrom(form, 'file')
+        if (files.length === 0) throw new ApiError(400, 'ファイルを選択してください')
+        const failed = await uploadAttachments(id, files)
+        if (failed.length > 0) throw new ApiError(400, failed.join('\n'))
+        return { ok: true }
+      }
+      case 'delete-attachment':
+        return unwrap(api.events[':id'].attachments[':attachmentId'].$delete({ param: { id, attachmentId: text(form, 'attachmentId') } }))
       case 'update-participant':
         return unwrap(
           api.events[':id'].participants[':userId'].$patch({
@@ -86,8 +110,10 @@ export async function clientAction({ request, params }: Route.ClientActionArgs):
 export { RouteErrorBoundary as ErrorBoundary } from '~/components/layout/RouteErrorBoundary'
 
 export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
-  const { event, canManage, isTarget, pending, reports, myReport, canWriteReport, summary } = loaderData
+  const { event, canManage, isTarget, pending, reports, myReport, canWriteReport, summary, lightReports, canWriteLightReport } = loaderData
   const me = useCurrentUser()
+  const [params] = useSearchParams()
+  const attachFailed = Number(params.get('attachFailed')) || 0
   const started = event.startsAt <= nowInJst()
 
   return (
@@ -129,13 +155,23 @@ export default function EventDetailPage({ loaderData }: Route.ComponentProps) {
           </>
         }
       />
+      {attachFailed > 0 && (
+        <div className={css({ mb: 'lg' })}>
+          <Alert tone="warning">{`イベントは保存しましたが、添付ファイルの追加・削除に失敗したものが${attachFailed}件あります。「概要」の添付ファイルを確認して、もう一度操作してください。`}</Alert>
+        </div>
+      )}
       <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', lg: '3fr 2fr' }, gap: 'lg', alignItems: 'start' })}>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
-          <EventInfo event={event} />
+          <EventInfo event={event} canManage={canManage} />
           <EventNotices reports={reports} />
           {/* 報告書を書かない種類のイベントには出さない（書かない設定にする前の承認済みの報告書は残す） */}
           {event.hasReport && <EventSummary event={event} summary={summary} canManage={canManage} started={started} />}
           {started && (event.hasReport || reports.length > 0) && <EventReports event={event} reports={reports} />}
+          {/* 簡易報告書は事後報告だけで承認がなく、書いた人の名前付きで載る（書かない設定にする前のものは残す） */}
+          {started && (event.hasLightReport || lightReports.length > 0) && (
+            <LightReports reports={lightReports} userId={me.id} canWrite={canWriteLightReport} />
+          )}
+          <ShiftList event={event} userId={me.id} />
           <ItemList event={event} userId={me.id} canManage={canManage} />
         </div>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>

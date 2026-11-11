@@ -1,18 +1,23 @@
-import type { Division, EventInput } from '@edtc/shared'
+import { hourLabel, type Division, type EventInput } from '@edtc/shared'
 import { useState, type ReactNode } from 'react'
 import { Form } from 'react-router'
 import { css } from 'styled-system/css'
 import { Alert } from '~/components/ui/Alert'
 import { Button } from '~/components/ui/Button'
 import { Card } from '~/components/ui/Card'
-import { SelectField, TextareaField, TextField } from '~/components/ui/Field'
+import { Checkbox, SelectField, TextareaField, TextField } from '~/components/ui/Field'
+import { AttachmentField } from '~/features/events/AttachmentField'
 import { DivisionPicker } from '~/features/members/DivisionPicker'
 import { MemberPicker } from '~/features/members/MemberPicker'
 import type { MemberListItem } from '~/features/members/types'
 import type { FormErrors } from '~/lib/form'
+import type { EventAttachment } from './types'
 
 type EventFormProps = {
   defaultValue?: Partial<EventInput>
+  /** 編集時の、すでに添付されているファイルとイベントID */
+  attachments?: EventAttachment[]
+  eventId?: string
   /** 種類の選択肢（管理者が管理する） */
   categories: { id: string; label: string }[]
   /** 対象者の選択と人数の表示に使う */
@@ -24,7 +29,67 @@ type EventFormProps = {
   secondaryActions?: ReactNode
 }
 
-export function EventForm({ defaultValue = {}, categories, members, errors, submitting, submitLabel, secondaryActions }: EventFormProps) {
+const HOURS = Array.from({ length: 25 }, (_, hour) => hour)
+
+/** シフトの有無と時間帯。区切りがあれば日ごとに午前・午後の2枠、無ければ1枠を作る */
+function ShiftSettings({ defaultValue, errors }: { defaultValue: Partial<EventInput>; errors: Record<string, string> }) {
+  const [enabled, setEnabled] = useState(defaultValue.hasShifts ?? false)
+  const [start, setStart] = useState(defaultValue.shiftStartHour ?? 9)
+  const [end, setEnd] = useState(defaultValue.shiftEndHour ?? 17)
+  const [split, setSplit] = useState<number | null>(defaultValue.hasShifts ? (defaultValue.shiftSplitHour ?? null) : 12)
+  const grid = css({ display: 'grid', gridTemplateColumns: { base: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 'md' })
+  const validSplit = split !== null && split > start && split < end
+
+  return (
+    <Card title="シフト">
+      <div className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
+        <Checkbox label="シフトを組む（文化祭の店番など）" name="hasShifts" value="true" checked={enabled} onChange={(e) => setEnabled(e.currentTarget.checked)} />
+        {enabled && (
+          <>
+            <div className={grid}>
+              <SelectField label="開始時刻" name="shiftStartHour" value={start} onChange={(e) => setStart(Number(e.currentTarget.value))} error={errors.shiftStartHour}>
+                {HOURS.slice(0, 24).map((hour) => (
+                  <option key={hour} value={hour}>
+                    {hourLabel(hour)}
+                  </option>
+                ))}
+              </SelectField>
+              <SelectField label="終了時刻" name="shiftEndHour" value={end} onChange={(e) => setEnd(Number(e.currentTarget.value))} error={errors.shiftEndHour}>
+                {HOURS.slice(1).map((hour) => (
+                  <option key={hour} value={hour}>
+                    {hourLabel(hour)}
+                  </option>
+                ))}
+              </SelectField>
+              <SelectField
+                label="午前・午後の区切り"
+                name="shiftSplitHour"
+                value={split ?? ''}
+                onChange={(e) => setSplit(e.currentTarget.value === '' ? null : Number(e.currentTarget.value))}
+                error={errors.shiftSplitHour}
+              >
+                <option value="">区切らない</option>
+                {HOURS.filter((hour) => hour > start && hour < end).map((hour) => (
+                  <option key={hour} value={hour}>
+                    {hourLabel(hour)}
+                  </option>
+                ))}
+              </SelectField>
+            </div>
+            <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
+              {end > start &&
+                (validSplit
+                  ? `イベントの日ごとに「午前 ${hourLabel(start)}〜${hourLabel(split)}」「午後 ${hourLabel(split)}〜${hourLabel(end)}」の枠を作ります。`
+                  : `イベントの日ごとに ${hourLabel(start)}〜${hourLabel(end)} の枠を1つ作ります。`)}
+            </p>
+          </>
+        )}
+      </div>
+    </Card>
+  )
+}
+
+export function EventForm({ defaultValue = {}, attachments, eventId, categories, members, errors, submitting, submitLabel, secondaryActions }: EventFormProps) {
   const e = errors?.fieldErrors ?? {}
   const [targetDivisions, setTargetDivisions] = useState<Division[]>(defaultValue.targetDivisions ?? [])
   const [targetUserIds, setTargetUserIds] = useState<string[]>(defaultValue.targetUserIds ?? [])
@@ -32,7 +97,7 @@ export function EventForm({ defaultValue = {}, categories, members, errors, subm
   const targeted = targetDivisions.length > 0 || targetUserIds.length > 0
   const grid = css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: '1fr 1fr' }, gap: 'md' })
   return (
-    <Form method="post" className={css({ display: 'flex', flexDirection: 'column', gap: 'lg', maxW: '760px' })}>
+    <Form method="post" encType="multipart/form-data" className={css({ display: 'flex', flexDirection: 'column', gap: 'lg', maxW: '760px' })}>
       {errors?.error && <Alert>{errors.error}</Alert>}
       <Card title="基本情報">
         <div className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
@@ -50,6 +115,7 @@ export function EventForm({ defaultValue = {}, categories, members, errors, subm
             <TextField label="終了日時" name="endsAt" type="datetime-local" defaultValue={defaultValue.endsAt ?? ''} error={e.endsAt} />
           </div>
           <TextareaField label="説明" name="description" rows={5} defaultValue={defaultValue.description} placeholder="内容・集合場所・服装など" error={e.description} />
+          <AttachmentField existing={attachments} eventId={eventId} />
         </div>
       </Card>
 
@@ -61,6 +127,7 @@ export function EventForm({ defaultValue = {}, categories, members, errors, subm
         </div>
       </Card>
 
+      <ShiftSettings defaultValue={defaultValue} errors={e} />
 
       <Card
         title="対象"
