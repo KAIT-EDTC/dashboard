@@ -218,6 +218,14 @@ npm run dev                        # client: http://localhost:5173 / server: htt
 
 ダミーデータ（`server/seed/`）はIDが `seed-` で始まり、自分のユーザーやデータには触らない。学年とイベントの日付は実行した日を基準に計算する。ダミーメンバーは実在のDiscordユーザーではないので、Discordのメンションは届かない。`--local` 固定のため本番のD1には入らない。
 
+### コミット前のシークレット検査
+
+`npm install` すると `.githooks/pre-commit` が有効になり、`git commit` のたびにステージ済みのファイルを [secretlint](https://github.com/secretlint/secretlint) で検査する（APIキー・トークン・PEM秘密鍵など）。検出されたらコミットは止まる。
+
+- 検出された値は消して、`server/.dev.vars` など gitignore 済みのファイルに置く
+- 誤検知なら `.secretlintignore` にパスを足すか、該当行に `secretlint-disable-line` のコメントを付ける
+- `git commit --no-verify` で飛ばせるが最後の手段。本物の秘密情報をコミットしてしまったら、消すだけでなく値の再発行までする
+
 ### ダミーユーザーでログインする
 
 `server/.dev.vars` に `DEV_LOGIN=true` を書いてサーバーを起動し直すと、ログイン画面の下にダミーユーザーの一覧が出て、選ぶだけでそのユーザーとしてログインできる（Discordは使わない）。別のユーザーに切り替えるときはログアウトして選び直す。
