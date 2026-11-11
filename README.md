@@ -124,7 +124,7 @@ JWT の秘密鍵は、 `openssl rand -base64 32` で設定すると良いです�
 
 以下のコマンドはリポジトリ直下で実行してください。
 
-client, server で必要な依存関係をインストールします。
+client, server で必要な依存関係をインストールします(機密情報を漏洩させないため `secretlint` フックもインストールされます)。
 
 ```sh
 npm install
