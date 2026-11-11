@@ -112,7 +112,7 @@ Webhook の Secret は、`openssl rand -base64 32` などで秘密鍵を生成�
 - `DISCORD_REDIRECT_URI`
 - `JWT_SECRET`
 
-上 2 つは `https://discord.com/developers/applications/` でアプリケーションを作ればすぐに取得でいます。
+上 2 つは `https://discord.com/developers/applications/` でアプリケーションを作ればすぐに取得できます。
 リダイレクト URI は アプリケーションと `.dev.vars` の両方に `http://localhost:8787/api/auth/callback`を設定してください。
 スコープは `identify` と `guilds.members.read` で十分です。
 
