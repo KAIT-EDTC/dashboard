@@ -8,7 +8,6 @@ export type Bindings = {
   FILES: R2Bucket
 
   FRONTEND_URL: string
-  COOKIE_DOMAIN?: string
   JWT_SECRET: string
 
   DISCORD_CLIENT_ID: string
