@@ -1,26 +1,18 @@
-# `cp .dev.vars.example .dev.vars` して値を埋める（.dev.vars はコミットしない）
+# cp .dev.vars.example .dev.vars して必要に応じて値を埋めてください。
+# 基本的な開発では DEV_LOGIN さえ埋めてあれば OK です。
 
-# --- Discord OAuth2 (https://discord.com/developers/applications) ---
+# 開発時ダミーユーザーでログイン
+DEV_LOGIN=true
+
+# 認証周りの開発で必須
+JWT_SECRET=
 DISCORD_CLIENT_ID=
 DISCORD_CLIENT_SECRET=
-DISCORD_REDIRECT_URI=http://localhost:8787/api/auth/callback
-# EDTCサーバーのID
+DISCORD_REDIRECT_URI=
 DISCORD_GUILD_ID=
-# 通知（チャンネル・活動報告書のDM）を送るBotのトークン（未設定なら送らない）。送り先チャンネルはダッシュボードの「通知設定」で選ぶ
 DISCORD_BOT_TOKEN=
 
-# --- Session ---
-JWT_SECRET=
-# 本番のみ（例: .kaitedtc.com）。未設定ならホスト限定Cookie
-COOKIE_DOMAIN=
-
-# --- GitHub App (ブログPR用) ---
+# GitHub App (ブログPR用)
 GITHUB_APP_ID=
-# PEM（改行は \n でエスケープ可）。PKCS#1 / PKCS#8 どちらでも可
 GITHUB_APP_PRIVATE_KEY=
 GITHUB_WEBHOOK_SECRET=
-
-# --- ローカル開発 ---
-# true にすると、ログイン画面からシードのダミーユーザー（npm run db:seed）を選んでログインできる。
-# FRONTEND_URL が http://localhost のときだけ有効。本番では設定しないこと
-DEV_LOGIN=

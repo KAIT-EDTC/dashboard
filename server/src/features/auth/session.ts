@@ -18,7 +18,6 @@ function cookieOptions(c: Context<AppEnv>, maxAge?: number): CookieOptions {
     httpOnly: true,
     sameSite: 'Lax',
     secure: c.env.FRONTEND_URL.startsWith('https://'),
-    ...(c.env.COOKIE_DOMAIN && { domain: c.env.COOKIE_DOMAIN }),
     ...(maxAge !== undefined && { maxAge }),
   }
 }

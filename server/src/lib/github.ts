@@ -22,39 +22,18 @@ export class GitHubError extends Error {
 // 認証（App JWT → Installation Access Token）
 // ---------------------------------------------------------------------------
 
-function pemToDer(pem: string): Uint8Array<ArrayBuffer> {
-  const base64 = pem.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '')
-  return Uint8Array.from(atob(base64), (ch) => ch.charCodeAt(0))
+/** 鍵は PKCS#8 DER の base64で受け取る。*/
+async function importPrivateKey(base64Der: string): Promise<CryptoKey> {
+  if (base64Der.includes('BEGIN')) {
+    throw new Error('GITHUB_APP_PRIVATE_KEY は PEM ではなく PKCS#8 DER の base64 で設定してください')
+  }
+  const der = Uint8Array.from(atob(base64Der.trim()), (ch) => ch.charCodeAt(0))
+  return crypto.subtle.importKey('pkcs8', der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign'])
 }
 
-function derLength(length: number): number[] {
-  if (length < 0x80) return [length]
-  const bytes: number[] = []
-  for (let n = length; n > 0; n >>= 8) bytes.unshift(n & 0xff)
-  return [0x80 | bytes.length, ...bytes]
-}
-
-/** GitHubが発行する PKCS#1 形式の鍵を WebCrypto が読める PKCS#8 に包み直す */
-function pkcs1ToPkcs8(pkcs1: Uint8Array): Uint8Array<ArrayBuffer> {
-  const version = [0x02, 0x01, 0x00]
-  const rsaAlgorithm = [0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00]
-  const octetHeader = [0x04, ...derLength(pkcs1.length)]
-  const bodyLength = version.length + rsaAlgorithm.length + octetHeader.length + pkcs1.length
-  const out = new Uint8Array([0x30, ...derLength(bodyLength), ...version, ...rsaAlgorithm, ...octetHeader, ...new Array(pkcs1.length)])
-  out.set(pkcs1, out.length - pkcs1.length)
-  return out
-}
-
-async function importPrivateKey(pem: string): Promise<CryptoKey> {
-  const normalized = pem.replace(/\\n/g, '\n')
-  const der = pemToDer(normalized)
-  const pkcs8 = normalized.includes('BEGIN RSA PRIVATE KEY') ? pkcs1ToPkcs8(der) : der
-  return crypto.subtle.importKey('pkcs8', pkcs8, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign'])
-}
-
-async function createAppJwt(appId: string, privateKeyPem: string): Promise<string> {
+async function createAppJwt(appId: string, privateKey: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
-  const key = await importPrivateKey(privateKeyPem)
+  const key = await importPrivateKey(privateKey)
   // 時計のずれを考慮して iat を過去にずらす（最大有効期間は10分）
   return sign({ iat: now - 60, exp: now + 9 * 60, iss: appId }, key, 'RS256')
 }

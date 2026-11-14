@@ -91,10 +91,10 @@ Bot のトークンは `https://discord.com/developers/applications/` で開発�
 - `GITHUB_APP_PRIVATE_KEY`
 - `GITHUB_WEBHOOK_SECRET` (提出後のレビューの状態等を受け取るために必要)
 
-Github App の Private Key は App の設定の Credentials から生成し、 `.pem` をダウンロードして以下のコマンドで改行を `\n` に置き換えて追記すると楽です。(Windows では WSL か Git Bash で実行できます。)
+Github App の Private Key は App の設定の Credentials > Key pairs > New key から `.pem` をダウンロードして以下のコマンドで変換して変数に登録してください。
 
 ```sh
-printf 'GITHUB_APP_PRIVATE_KEY="%s"\n' "$(awk 'NF{printf "%s\\n", $0}' <.pemのファイルパス>)" >> .dev.vars
+openssl pkcs8 -topk8 -nocrypt -in <.pemのファイルパス> -outform DER | base64 -w0
 ```
 
 Webhook の Secret は、`openssl rand -base64 32` などで秘密鍵を生成して、`.dev.vars` と Github App の両方に設定してください。
