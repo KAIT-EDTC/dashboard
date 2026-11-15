@@ -1,4 +1,4 @@
-import { articleIdBase, seriesLabel, type BlogPostContent } from '@edtc/shared'
+import { articleIdBase, categoryLabel, type BlogPostContent } from '@edtc/shared'
 import { useMemo } from 'react'
 import { css } from 'styled-system/css'
 import { Badge } from '~/components/ui/Badge'
@@ -58,12 +58,12 @@ export function ListCardPreview({ postId, content }: { postId: string; content: 
 
 /** 記事ページ全体（閲覧用） */
 export function ArticlePreview({ postId, content, articleId: fixedId }: { postId: string; content: BlogPostContent; articleId?: string | null }) {
-  const articleId = fixedId || articleIdBase(content.eventDate, content.series)
+  const articleId = fixedId || articleIdBase(content.eventDate, content.category)
   return (
     <article className={css({ display: 'flex', flexDirection: 'column', gap: 'md', maxW: '760px' })}>
       <header className={css({ display: 'flex', flexDirection: 'column', gap: 'xs' })}>
         <div className={css({ display: 'flex', flexWrap: 'wrap', gap: 'xs' })}>
-          {content.series && <Badge tone="accent">{seriesLabel(content.series)}</Badge>}
+          {content.category && <Badge tone="accent">{categoryLabel(content.category)}</Badge>}
           {content.pickup && <Badge tone="warning">ピックアップ</Badge>}
         </div>
         <h2 className={css({ fontSize: '2xl', fontWeight: '700' })}>{content.title || '（タイトル未入力）'}</h2>

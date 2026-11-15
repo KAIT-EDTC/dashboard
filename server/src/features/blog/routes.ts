@@ -101,7 +101,7 @@ export const blogRoute = new Hono<AppEnv>()
     const db = createDb(c.env)
     const post = await findPost(db, c.req.param('id'))
     assertCanManage(c.get('session'), post.authorId)
-    // 公開済みの記事IDは変わらないので、種別は付け直してよい（サイトでの分類だけが変わる）
+    // 公開済みの記事IDは変わらないので、カテゴリは付け直してよい（サイトでの分類だけが変わる）
     if (post.publishedAt && input.eventDate !== post.eventDate) throw badRequest('公開済みの記事は日付を変更できません')
 
     // 使われなくなった画像を消す。提出済みの内容が参照している画像と、

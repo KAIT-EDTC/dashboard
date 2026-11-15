@@ -1,4 +1,4 @@
-import { isBlogSeriesId, referencedImages, type BlogPostContent } from '@edtc/shared'
+import { isBlogCategoryId, referencedImages, type BlogPostContent } from '@edtc/shared'
 import type { blogPosts } from '../../db/schema'
 
 type PostRow = typeof blogPosts.$inferSelect
@@ -8,7 +8,7 @@ export function contentOf(post: Pick<PostRow, keyof BlogPostContent>): BlogPostC
   return {
     title: post.title,
     eventDate: post.eventDate,
-    series: post.series,
+    category: post.category,
     description: post.description,
     authorName: post.authorName,
     pickup: post.pickup,
@@ -21,19 +21,19 @@ export function imagesOf(content: BlogPostContent | null | undefined): string[] 
   return content ? referencedImages(content) : []
 }
 
-type LegacySnapshot = Omit<BlogPostContent, 'series' | 'pickup'> & { series?: string; pickup?: boolean; slug?: string; tags?: string[] }
+type LegacySnapshot = Omit<BlogPostContent, 'category' | 'pickup'> & { category?: string; series?: string; pickup?: boolean; slug?: string; tags?: string[] }
 
 /**
  * 古い形式で提出した内容を今の形に揃える。
- * - series がなく slug がある（最初の形式）
+ * - series（category の旧名）で保存されている / category も series もなく slug がある（最初の形式）
  * - タグとイベント種別が別だった形式（tags があり pickup がない。種別 outreach は学外イベントに、event / other は未選択に）
  */
 export function normalizeSnapshot(snapshot: BlogPostContent): BlogPostContent {
-  const { slug: _legacySlug, tags, series = '', pickup, ...rest } = snapshot as LegacySnapshot
-  const migrated = series === 'outreach' ? 'offcampus' : series
+  const { slug: _legacySlug, tags, series, category = series ?? '', pickup, ...rest } = snapshot as LegacySnapshot
+  const migrated = category === 'outreach' ? 'offcampus' : category
   return contentOf({
     ...rest,
-    series: isBlogSeriesId(migrated) ? migrated : '',
+    category: isBlogCategoryId(migrated) ? migrated : '',
     pickup: pickup ?? !!tags?.includes('ピックアップ'),
   })
 }

@@ -9,8 +9,8 @@ import type { BlogPublisher } from './publisher'
  * 提出する記事の記事IDを決める。
  *
  * - 公開済みなら変わらない
- * - すでに今の日付・イベント種別に合うID（または旧ルールで提出済みのID）を持っていれば、そのまま使う
- * - それ以外は「YY-MM-DD-イベント種別」から始めて、使用済みなら -2, -3… と連番を付ける
+ * - すでに今の日付・カテゴリに合うID（または旧ルールで提出済みのID）を持っていれば、そのまま使う
+ * - それ以外は「YY-MM-DD-カテゴリ」から始めて、使用済みなら -2, -3… と連番を付ける
  *   （使用済み = 他の提出済み記事のID、または EDTCHP にすでにあるフォルダ）
  */
 export async function resolveArticleId(
@@ -21,9 +21,9 @@ export async function resolveArticleId(
 ): Promise<string> {
   if (post.publishedAt && post.articleId) return post.articleId
 
-  const base = articleIdBase(content.eventDate, content.series)
-  if (post.articleId && (!content.series || isArticleIdOf(post.articleId, base))) return post.articleId
-  if (!base) throw badRequest('イベント実施日とイベント種別を入力してください')
+  const base = articleIdBase(content.eventDate, content.category)
+  if (post.articleId && (!content.category || isArticleIdOf(post.articleId, base))) return post.articleId
+  if (!base) throw badRequest('イベント実施日とカテゴリを入力してください')
 
   for (let n = 1; n <= 99; n++) {
     const candidate = n === 1 ? base : `${base}-${n}`
@@ -34,5 +34,5 @@ export async function resolveArticleId(
       .get()
     if (!taken && !(await publisher.articleExists(candidate))) return candidate
   }
-  throw badRequest('同じ日付・イベント種別の記事が多すぎます')
+  throw badRequest('同じ日付・カテゴリの記事が多すぎます')
 }

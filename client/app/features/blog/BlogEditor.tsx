@@ -1,4 +1,4 @@
-import { BLOG_SERIES, validateBodyForSubmit, validateInfoForSubmit, type BlogPostContent } from '@edtc/shared'
+import { BLOG_CATEGORIES, validateBodyForSubmit, validateInfoForSubmit, type BlogPostContent } from '@edtc/shared'
 import { useEffect, useState } from 'react'
 import { useBlocker, useFetcher, useSearchParams } from 'react-router'
 import { css } from 'styled-system/css'
@@ -119,17 +119,17 @@ export function BlogEditor({ post, hasUnsubmittedChanges, githubConfigured }: Po
               <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', md: '1fr 1fr' }, gap: 'md' })}>
                 <TextField label="イベント実施日" type="date" value={content.eventDate} onChange={(e) => set('eventDate', e.currentTarget.value)} required disabled={locked} error={fieldErrors.eventDate} />
                 <SelectField
-                  label="イベント種別"
-                  value={content.series}
-                  onChange={(e) => set('series', e.currentTarget.value as BlogPostContent['series'])}
+                  label="カテゴリ"
+                  value={content.category}
+                  onChange={(e) => set('category', e.currentTarget.value as BlogPostContent['category'])}
                   required
-                  error={fieldErrors.series}
+                  error={fieldErrors.category}
                   hint="遊行塾・レク以外は、学内か学外かで選ぶ"
                 >
                   <option value="">選択してください</option>
-                  {BLOG_SERIES.map((series) => (
-                    <option key={series.id} value={series.id}>
-                      {series.label}
+                  {BLOG_CATEGORIES.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.label}
                     </option>
                   ))}
                 </SelectField>
