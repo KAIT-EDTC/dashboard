@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@secretlint/secretlint-rule-preset-recommend": "^13.1.0",
-    "concurrently": "^10.0.6",
+    "concurrently": "^10.0.7",
     "secretlint": "^13.1.0",
     "typescript": "~6.0.3"
   }
