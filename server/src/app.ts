@@ -20,6 +20,8 @@ app.use('/api/*', (c, next) => csrf({ origin: c.env.FRONTEND_URL })(c, next))
 
 app.onError((error, c) => {
   if (error instanceof HTTPException) {
+    // リダイレクトなど、レスポンスを指定して投げられた場合はそれを返す
+    if (error.status === 302) return error.getResponse()
     return c.json({ error: error.message }, error.status)
   }
   console.error(error)
