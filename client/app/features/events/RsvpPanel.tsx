@@ -29,7 +29,11 @@ const optionStyle = css({
 export function RsvpPanel({ event, userId, canManage, isTarget }: { event: EventDetail; userId: string; canManage: boolean; isTarget: boolean }) {
   const fetcher = useFetcher<FormErrors | { ok: true }>()
   const mine = event.participants.find((p) => p.userId === userId)
-  const closed = !!event.rsvpDeadline && nowInJst() > event.rsvpDeadline && !canManage
+  const now = nowInJst()
+  const pastDeadline = !!event.rsvpDeadline && now > event.rsvpDeadline && !canManage
+  // 回答し忘れたまま始まったイベントは、後から報告書を書けるように「参加」とだけ回答できる
+  const lateJoin = pastDeadline && !mine && event.startsAt <= now
+  const closed = pastDeadline && !lateJoin
   const error = fetcher.data && 'error' in fetcher.data ? fetcher.data.error : undefined
 
   return (
@@ -37,6 +41,7 @@ export function RsvpPanel({ event, userId, canManage, isTarget }: { event: Event
       <fetcher.Form method="post" className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
         <input type="hidden" name="intent" value="rsvp" />
         {closed && <Alert tone="warning">回答期限を過ぎています。変更したい場合は主催者に連絡してください。</Alert>}
+        {lateJoin && <Alert tone="warning">回答期限を過ぎていますが、未回答のため「参加」とだけ回答できます。参加していた場合は回答してから報告書を書いてください。</Alert>}
         {error && <Alert>{error}</Alert>}
         {!isTarget && !mine && (
           <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
@@ -45,9 +50,9 @@ export function RsvpPanel({ event, userId, canManage, isTarget }: { event: Event
         )}
         <fieldset disabled={closed} className={css({ display: 'flex', gap: 'sm' })}>
           <legend className={css({ srOnly: true })}>出欠</legend>
-          {RSVP_STATUSES.map((status: RsvpStatus) => (
+          {(lateJoin ? (['going'] as const) : RSVP_STATUSES).map((status: RsvpStatus) => (
             <label key={status} className={cx(optionStyle)}>
-              <input type="radio" name="status" value={status} defaultChecked={mine?.status === status} required className={css({ srOnly: true })} />
+              <input type="radio" name="status" value={status} defaultChecked={lateJoin || mine?.status === status} required className={css({ srOnly: true })} />
               {RSVP_STATUS_LABELS[status]}
             </label>
           ))}
