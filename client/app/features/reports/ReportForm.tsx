@@ -94,8 +94,8 @@ export function ReportForm({ context, initial, status, divisions, canDelete, rej
               errors={fieldErrors}
               onChange={(next) => setContent((prev) => ({ ...prev, ...next }))}
             />
-            {field('content', { rows: 5, required: true, placeholder: '当日行ったこと（担当した作業・進行など）', max: REPORT_LIMITS.content.max })}
-            {field('reflection', { rows: 10, required: true, placeholder: '良かった点・反省点・次回に向けて改善したいこと', max: REPORT_LIMITS.reflection.max })}
+            {field('content', { rows: 5, required: true, placeholder: '計画していた活動内容（担当する作業・進行など）', max: REPORT_LIMITS.content.max })}
+            {field('reflection', { rows: 10, required: true, placeholder: '準備段階でなにを行ったか・計画とどう違ったか・反省点・次回に向けて', max: REPORT_LIMITS.reflection.max })}
             <RatingInput label={REPORT_FIELD_LABELS.rating} value={content.rating} onChange={(rating) => set('rating', rating)} error={fieldErrors.rating} />
             {field('notes', { rows: 3, placeholder: '次回の担当者への引き継ぎ、忘れ物、備品の不具合など（任意）', max: REPORT_LIMITS.notes.max })}
           </div>
