@@ -474,14 +474,14 @@ export const eventsRoute = new Hono<AppEnv>()
 
     const nowJst = nowInJst()
     if (event.rsvpDeadline && nowJst > event.rsvpDeadline && !canManage(session, event.createdBy)) {
-      // 回答し忘れたまま始まったイベントは、後から報告書を書けるように「参加」とだけ回答できる
+      // 回答し忘れたまま始まったイベントは、後から報告書を書けるように期限後でも回答できる
       const answered = await db
         .select({ userId: eventParticipants.userId })
         .from(eventParticipants)
         .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, session.userId)))
         .get()
-      const lateJoin = !answered && event.startsAt <= nowJst && status === 'going'
-      if (!lateJoin) throw badRequest('出欠の回答期限を過ぎています。主催者に連絡してください。')
+      const lateAnswer = !answered && event.startsAt <= nowJst
+      if (!lateAnswer) throw badRequest('出欠の回答期限を過ぎています。主催者に連絡してください。')
     }
     if (status === 'going' && event.capacity) {
       const others = await db

@@ -31,9 +31,9 @@ export function RsvpPanel({ event, userId, canManage, isTarget }: { event: Event
   const mine = event.participants.find((p) => p.userId === userId)
   const now = nowInJst()
   const pastDeadline = !!event.rsvpDeadline && now > event.rsvpDeadline && !canManage
-  // 回答し忘れたまま始まったイベントは、後から報告書を書けるように「参加」とだけ回答できる
-  const lateJoin = pastDeadline && !mine && event.startsAt <= now
-  const closed = pastDeadline && !lateJoin
+  // 回答し忘れたまま始まったイベントは、後から報告書を書けるように期限後でも回答できる
+  const lateAnswer = pastDeadline && !mine && event.startsAt <= now
+  const closed = pastDeadline && !lateAnswer
   const error = fetcher.data && 'error' in fetcher.data ? fetcher.data.error : undefined
 
   return (
@@ -41,7 +41,7 @@ export function RsvpPanel({ event, userId, canManage, isTarget }: { event: Event
       <fetcher.Form method="post" className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
         <input type="hidden" name="intent" value="rsvp" />
         {closed && <Alert tone="warning">回答期限を過ぎています。変更したい場合は主催者に連絡してください。</Alert>}
-        {lateJoin && <Alert tone="warning">回答期限を過ぎていますが、未回答のため「参加」とだけ回答できます。参加していた場合は回答してから報告書を書いてください。</Alert>}
+        {lateAnswer && <Alert tone="warning">回答期限を過ぎていますが、未回答のため回答できます。回答は一度だけで、後から変更したい場合は主催者に連絡してください。</Alert>}
         {error && <Alert>{error}</Alert>}
         {!isTarget && !mine && (
           <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
@@ -50,9 +50,9 @@ export function RsvpPanel({ event, userId, canManage, isTarget }: { event: Event
         )}
         <fieldset disabled={closed} className={css({ display: 'flex', gap: 'sm' })}>
           <legend className={css({ srOnly: true })}>出欠</legend>
-          {(lateJoin ? (['going'] as const) : RSVP_STATUSES).map((status: RsvpStatus) => (
+          {RSVP_STATUSES.map((status: RsvpStatus) => (
             <label key={status} className={cx(optionStyle)}>
-              <input type="radio" name="status" value={status} defaultChecked={lateJoin || mine?.status === status} required className={css({ srOnly: true })} />
+              <input type="radio" name="status" value={status} defaultChecked={mine?.status === status} required className={css({ srOnly: true })} />
               {RSVP_STATUS_LABELS[status]}
             </label>
           ))}
