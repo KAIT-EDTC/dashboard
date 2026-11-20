@@ -29,7 +29,11 @@ const optionStyle = css({
 export function RsvpPanel({ event, userId, canManage, isTarget }: { event: EventDetail; userId: string; canManage: boolean; isTarget: boolean }) {
   const fetcher = useFetcher<FormErrors | { ok: true }>()
   const mine = event.participants.find((p) => p.userId === userId)
-  const closed = !!event.rsvpDeadline && nowInJst() > event.rsvpDeadline && !canManage
+  const now = nowInJst()
+  const pastDeadline = !!event.rsvpDeadline && now > event.rsvpDeadline && !canManage
+  // 回答し忘れたまま始まったイベントは、後から報告書を書けるように期限後でも回答できる
+  const lateAnswer = pastDeadline && !mine && event.startsAt <= now
+  const closed = pastDeadline && !lateAnswer
   const error = fetcher.data && 'error' in fetcher.data ? fetcher.data.error : undefined
 
   return (
@@ -37,6 +41,7 @@ export function RsvpPanel({ event, userId, canManage, isTarget }: { event: Event
       <fetcher.Form method="post" className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
         <input type="hidden" name="intent" value="rsvp" />
         {closed && <Alert tone="warning">回答期限を過ぎています。変更したい場合は主催者に連絡してください。</Alert>}
+        {lateAnswer && <Alert tone="warning">回答期限を過ぎていますが、未回答のため回答できます。回答は一度だけで、後から変更したい場合は主催者に連絡してください。</Alert>}
         {error && <Alert>{error}</Alert>}
         {!isTarget && !mine && (
           <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>
