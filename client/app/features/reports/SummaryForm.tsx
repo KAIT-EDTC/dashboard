@@ -1,4 +1,4 @@
-import { countChars, HOSTING_LABELS, HOSTINGS, SUMMARY_FIELD_LABELS, SUMMARY_LIMITS, summarySubmitSchema, type Division, type ReportStatus } from '@edtc/shared'
+import { HOSTING_LABELS, HOSTINGS, SUMMARY_FIELD_LABELS, SUMMARY_LIMITS, summarySubmitSchema, type Division, type ReportStatus } from '@edtc/shared'
 import { useState, type ReactNode } from 'react'
 import { useFetcher } from 'react-router'
 import { css } from 'styled-system/css'
@@ -50,19 +50,6 @@ function withMembers(content: SummaryContent, members: SummaryMember[]): Summary
   }
 }
 
-/** 自己分析の文字数。範囲外なら赤字の文字数の隣に注意を出す */
-function AnalysisCount({ value }: { value: string }) {
-  const count = countChars(value)
-  const { min, max } = SUMMARY_LIMITS.analysis
-  const warning = count > max ? '文字が多すぎます！' : count > 0 && count < min ? '文字が足りません！' : null
-  return (
-    <span className={css({ display: 'inline-flex', alignItems: 'center', gap: 'sm' })}>
-      {warning && <span className={css({ fontSize: 'xs', fontWeight: '600', color: 'danger.fg' })}>{warning}</span>}
-      <CharCount value={value} min={min} max={max} />
-    </span>
-  )
-}
-
 /** 参加者1人分の自己分析。評価と提出状況は本人の活動報告書から */
 function AnalysisInput({
   member,
@@ -108,7 +95,7 @@ function AnalysisInput({
               </Button>
             )}
             <span className={css({ ml: 'auto' })}>
-              <AnalysisCount value={value} />
+              <CharCount value={value} min={SUMMARY_LIMITS.analysis.min} max={SUMMARY_LIMITS.analysis.max} />
             </span>
           </span>
         }
