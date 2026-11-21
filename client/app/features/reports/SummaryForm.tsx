@@ -1,4 +1,4 @@
-import { HOSTING_LABELS, HOSTINGS, SUMMARY_FIELD_LABELS, SUMMARY_LIMITS, summarySubmitSchema, type Division, type ReportStatus } from '@edtc/shared'
+import { countChars, HOSTING_LABELS, HOSTINGS, SUMMARY_FIELD_LABELS, SUMMARY_LIMITS, summarySubmitSchema, type Division, type ReportStatus } from '@edtc/shared'
 import { useState, type ReactNode } from 'react'
 import { useFetcher } from 'react-router'
 import { css } from 'styled-system/css'
@@ -50,6 +50,19 @@ function withMembers(content: SummaryContent, members: SummaryMember[]): Summary
   }
 }
 
+/** 自己分析の文字数。範囲外なら赤字の文字数の隣に注意を出す */
+function AnalysisCount({ value }: { value: string }) {
+  const count = countChars(value)
+  const { min, max } = SUMMARY_LIMITS.analysis
+  const warning = count > max ? '文字が多すぎます！' : count > 0 && count < min ? '文字が足りません！' : null
+  return (
+    <span className={css({ display: 'inline-flex', alignItems: 'center', gap: 'sm' })}>
+      {warning && <span className={css({ fontSize: 'xs', fontWeight: '600', color: 'danger.fg' })}>{warning}</span>}
+      <CharCount value={value} min={min} max={max} />
+    </span>
+  )
+}
+
 /** 参加者1人分の自己分析。評価と提出状況は本人の活動報告書から */
 function AnalysisInput({
   member,
@@ -76,11 +89,16 @@ function AnalysisInput({
           <RatingMeter value={rating} />
         </span>
       </div>
+      <p className={css({ fontSize: 'sm', fontWeight: '600', color: 'fg.muted' })}>{fullName(member.user)}さんの自己分析</p>
+      <p className={css({ fontSize: 'xs', color: 'fg.subtle' })}>
+        {SUMMARY_LIMITS.analysis.min}~{SUMMARY_LIMITS.analysis.max}文字以内に要約してください
+      </p>
       <TextareaField
         label={<span className={css({ srOnly: true })}>{fullName(member.user)}の自己分析</span>}
         value={value}
         onChange={(e) => onChange(e.currentTarget.value)}
         rows={3}
+        placeholder="準備段階でなにを行ったか・計画とどう違ったか・反省点"
         error={error}
         hint={
           <span className={css({ display: 'flex', alignItems: 'center', gap: 'sm' })}>
@@ -90,7 +108,7 @@ function AnalysisInput({
               </Button>
             )}
             <span className={css({ ml: 'auto' })}>
-              <CharCount value={value} max={SUMMARY_LIMITS.analysis.max} />
+              <AnalysisCount value={value} />
             </span>
           </span>
         }
@@ -165,7 +183,7 @@ export function SummaryForm({ context, initial: rawInitial, members, photos, rep
                 errors={fieldErrors}
                 onChange={(next) => setContent((prev) => ({ ...prev, ...next }))}
               />
-              {field('content', { rows: 3, required: true, placeholder: `1行に1つ（${SUMMARY_LIMITS.content.lines}行まで）`, max: SUMMARY_LIMITS.content.max })}
+              {field('content', { rows: 3, required: true, placeholder: `計画していた活動内容（担当する作業・進行など）。1行に1つ（${SUMMARY_LIMITS.content.lines}行まで）`, max: SUMMARY_LIMITS.content.max })}
               <fieldset>
                 <legend className={css({ fontSize: 'sm', fontWeight: '600', color: 'fg.muted', mb: '6px' })}>
                   {SUMMARY_FIELD_LABELS.hosting}
@@ -222,8 +240,8 @@ export function SummaryForm({ context, initial: rawInitial, members, photos, rep
 
           <Card title="評価">
             <div className={css({ display: 'flex', flexDirection: 'column', gap: 'lg' })}>
-              {field('overview', { rows: 5, required: true, max: SUMMARY_LIMITS.overview.max })}
-              {field('impressions', { rows: 10, required: true, max: SUMMARY_LIMITS.impressions.max })}
+              {field('overview', { rows: 5, required: true, placeholder: '自己分析を自分の言葉でまとめてください', max: SUMMARY_LIMITS.overview.max })}
+              {field('impressions', { rows: 10, required: true, placeholder: '全体を通した、良かった点・反省点・次回に向けて改善したいこと', max: SUMMARY_LIMITS.impressions.max })}
               <RatingInput label={SUMMARY_FIELD_LABELS.rating} value={content.rating} onChange={(rating) => set('rating', rating)} error={fieldErrors.rating} />
               {field('notes', { rows: 3, placeholder: '任意', max: SUMMARY_LIMITS.notes.max })}
             </div>

@@ -64,14 +64,14 @@ export function ReportForm({ context, initial, status, divisions, canDelete, rej
     value: (field) => content[field],
     update: (field, value) => set(field, value),
   })
-  const field = (name: ActivityField, props: { rows: number; placeholder: string; required?: boolean; max: number }) =>
+  const field = (name: ActivityField, props: { rows: number; placeholder: string; required?: boolean; min?: number; max: number }) =>
     textarea(name, {
       label: REPORT_FIELD_LABELS[name],
       rows: props.rows,
       placeholder: props.placeholder,
       required: props.required,
       error: fieldErrors[name],
-      hint: <CharCount value={content[name]} max={props.max} />,
+      hint: <CharCount value={content[name]} min={props.min} max={props.max} />,
     })
 
   return (
@@ -95,7 +95,7 @@ export function ReportForm({ context, initial, status, divisions, canDelete, rej
               onChange={(next) => setContent((prev) => ({ ...prev, ...next }))}
             />
             {field('content', { rows: 5, required: true, placeholder: '計画していた活動内容（担当する作業・進行など）', max: REPORT_LIMITS.content.max })}
-            {field('reflection', { rows: 10, required: true, placeholder: '準備段階でなにを行ったか・計画とどう違ったか・反省点・次回に向けて', max: REPORT_LIMITS.reflection.max })}
+            {field('reflection', { rows: 10, required: true, placeholder: '準備段階でなにを行ったか・計画とどう違ったか・反省点・次回に向けて', min: REPORT_LIMITS.reflection.min, max: REPORT_LIMITS.reflection.max })}
             <RatingInput label={REPORT_FIELD_LABELS.rating} value={content.rating} onChange={(rating) => set('rating', rating)} error={fieldErrors.rating} />
             {field('notes', { rows: 3, placeholder: '次回の担当者への引き継ぎ、忘れ物、備品の不具合など（任意）', max: REPORT_LIMITS.notes.max })}
           </div>
