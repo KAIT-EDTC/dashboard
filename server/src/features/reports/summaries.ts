@@ -1,7 +1,7 @@
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { EDITABLE_REPORT_STATUSES, isLeader, SUMMARY_LIMITS, nowInJst, summaryCreateSchema, summaryDraftSchema, summarySubmitSchema, type SummaryDraftInput } from '@edtc/shared'
+import { countChars, EDITABLE_REPORT_STATUSES, isLeader, SUMMARY_LIMITS, nowInJst, summaryCreateSchema, summaryDraftSchema, summarySubmitSchema, type SummaryDraftInput } from '@edtc/shared'
 import { createDb, memberSummaryColumns, type Db } from '../../db'
 import { activityReports, events, reportPhotos, userDivisions, users } from '../../db/schema'
 import type { AppEnv, Session } from '../../env'
@@ -217,7 +217,8 @@ export const summariesRoute = new Hono<AppEnv>()
     const { submitted, total } = submissionProgress(members, report.authorId)
     if (submitted < total) throw badRequest(`参加者全員の活動報告書が提出されてから提出できます（提出済み ${submitted} / ${total}人）`)
     const sorted = analysesFor(members, analyses)
-    if (sorted.some((a) => a.text.length === 0)) throw badRequest('参加者全員の自己分析を入力してください')
+    if (sorted.some((a) => countChars(a.text) < SUMMARY_LIMITS.analysis.min))
+      throw badRequest(`参加者全員の自己分析を${SUMMARY_LIMITS.analysis.min}文字以上で入力してください`)
 
     await submitReport(c, db, report, { ...input, analyses: sorted })
     return c.json({ ok: true })

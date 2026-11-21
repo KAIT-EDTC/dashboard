@@ -82,7 +82,7 @@ export const SUMMARY_LIMITS = {
   /** 活動内容は様式の「・」の行の数まで */
   content: { max: 300, lines: 3 },
   /** 1人分の自己分析 */
-  analysis: { max: 200 },
+  analysis: { min: 100, max: 300 },
   overview: { max: 314 },
   impressions: { max: 611 },
   notes: { max: 300 },
