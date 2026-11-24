@@ -109,7 +109,7 @@ function MyItemRow({ item }: { item: EventItem }) {
       <label htmlFor={`prepared-${item.id}`} className={css({ cursor: 'pointer', minW: 0 })}>
         <ItemText item={item} muted={prepared} />
       </label>
-      <Button size="sm" variant="secondary" loading={releasing} disabled={busy} onClick={() => submit({ assigneeId: '' })} aria-label={`${item.name}の担当をやめる`}>
+      <Button size="sm" variant="danger" loading={releasing} disabled={busy} onClick={() => submit({ assigneeId: '' })} aria-label={`${item.name}の担当をやめる`}>
         担当をやめる
       </Button>
       <FetchError error={fetcher.data?.error} />
