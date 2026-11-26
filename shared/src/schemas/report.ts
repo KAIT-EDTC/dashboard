@@ -40,7 +40,9 @@ export type ReportDraftInput = z.input<typeof reportDraftSchema>
 export const reportSubmitSchema = reportDraftSchema.extend({
   division: z.enum(DIVISIONS, `${REPORT_FIELD_LABELS.division}を選んでください`),
   content: reportDraftSchema.shape.content.refine((v) => v.length > 0, `${REPORT_FIELD_LABELS.content}を入力してください`),
-  reflection: reportDraftSchema.shape.reflection.refine((v) => v.length > 0, `${REPORT_FIELD_LABELS.reflection}を入力してください`),
+  reflection: reportDraftSchema.shape.reflection
+    .refine((v) => v.length > 0, `${REPORT_FIELD_LABELS.reflection}を入力してください`)
+    .refine((v) => v.length === 0 || countChars(v) >= REPORT_LIMITS.reflection.min, `${REPORT_FIELD_LABELS.reflection}は${REPORT_LIMITS.reflection.min}文字以上にしてください`),
   rating: rating.nullable().refine((v) => v !== null, `${REPORT_FIELD_LABELS.rating}を選んでください`),
 })
 
@@ -54,6 +56,7 @@ const analysis = z.object({
   userId: z.string().min(1),
   text: maxText(SUMMARY_FIELD_LABELS.analyses, SUMMARY_LIMITS.analysis.max),
 })
+const analysisMinMessage = `自己分析は${SUMMARY_LIMITS.analysis.min}文字以上にしてください`
 
 /** 下書き保存。上限だけ確認し、未入力でもよい */
 export const summaryDraftSchema = z.object({
@@ -79,6 +82,7 @@ export const summarySubmitSchema = summaryDraftSchema.extend({
   hosting: z.enum(HOSTINGS, '主催か参加かを選んでください'),
   overview: summaryDraftSchema.shape.overview.refine((v) => v.length > 0, '総評を入力してください'),
   impressions: summaryDraftSchema.shape.impressions.refine((v) => v.length > 0, '所感を入力してください'),
+  analyses: z.array(analysis.extend({ text: analysis.shape.text.refine((v) => v.length === 0 || countChars(v) >= SUMMARY_LIMITS.analysis.min, analysisMinMessage) })).max(200),
   rating: rating.nullable().refine((v) => v !== null, '総合評価を選んでください'),
 })
 

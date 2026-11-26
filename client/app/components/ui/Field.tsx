@@ -46,9 +46,10 @@ export function Field({ label, error, hint, required, className, children }: Fie
         ...((error || hint) && { 'aria-describedby': messageId }),
       })}
       {(error || hint) && (
-        <p id={messageId} className={css({ fontSize: 'xs', color: error ? 'danger.fg' : 'fg.subtle' })}>
-          {error ?? hint}
-        </p>
+        <div id={messageId} className={css({ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: 'xs', color: 'fg.subtle' })}>
+          {error && <p className={css({ color: 'danger.fg' })}>{error}</p>}
+          {hint}
+        </div>
       )}
     </div>
   )
