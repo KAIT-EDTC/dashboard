@@ -40,8 +40,8 @@ export function RsvpPanel({ event, userId, canManage, isTarget }: { event: Event
     <Card title="出欠">
       <fetcher.Form method="post" className={css({ display: 'flex', flexDirection: 'column', gap: 'md' })}>
         <input type="hidden" name="intent" value="rsvp" />
-        {closed && <Alert tone="warning">回答期限を過ぎています。変更したい場合は主催者に連絡してください。</Alert>}
-        {lateAnswer && <Alert tone="warning">回答期限を過ぎていますが、未回答のため回答できます。回答は一度だけで、後から変更したい場合は主催者に連絡してください。</Alert>}
+        {closed && <Alert tone="warning">回答期限を過ぎています。変更したい場合は主催者に回答期限を延長するように依頼してください。</Alert>}
+        {lateAnswer && <Alert tone="warning">回答期限を過ぎていますが、未回答のため回答できます。回答は一度だけで、後から変更したい場合は主催者に回答期限を延長するように依頼してください。</Alert>}
         {error && <Alert>{error}</Alert>}
         {!isTarget && !mine && (
           <p className={css({ fontSize: 'sm', color: 'fg.muted' })}>

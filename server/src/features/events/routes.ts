@@ -481,7 +481,7 @@ export const eventsRoute = new Hono<AppEnv>()
         .where(and(eq(eventParticipants.eventId, event.id), eq(eventParticipants.userId, session.userId)))
         .get()
       const lateAnswer = !answered && event.startsAt <= nowJst
-      if (!lateAnswer) throw badRequest('出欠の回答期限を過ぎています。主催者に連絡してください。')
+      if (!lateAnswer) throw badRequest('出欠の回答期限を過ぎています。主催者に回答期限を延長するように依頼してください。')
     }
     if (status === 'going' && event.capacity) {
       const others = await db
